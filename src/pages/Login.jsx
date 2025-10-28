@@ -1,0 +1,100 @@
+import Input from "../components/forms/Input";
+import { useState } from "react";
+import LogoAppsline from '../assets/images/appsline_logo_white.png';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../routes/AuthContext';
+
+const Login = () => {
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
+    const { login } = useAuth();
+
+    const apiUrl = import.meta.env.VITE_API_URL;
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        const email = event.target.elements.email.value;
+        const password = event.target.elements.password.value;
+        try {
+            const response = await axios.post(`${apiUrl}/login`, {
+                email: email,
+                password: password
+            });
+            if (response.status == 200) {
+                console.log(response.data.data);
+                localStorage.setItem("user_token", response.data.data.token);
+                localStorage.setItem("user", JSON.stringify(response.data.data.user));
+                navigate('/admin/dashboard');
+            } else {
+                alert('Error en las credenciales');
+            }
+        } catch (error) {
+            console.error('Error fetching user details:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-app-one via-app-two to-app-three">
+            <div className="relative w-full max-w-4xl mx-auto flex flex-col md:flex-row items-stretch justify-center shadow-2xl rounded-3xl overflow-hidden" style={{background: 'white'}}>
+                {/* Nube decorativa */}
+                <div className="absolute inset-0 z-0 pointer-events-none">
+                    <svg viewBox="0 0 900 600" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                        <path d="M0 400 Q200 300 400 400 T900 400 V600 H0Z" fill="url(#cloudGradient)" opacity="0.18"/>
+                        <defs>
+                            <linearGradient id="cloudGradient" x1="0" y1="0" x2="900" y2="600" gradientUnits="userSpaceOnUse">
+                                <stop stopColor="#2B2E83"/>
+                                <stop offset="1" stopColor="#3AC6F6"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                {/* Formulario */}
+                <div className="relative z-10 flex-1 flex flex-col justify-center px-8 py-12 bg-white/90 backdrop-blur-md">
+                    <form className="max-w-md w-full mx-auto" onSubmit={handleSubmit}>
+                        <h2 className="text-3xl font-bold text-app-one mb-2 text-center">Hello!</h2>
+                        <p className="text-center text-gray-500 mb-8">Sign in to your account</p>
+                        <div className="mb-4 relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-app-one">
+                                <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path fill="#2B2E83" d="M12 12c2.7 0 8 1.34 8 4v2H4v-2c0-2.66 5.3-4 8-4zm0-2a4 4 0 100-8 4 4 0 000 8z"/></svg>
+                            </span>
+                            <Input name="email" type="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)} className="pl-10 pr-4 py-3 rounded-lg shadow focus:ring-2 focus:ring-app-two w-full bg-white border border-gray-200" />
+                        </div>
+                        <div className="mb-2 relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-app-one">
+                                <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path fill="#2B2E83" d="M12 17a2 2 0 100-4 2 2 0 000 4zm6-7V7a6 6 0 10-12 0v3a2 2 0 00-2 2v7a2 2 0 002 2h12a2 2 0 002-2v-7a2 2 0 00-2-2zm-8-3a4 4 0 118 0v3H6V7z"/></svg>
+                            </span>
+                            <Input name="password" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="pl-10 pr-4 py-3 rounded-lg shadow focus:ring-2 focus:ring-app-two w-full bg-white border border-gray-200" />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer">
+                                <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path fill="#bbb" d="M12 5c-7 0-9 7-9 7s2 7 9 7 9-7 9-7-2-7-9-7zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between mb-6 text-sm">
+                            <label className="flex items-center gap-2">
+                                <input type="checkbox" className="accent-app-two" />
+                                <span className="text-gray-500">Remember me</span>
+                            </label>
+                            <a href="#" className="text-app-one hover:text-app-two transition">Forgot password?</a>
+                        </div>
+                        <button type="submit" className="w-full py-3 rounded-lg font-bold text-white bg-gradient-to-r from-app-one via-app-two to-app-three shadow-lg hover:from-app-two hover:to-app-one transition text-lg">SIGN IN</button>
+                        <p className="text-center mt-6 text-sm text-gray-500">Don't have an account? <a href="#" className="text-app-two hover:text-app-one font-semibold">Create</a></p>
+                    </form>
+                </div>
+                {/* Mensaje de bienvenida */}
+                <div className="hidden md:flex flex-1 flex-col justify-center items-center bg-gradient-to-br from-app-one via-app-two to-app-three text-white px-10 py-12 relative z-10">
+                    <div className="max-w-md text-center">
+                        <h2 className="text-3xl font-bold mb-4">Welcome Back!</h2>
+                        <p className="text-lg opacity-90 mb-8">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed pharetra magna nisl, at posuere sem dapibus sed.</p>
+                        <img src={LogoAppsline} className="w-40 mx-auto drop-shadow-xl" alt="Appsline" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default Login;

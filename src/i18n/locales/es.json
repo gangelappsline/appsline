@@ -1,0 +1,44 @@
+{
+  "nav": {
+    "home": "Inicio",
+    "about": "Sobre Nosotros",
+    "projects": "Portafolio",
+    "contact": "Contacto",
+    "login": "Iniciar Sesión"
+  },
+  "home": {
+    "heroTitle": "Soluciones Tecnológicas para tu Negocio",
+    "heroSubtitle": "En Appsline, desarrollamos aplicaciones web y móviles modernas que impulsan tu crecimiento.",
+    "services": "Nuestros Servicios",
+    "about": "Sobre Appsline",
+    "aboutText": "Somos una empresa dedicada al desarrollo de software innovador. Con años de experiencia en web y móvil, ayudamos a empresas a digitalizarse y crecer.",
+    "contact": "Contáctanos"
+  },
+  "about": {
+    "title": "Sobre Appsline",
+    "history": "Nuestra Historia",
+    "mission": "Misión",
+    "vision": "Visión",
+    "values": "Valores",
+    "team": "Nuestro Equipo",
+    "services": "Nuestros Servicios",
+    "stats": "Nuestros Logros"
+  },
+  "projects": {
+    "title": "Nuestro Portafolio",
+    "filterAll": "Todos",
+    "filterWeb": "Web",
+    "filterMobile": "Móvil",
+    "filterEcommerce": "E-commerce",
+    "viewProject": "Ver Proyecto"
+  },
+  "footer": {
+    "rights": "© 2024 Appsline. Todos los derechos reservados.",
+    "contact": "Contacto"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "submit": "Enviar"
+  }
+}
