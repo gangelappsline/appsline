@@ -22,7 +22,7 @@ const ProjectTaskForm = () => {
       if (!taskId) return;
       try {
         const token = localStorage.getItem("user_token");
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tasks/${taskId}`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/tasks/${taskId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
@@ -47,8 +47,8 @@ const ProjectTaskForm = () => {
     try {
       const token = localStorage.getItem("user_token");
       const url = taskId
-        ? `${import.meta.env.VITE_API_URL}/api/tasks/${taskId}`
-        : `${import.meta.env.VITE_API_URL}/api/tasks`;
+        ? `${import.meta.env.VITE_API_URL}/tasks/${taskId}`
+        : `${import.meta.env.VITE_API_URL}/tasks`;
       const method = taskId ? "PUT" : "POST";
       // Envía el arreglo de IDs en assignees:
       const res = await fetch(url, {
