@@ -1,14 +1,13 @@
 import { NavLink, useParams } from "react-router-dom";
 import LayoutAdmin from "../../layouts/LayoutAdmin";
 import { useEffect, useState } from "react";
-import axios from 'axios';
 import Input from "../../components/forms/Input";
 import TextArea from "../../components/forms/TextArea";
 import IndeterminateLineBar from "../../components/IndeterminateLineBar";
+import api from "../../services/api";
 
 const Product = () => {
 
-    const apiUrl = import.meta.env.VITE_API_URL;
     const { id } = useParams();
     const [product, setProduct] = useState(null)
     const [isLoading, setIsLoading] = useState(true)
@@ -16,19 +15,18 @@ const Product = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await axios.get(apiUrl + "/products/" + id);
-                console.log(response.data)
-                setProduct(response.data)
-                console.log(product)
+                const response = await api.get("/products/" + id);
+                const payload = response.data;
+                setProduct(payload?.data ?? payload ?? null);
             } catch (error) {
-                console.error('Error fetching Pokémon details:', error);
+                console.error('Error fetching product details:', error);
             } finally {
                 setIsLoading(false)
             }
         }
 
         fetchData();
-    }, [])
+    }, [id])
 
     if (isLoading) {
         return (
@@ -77,7 +75,7 @@ const Product = () => {
                                 </div>
                                 <div className="gap-2 flex flex-col">
                                     <label htmlFor="price" className="font-semibold">Rate</label>
-                                    <Input name="rate" type="number" value={product.rating.rate} onChange={(e) => console.log(e.target.value)} />
+                                    <Input name="rate" type="number" value={product.rating?.rate ?? ''} onChange={(e) => console.log(e.target.value)} />
                                 </div>
                                 <div className="col-span-2 flex flex-col gap-2">
                                     <label htmlFor="category" className="font-semibold">Description</label>

@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import LayoutAdmin from "../../layouts/LayoutAdmin";
-import axios from 'axios';
 import { NavLink } from "react-router-dom";
+import api from "../../services/api";
 
 const Products = () => {
-
-    const apiUrl = import.meta.env.VITE_API_URL;
 
     const [products, setProducts] = useState([])
     const [isLoading, setIsLoading] = useState(true)
@@ -13,13 +11,14 @@ const Products = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await axios.get(apiUrl + "/products");
-                console.table(response)
-                setProducts(response.data)
+                const response = await api.get("/products");
+                const payload = response.data;
+                setProducts(Array.isArray(payload) ? payload : payload?.data || []);
             } catch (error) {
-                console.error('Error fetching Pokémon details:', error);
+                console.error('Error fetching products:', error);
+                setProducts([]);
             } finally {
-                //setLoading(false);
+                setIsLoading(false);
             }
         }
 

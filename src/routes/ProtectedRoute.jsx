@@ -1,16 +1,19 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "./AuthContext";
 
-// Este componente verifica si el usuario está autenticado
+/**
+ * Protege las rutas del panel administrativo.
+ * Si no hay token de sesión, redirige al login recordando la ruta
+ * a la que se intentaba entrar para volver ahí después de autenticarse.
+ */
 function ProtectedRoute({ children }) {
-  const token = localStorage.getItem('user_token');
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
 
-  if (!token) {
-    // Si no hay token, redirigir al login
-    return <Navigate to="/login" />;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Si hay token, renderizar el componente protegido
   return children;
 }
 

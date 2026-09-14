@@ -6,6 +6,7 @@ import './i18n'; // Importa la configuración de i18n
 
 import {
   BrowserRouter,
+  Navigate,
   Route,
   Routes,
 } from "react-router-dom";
@@ -26,10 +27,10 @@ import ProjectLead from './pages/ProjectLead';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          {/* Rutas públicas */}
           <Route path="/">
             <Route index element={<Home />} />
             <Route path="about-us" element={<AboutUs />} />
@@ -39,11 +40,11 @@ createRoot(document.getElementById('root')).render(
           <Route path="/login" element={<Login />} />
           <Route path="/solicitar-proyecto" element={<ProjectLead />} />
 
-          {/* Rutas protegidas: */}
+          {/* Panel administrativo (requiere sesión) */}
+          <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
           <Route
             path="/admin/dashboard"
             element={
-
               <ProtectedRoute>
                 <Dashboard />
               </ProtectedRoute>
@@ -52,7 +53,6 @@ createRoot(document.getElementById('root')).render(
           <Route
             path="/admin/users"
             element={
-
               <ProtectedRoute>
                 <Users />
               </ProtectedRoute>
@@ -61,7 +61,6 @@ createRoot(document.getElementById('root')).render(
           <Route
             path="/admin/products"
             element={
-
               <ProtectedRoute>
                 <Products />
               </ProtectedRoute>
@@ -70,7 +69,6 @@ createRoot(document.getElementById('root')).render(
           <Route
             path="/admin/products/:id"
             element={
-
               <ProtectedRoute>
                 <Product />
               </ProtectedRoute>
@@ -79,7 +77,6 @@ createRoot(document.getElementById('root')).render(
           <Route
             path="/admin/projects"
             element={
-
               <ProtectedRoute>
                 <Projects />
               </ProtectedRoute>
@@ -88,7 +85,6 @@ createRoot(document.getElementById('root')).render(
           <Route
             path="/admin/projects/:id"
             element={
-
               <ProtectedRoute>
                 <Project />
               </ProtectedRoute>
@@ -97,6 +93,5 @@ createRoot(document.getElementById('root')).render(
         </Routes>
       </AuthProvider>
     </BrowserRouter>
-
   </StrictMode>,
 )
