@@ -13,6 +13,7 @@ import {
 import Home from './pages/Home.jsx';
 import NoPage from './pages/NoPage.jsx';
 import AboutUs from './pages/AboutUs.jsx';
+import WhatWeDo from './pages/WhatWeDo.jsx';
 import Login from './pages/Login.jsx';
 import Portfolio from './pages/Portfolio.jsx';
 import Dashboard from './pages/admin/Dashboard.jsx';
@@ -34,6 +35,7 @@ createRoot(document.getElementById('root')).render(
           <Route path="/">
             <Route index element={<Home />} />
             <Route path="about-us" element={<AboutUs />} />
+            <Route path="what-we-do" element={<WhatWeDo />} />
             <Route path="portfolio" element={<Portfolio />} />
             <Route path="*" element={<NoPage />} />
           </Route>

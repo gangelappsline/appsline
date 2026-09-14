@@ -1,187 +1,20 @@
-import { useEffect } from "react";
+import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { FiArrowUpRight, FiHeart, FiTarget, FiUsers, FiZap } from "react-icons/fi";
 import Layout from "../layouts/Layout";
-import AOS from 'aos';
-import 'aos/dist/aos.css';
 
 const AboutUs = () => {
-  useEffect(() => {
-    AOS.init({ once: true, duration: 800 });
-  }, []);
-
-  return (
-    <Layout title="Sobre Nosotros">
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-app-one via-app-two to-app-three text-white min-h-[60vh] flex items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-black opacity-20"></div>
-        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto" data-aos="fade-up">
-          <h1 className="text-4xl md:text-6xl font-bold mb-4">
-            Sobre Appsline
-          </h1>
-          <p className="text-lg md:text-2xl mb-8 opacity-90">
-            Especialistas en desarrollo web y móvil, transformando ideas en soluciones tecnológicas innovadoras.
-          </p>
-        </div>
-      </section>
-
-      {/* Nuestra Historia */}
-      <section className="py-16 bg-white" data-aos="fade-up">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="grid md:grid-cols-2 gap-8 items-center">
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-app-one">Nuestra Historia</h2>
-              <p className="text-gray-600 mb-4">
-                Fundada en 2020, Appsline nació de la pasión por la tecnología y el deseo de ayudar a empresas a digitalizarse. Comenzamos como un pequeño equipo de desarrolladores visionarios, y hoy somos líderes en el desarrollo de aplicaciones web y móviles personalizadas.
-              </p>
-              <p className="text-gray-600">
-                Desde nuestros inicios, hemos trabajado con startups y empresas establecidas, entregando soluciones que no solo cumplen con las expectativas, sino que las superan. Nuestra experiencia en tecnologías modernas nos permite crear productos escalables y de alta calidad.
-              </p>
-            </div>
-            <div className="bg-gray-100 p-8 rounded-lg">
-              <img
-                src="https://via.placeholder.com/500x300"
-                alt="Equipo de Appsline"
-                className="w-full rounded-lg shadow-lg"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Misión, Visión y Valores */}
-      <section className="py-16 bg-gray-50" data-aos="fade-up">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-app-one">Misión, Visión y Valores</h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition" data-aos="zoom-in">
-              <h3 className="text-xl font-bold mb-4 text-app-one">Misión</h3>
-              <p className="text-gray-600">
-                Proporcionar soluciones tecnológicas innovadoras y personalizadas que impulsen el crecimiento y la eficiencia de nuestros clientes, utilizando las mejores prácticas en desarrollo web y móvil.
-              </p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition" data-aos="zoom-in">
-              <h3 className="text-xl font-bold mb-4 text-app-one">Visión</h3>
-              <p className="text-gray-600">
-                Ser la empresa líder en desarrollo de software en América Latina, reconocida por nuestra calidad, innovación y compromiso con el éxito de nuestros clientes.
-              </p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition" data-aos="zoom-in">
-              <h3 className="text-xl font-bold mb-4 text-app-one">Valores</h3>
-              <ul className="text-gray-600 space-y-2">
-                <li>• Innovación constante</li>
-                <li>• Calidad y excelencia</li>
-                <li>• Trabajo en equipo</li>
-                <li>• Transparencia y honestidad</li>
-                <li>• Compromiso con el cliente</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Nuestro Equipo */}
-      <section className="py-16 bg-white" data-aos="fade-up">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-app-one">Nuestro Equipo</h2>
-            <p className="text-gray-600 mt-4">
-              Un equipo multidisciplinario de expertos apasionados por la tecnología.
-            </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center" data-aos="fade-up">
-              <img
-                src="https://via.placeholder.com/200x200"
-                alt="Desarrollador"
-                className="w-32 h-32 rounded-full mx-auto mb-4 shadow-lg"
-              />
-              <h3 className="text-xl font-bold text-app-one">Antonio Bolivar</h3>
-              <p className="text-gray-600">Director de Negocios</p>
-            </div>
-            <div className="text-center" data-aos="fade-up">
-              <img
-                src="https://via.placeholder.com/200x200"
-                alt="Diseñadora"
-                className="w-32 h-32 rounded-full mx-auto mb-4 shadow-lg"
-              />
-              <h3 className="text-xl font-bold text-app-one">Ángel García</h3>
-              <p className="text-gray-600">Director de Tecnología</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Servicios Destacados */}
-      <section className="py-16 bg-gray-50" data-aos="fade-up">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-app-one">Nuestros Servicios</h2>
-            <p className="text-gray-600 mt-4">
-              Ofrecemos soluciones completas en desarrollo web y móvil.
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition" data-aos="fade-right">
-              <h3 className="text-xl font-bold mb-4 text-app-one">Desarrollo Web</h3>
-              <p className="text-gray-600">
-                Creamos sitios web responsivos, e-commerce y aplicaciones web utilizando tecnologías modernas como React, Node.js y más.
-              </p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition" data-aos="fade-left">
-              <h3 className="text-xl font-bold mb-4 text-app-one">Desarrollo Móvil</h3>
-              <p className="text-gray-600">
-                Desarrollamos apps nativas para iOS y Android, así como híbridas con React Native, enfocadas en la experiencia del usuario.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Estadísticas */}
-      <section className="py-16 bg-app-one text-white" data-aos="fade-up">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold">Nuestros Logros</h2>
-          </div>
-          <div className="grid md:grid-cols-4 gap-8 text-center">
-            <div data-aos="zoom-in">
-              <h3 className="text-4xl font-bold mb-2">50+</h3>
-              <p className="text-gray-200">Proyectos Completados</p>
-            </div>
-            <div data-aos="zoom-in">
-              <h3 className="text-4xl font-bold mb-2">10+</h3>
-              <p className="text-gray-200">Años de Experiencia</p>
-            </div>
-            <div data-aos="zoom-in">
-              <h3 className="text-4xl font-bold mb-2">50+</h3>
-              <p className="text-gray-200">Clientes Satisfechos</p>
-            </div>
-            <div data-aos="zoom-in">
-              <h3 className="text-4xl font-bold mb-2">24/7</h3>
-              <p className="text-gray-200">Soporte Técnico</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Final */}
-      <section className="py-16 bg-app-two text-white text-center" data-aos="fade-up">
-        <div className="max-w-4xl mx-auto px-4">
-          <h2 className="text-3xl font-bold mb-4">¿Listo para trabajar con nosotros?</h2>
-          <p className="text-lg mb-8 opacity-90">
-            Contáctanos y descubre cómo podemos ayudar a tu empresa a crecer.
-          </p>
-          <a
-            href="#contact"
-            className="bg-app-three text-app-one px-8 py-3 rounded-lg font-semibold hover:bg-white transition"
-          >
-            Contactar Ahora
-          </a>
-        </div>
-      </section>
-    </Layout>
-  );
+  const { t } = useTranslation();
+  const values = [
+    { icon: FiZap, key: "innovation" }, { icon: FiHeart, key: "commitment" },
+    { icon: FiUsers, key: "team" }, { icon: FiTarget, key: "impact" },
+  ];
+  return <Layout title={t("about.pageTitle")}><div className="bg-[#080a0f] text-white">
+    <section className="relative overflow-hidden border-b border-white/10 px-5 py-24 lg:py-36"><div className="absolute right-[-10%] top-[-40%] h-[600px] w-[600px] rounded-full bg-[#ff2952]/10 blur-3xl"/><div className="relative mx-auto max-w-7xl"><p className="section-kicker">{t("about.eyebrow")}</p><h1 className="max-w-5xl text-5xl font-semibold leading-[1.05] tracking-[-.05em] sm:text-7xl">{t("about.heroTitle")} <span className="text-[#ff5372]">{t("about.heroAccent")}</span></h1><p className="mt-8 max-w-2xl text-xl leading-8 text-slate-400">{t("about.heroText")}</p></div></section>
+    <section className="mx-auto grid max-w-7xl gap-14 px-5 py-24 lg:grid-cols-2 lg:px-8 lg:py-32"><div><p className="section-kicker">{t("about.storyEyebrow")}</p><h2 className="section-title">{t("about.storyTitle")}</h2></div><div className="space-y-6 text-lg leading-8 text-slate-400"><p>{t("about.storyOne")}</p><p>{t("about.storyTwo")}</p></div></section>
+    <section className="border-y border-white/10 bg-[#0d1017]"><div className="mx-auto grid max-w-7xl gap-5 px-5 py-24 md:grid-cols-2 lg:px-8">{["mission", "vision"].map((key) => <article key={key} className="rounded-3xl border border-white/10 bg-white/[.03] p-8 sm:p-10"><span className="text-sm font-bold uppercase tracking-[.2em] text-[#ff5a77]">{t(`about.${key}.label`)}</span><h2 className="mt-5 text-3xl font-semibold">{t(`about.${key}.title`)}</h2><p className="mt-5 text-lg leading-8 text-slate-400">{t(`about.${key}.text`)}</p></article>)}</div></section>
+    <section className="mx-auto max-w-7xl px-5 py-24 lg:px-8 lg:py-32"><p className="section-kicker">{t("about.valuesEyebrow")}</p><h2 className="section-title">{t("about.valuesTitle")}</h2><div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{values.map(({icon: Icon,key}) => <article key={key} className="rounded-3xl border border-white/10 p-7"><Icon className="text-2xl text-[#ff5a77]"/><h3 className="mt-8 text-xl font-semibold">{t(`about.values.${key}.title`)}</h3><p className="mt-3 leading-7 text-slate-400">{t(`about.values.${key}.text`)}</p></article>)}</div></section>
+    <section className="mx-auto max-w-7xl px-5 pb-24 lg:px-8 lg:pb-32"><div className="flex flex-col items-start justify-between gap-8 rounded-[2rem] border border-[#ff365d]/30 bg-[#ff365d]/10 p-8 sm:p-12 lg:flex-row lg:items-center"><div><h2 className="text-3xl font-semibold sm:text-4xl">{t("about.ctaTitle")}</h2><p className="mt-3 text-slate-400">{t("about.ctaText")}</p></div><Link to="/solicitar-proyecto" className="flex shrink-0 items-center gap-2 rounded-full bg-[#ff365d] px-7 py-4 font-semibold">{t("nav.startProject")} <FiArrowUpRight/></Link></div></section>
+  </div></Layout>;
 };
-
 export default AboutUs;
