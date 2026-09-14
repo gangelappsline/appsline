@@ -1,44 +1,34 @@
 {
-  "nav": {
-    "home": "Inicio",
-    "about": "Sobre Nosotros",
-    "projects": "Portafolio",
-    "contact": "Contacto",
-    "login": "Iniciar Sesión"
-  },
+  "nav": {"home":"Inicio","about":"Quiénes somos","whatWeDo":"Qué hacemos","projects":"Proyectos","contact":"Contacto","login":"Iniciar sesión","startProject":"Iniciar un proyecto","menu":"Abrir menú"},
   "home": {
-    "heroTitle": "Soluciones Tecnológicas para tu Negocio",
-    "heroSubtitle": "En Appsline, desarrollamos aplicaciones web y móviles modernas que impulsan tu crecimiento.",
-    "services": "Nuestros Servicios",
-    "about": "Sobre Appsline",
-    "aboutText": "Somos una empresa dedicada al desarrollo de software innovador. Con años de experiencia en web y móvil, ayudamos a empresas a digitalizarse y crecer.",
-    "contact": "Contáctanos"
+    "eyebrow":"Soluciones digitales que avanzan",
+    "heroTitleStart":"Creamos productos digitales que hacen crecer",
+    "heroTitleAccent":"tu negocio.",
+    "heroSubtitle":"Diseñamos y desarrollamos experiencias web y móviles de alto impacto. Tecnología, estrategia y diseño trabajando para convertir ideas ambiciosas en productos reales.",
+    "primaryCta":"Cuéntanos tu idea","secondaryCta":"Explorar servicios","years":"años creando","projects":"proyectos lanzados",
+    "servicesEyebrow":"Lo que hacemos","servicesTitle":"De la idea al producto, sin atajos.","servicesIntro":"Nos integramos a tu equipo para diseñar, construir y evolucionar soluciones digitales sólidas, rápidas y preparadas para crecer.",
+    "servicesList":{"web":{"title":"Desarrollo web","text":"Plataformas, e-commerce y aplicaciones web rápidas, escalables y centradas en resultados."},"mobile":{"title":"Apps móviles","text":"Experiencias nativas y multiplataforma fluidas que tus usuarios querrán usar cada día."},"product":{"title":"Producto y UX/UI","text":"Estrategia, investigación y diseño para transformar problemas complejos en productos simples."}},
+    "learnMore":"Saber más","processEyebrow":"Nuestra forma de trabajar","processTitle":"Claridad en cada etapa.","processIntro":"Un proceso colaborativo, transparente y enfocado en entregar valor desde el primer día.",
+    "steps":{"strategy":{"title":"Entender y alinear","text":"Definimos objetivos, usuarios y oportunidades."},"design":{"title":"Diseñar la experiencia","text":"Convertimos la estrategia en flujos y prototipos."},"build":{"title":"Construir y validar","text":"Desarrollamos en iteraciones cortas y medibles."},"scale":{"title":"Lanzar y evolucionar","text":"Medimos, aprendemos y hacemos crecer el producto."}},
+    "ctaTitle":"Tu próxima gran idea merece hacerse realidad.","ctaText":"Hablemos de tus objetivos y construyamos juntos el camino para alcanzarlos."
   },
   "about": {
-    "title": "Sobre Appsline",
-    "history": "Nuestra Historia",
-    "mission": "Misión",
-    "vision": "Visión",
-    "values": "Valores",
-    "team": "Nuestro Equipo",
-    "services": "Nuestros Servicios",
-    "stats": "Nuestros Logros"
+    "pageTitle":"Quiénes somos","eyebrow":"Quiénes somos","heroTitle":"Personas curiosas creando tecnología con","heroAccent":"propósito.","heroText":"Somos un estudio de producto digital. Unimos negocio, diseño y tecnología para resolver desafíos reales y generar impacto duradero.",
+    "storyEyebrow":"Nuestra historia","storyTitle":"Nacimos para hacer las cosas de otra manera.","storyOne":"Appsline nació de una convicción sencilla: la tecnología funciona mejor cuando entiende a las personas. Desde nuestros inicios acompañamos a empresas y emprendedores a convertir sus retos en oportunidades digitales.","storyTwo":"Hoy somos un equipo multidisciplinario que combina pensamiento estratégico, diseño y desarrollo. Trabajamos cerca de cada cliente, con honestidad, curiosidad y un compromiso absoluto con la calidad.",
+    "mission":{"label":"Misión","title":"Construir tecnología que mueve negocios.","text":"Creamos productos digitales útiles, sostenibles y preparados para evolucionar, ayudando a nuestros clientes a competir y crecer."},
+    "vision":{"label":"Visión","title":"Ser el aliado digital que deja huella.","text":"Queremos ser reconocidos por crear relaciones duraderas y soluciones que mejoran genuinamente la vida de quienes las usan."},
+    "valuesEyebrow":"Lo que nos define","valuesTitle":"Nuestros valores se ven en el trabajo.",
+    "values":{"innovation":{"title":"Curiosidad","text":"Cuestionamos, exploramos y buscamos siempre una mejor forma."},"commitment":{"title":"Compromiso","text":"Hacemos nuestros tus objetivos y cuidamos cada detalle."},"team":{"title":"Colaboración","text":"Las mejores ideas nacen cuando trabajamos como un solo equipo."},"impact":{"title":"Impacto","text":"Priorizamos lo que aporta valor real a usuarios y negocio."}},
+    "ctaTitle":"Construyamos algo extraordinario.","ctaText":"Tu desafío puede ser nuestro próximo gran proyecto."
   },
-  "projects": {
-    "title": "Nuestro Portafolio",
-    "filterAll": "Todos",
-    "filterWeb": "Web",
-    "filterMobile": "Móvil",
-    "filterEcommerce": "E-commerce",
-    "viewProject": "Ver Proyecto"
+  "whatWeDo": {
+    "pageTitle":"Qué hacemos","eyebrow":"Qué hacemos","heroTitle":"Convertimos desafíos complejos en soluciones digitales","heroAccent":"simples.","heroText":"Cubrimos todo el ciclo de vida de un producto, desde la estrategia inicial hasta su lanzamiento, operación y crecimiento.",
+    "servicesEyebrow":"Capacidades","servicesTitle":"Todo lo necesario para avanzar.","servicesIntro":"Equipos flexibles y experiencia especializada para crear el producto correcto y construirlo de la manera correcta.",
+    "services":{"web":{"title":"Desarrollo web","text":"Aplicaciones y plataformas robustas, accesibles y optimizadas para cualquier dispositivo."},"mobile":{"title":"Desarrollo móvil","text":"Apps intuitivas y de alto rendimiento para iOS y Android."},"design":{"title":"Diseño UX/UI","text":"Experiencias claras y memorables basadas en necesidades reales."},"consulting":{"title":"Estrategia digital","text":"Decisiones tecnológicas alineadas con tus objetivos de negocio."},"cloud":{"title":"Cloud y DevOps","text":"Infraestructura segura, automatizada y lista para escalar."},"support":{"title":"Evolución y soporte","text":"Mejora continua para que tu producto nunca deje de avanzar."}},
+    "methodEyebrow":"Metodología","methodTitle":"Pensamos, hacemos, medimos.","method":{"discover":{"title":"Descubrir","text":"Entendemos el contexto, el usuario y el reto."},"define":{"title":"Definir","text":"Priorizamos oportunidades y trazamos la ruta."},"create":{"title":"Crear","text":"Diseñamos y construimos de forma iterativa."},"improve":{"title":"Mejorar","text":"Medimos resultados y evolucionamos continuamente."}},
+    "ctaTitle":"¿Tienes un reto entre manos?","ctaText":"Conversemos. Te ayudaremos a encontrar el mejor camino para convertirlo en una oportunidad."
   },
-  "footer": {
-    "rights": "© 2024 Appsline. Todos los derechos reservados.",
-    "contact": "Contacto"
-  },
-  "common": {
-    "loading": "Cargando...",
-    "error": "Error",
-    "submit": "Enviar"
-  }
+  "projects":{"title":"Nuestro portafolio","filterAll":"Todos","filterWeb":"Web","filterMobile":"Móvil","filterEcommerce":"E-commerce","viewProject":"Ver proyecto"},
+  "footer":{"tagline":"Soluciones inteligentes para una era digital.","rights":"Todos los derechos reservados."},
+  "common":{"loading":"Cargando...","error":"Error","submit":"Enviar"}
 }
