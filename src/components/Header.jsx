@@ -30,7 +30,7 @@ const Header = () => {
         </nav>
         <div className="flex items-center gap-3">
           <LanguageSelector />
-          <Link to="/solicitar-proyecto" className="hidden items-center gap-2 rounded-full bg-[#001cbd] px-5 py-2.5 text-sm font-semibold hover:bg-[#ff5372] sm:flex">
+          <Link to="/solicitar-proyecto" className="hidden items-center gap-2 rounded-full bg-[#002EFD] px-5 py-2.5 text-sm font-semibold hover:bg-[#00A3FE] sm:flex">
             {t("nav.startProject")} <FiArrowUpRight />
           </Link>
           <button className="rounded-lg p-2 text-xl md:hidden" onClick={() => setOpen(!open)} aria-label={t("nav.menu")}>
@@ -41,7 +41,7 @@ const Header = () => {
       {open && (
         <nav className="border-t border-white/10 px-5 py-5 md:hidden">
           {links.map(([to, label]) => <NavLink key={to} to={to} onClick={() => setOpen(false)} className="block border-b border-white/5 py-3 text-slate-300">{label}</NavLink>)}
-          <Link to="/solicitar-proyecto" className="mt-5 block rounded-full bg-[#001cbd] px-5 py-3 text-center font-semibold">{t("nav.startProject")}</Link>
+          <Link to="/solicitar-proyecto" className="mt-5 block rounded-full bg-[#002EFD] px-5 py-3 text-center font-semibold">{t("nav.startProject")}</Link>
         </nav>
       )}
     </header>

@@ -172,7 +172,7 @@ const ProjectLead = () => {
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              Convierte tu <span className="text-transparent bg-clip-text bg-gradient-to-r from-app-one to-app-two">idea en realidad</span>
+              Convierte tu <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-700 to-brand-400">idea en realidad</span>
             </h1>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
               Completa este formulario y agendemos una videollamada gratuita para discutir tu proyecto personalizado.
@@ -192,8 +192,8 @@ const ProjectLead = () => {
                     onClick={() => handleProjectTypeSelect(project.key)}
                     className={`p-4 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md ${
                       formData.tipo_proyecto === project.key
-                        ? "border-app-two bg-app-two/10"
-                        : "border-gray-200 hover:border-app-two/50"
+                        ? "border-brand-500 bg-brand-50"
+                        : "border-slate-200 hover:border-brand-300"
                     }`}
                   >
                     <div className="text-3xl mb-2">{project.icon}</div>
@@ -213,7 +213,7 @@ const ProjectLead = () => {
                     name="otro_proyecto"
                     value={formData.otro_proyecto || ""}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                     placeholder="Describe brevemente tu proyecto..."
                   />
                 </div>
@@ -234,7 +234,7 @@ const ProjectLead = () => {
                     value={formData.nombre}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                     placeholder="Tu nombre completo"
                   />
                 </div>
@@ -249,7 +249,7 @@ const ProjectLead = () => {
                     value={formData.email}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                     placeholder="tu@email.com"
                   />
                 </div>
@@ -263,7 +263,7 @@ const ProjectLead = () => {
                     name="telefono"
                     value={formData.telefono}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                     placeholder="55 1234 5678"
                   />
                 </div>
@@ -277,7 +277,7 @@ const ProjectLead = () => {
                     name="empresa"
                     value={formData.empresa}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                     placeholder="Nombre de tu empresa"
                   />
                 </div>
@@ -292,7 +292,7 @@ const ProjectLead = () => {
                   value={formData.descripcion_proyecto}
                   onChange={handleInputChange}
                   rows={4}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                  className="admin-input"
                   placeholder="Cuéntanos más detalles sobre lo que necesitas..."
                 />
               </div>
@@ -310,7 +310,7 @@ const ProjectLead = () => {
                     name="tiempo_estimado"
                     value={formData.tiempo_estimado}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                   >
                     <option value="">Selecciona una opción</option>
                     {timeOptions.map(option => (
@@ -327,7 +327,7 @@ const ProjectLead = () => {
                     name="presupuesto"
                     value={formData.presupuesto}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                   >
                     <option value="">Selecciona un rango</option>
                     {budgetOptions.map(option => (
@@ -346,7 +346,7 @@ const ProjectLead = () => {
                     value={formData.usuarios_estimados}
                     onChange={handleInputChange}
                     min="1"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                     placeholder="¿Cuántas personas usarían el sistema?"
                   />
                 </div>
@@ -368,7 +368,7 @@ const ProjectLead = () => {
                     onChange={handleInputChange}
                     required
                     min={new Date().toISOString().split('T')[0]}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                   />
                 </div>
 
@@ -381,7 +381,7 @@ const ProjectLead = () => {
                     value={formData.hora_videollamada}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                   >
                     <option value="">Selecciona una hora</option>
                     {timeSlots.map(time => (
@@ -400,7 +400,7 @@ const ProjectLead = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-app-one to-app-two text-white py-4 px-8 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                className="w-full bg-gradient-to-r from-brand-700 to-brand-400 text-white py-4 px-8 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 {loading ? (
                   <div className="flex items-center justify-center">

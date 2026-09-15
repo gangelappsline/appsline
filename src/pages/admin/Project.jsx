@@ -317,7 +317,7 @@ const Project = () => {
       case "low":
         return "text-blue-400";
       default:
-        return "text-gray-500";
+        return "text-slate-500";
     }
   };
 
@@ -556,8 +556,8 @@ const Project = () => {
             key={t.id}
             className={`min-w-[200px] max-w-sm px-4 py-2 rounded shadow-lg text-sm ${
               t.type === "success"
-                ? "bg-green-600 text-white"
-                : "bg-red-600 text-white"
+                ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200"
+                : "bg-red-100 text-red-700 ring-1 ring-red-200"
             }`}
           >
             {t.message}
@@ -576,13 +576,13 @@ const Project = () => {
             whileFocus={{ scale: 1.05 }}
             type="text"
             placeholder="Buscar tareas..."
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two"
+            className="admin-input"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
           <motion.select
             whileHover={{ scale: 1.02 }}
-            className="px-4 py-2 border border-gray-300 rounded-lg"
+            className="px-4 py-2 border border-slate-300 rounded-lg"
             value={filterPriority}
             onChange={(e) => setFilterPriority(e.target.value)}
           >
@@ -593,7 +593,7 @@ const Project = () => {
           </motion.select>
           <motion.select
             whileHover={{ scale: 1.02 }}
-            className="px-4 py-2 border border-gray-300 rounded-lg"
+            className="px-4 py-2 border border-slate-300 rounded-lg"
             value={filterUser}
             onChange={(e) => setFilterUser(e.target.value)}
           >
@@ -609,7 +609,7 @@ const Project = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setCompactView(!compactView)}
-          className="bg-app-two text-white px-4 py-2 rounded-lg hover:bg-app-three transition"
+          className="btn-primary"
         >
           {compactView ? "Vista Expandida" : "Vista Compacta"}
         </motion.button>
@@ -628,14 +628,14 @@ const Project = () => {
               className="bg-gradient-to-br from-[#181A20] to-[#1F2125] rounded-xl p-4 min-h-[500px] flex flex-col shadow-2xl border border-[#23262F] hover:shadow-3xl transition-shadow"
             >
               <div className="mb-4 flex items-center justify-between">
-                <span className="text-white font-bold text-lg">
+                <span className="text-slate-800 font-bold text-lg">
                   {col.label}
                 </span>
                 <motion.span
                   key={getTasksByStatus(col.key).length}
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  className="bg-app-two text-white text-xs px-2 py-1 rounded-full font-semibold"
+                  className="badge-brand"
                 >
                   {getTasksByStatus(col.key).length}
                 </motion.span>
@@ -655,7 +655,7 @@ const Project = () => {
                       whileHover={{ scale: 1.02 }}
                       whileDrag={{ scale: 1.05, rotate: 5 }}
                       onDoubleClick={() => openTaskModal(task)} // <- abrir modal de detalle con doble click
-                      className={`bg-gradient-to-br from-[#23262F] to-[#2A2D32] border border-gray-700 rounded-lg p-4 shadow-lg text-white flex flex-col gap-2 cursor-move ${
+                      className={`bg-gradient-to-br from-[#23262F] to-[#2A2D32] border border-slate-200 rounded-lg p-4 shadow-lg text-slate-800 flex flex-col gap-2 cursor-move ${
                         compactView ? "p-2" : ""
                       }`}
                     >
@@ -687,10 +687,10 @@ const Project = () => {
                       </div>
                       {!compactView && (
                         <>
-                          <p className="text-gray-300 text-sm line-clamp-2">
+                          <p className="text-slate-600 text-sm line-clamp-2">
                             {task.description}
                           </p>
-                          <div className="flex items-center justify-between text-xs text-gray-400">
+                          <div className="flex items-center justify-between text-xs text-slate-500">
                             <span className="flex items-center gap-1">
                               <span className="flex flex-wrap gap-1">
                                 <img
@@ -717,19 +717,19 @@ const Project = () => {
                           </div>
                         </>
                       )}
-                      <hr className="my-1 w-full border-gray-500" />
+                      <hr className="my-1 w-full border-slate-300" />
                       <div className="flex  justify-center gap-6 mt-2">
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           onClick={() => handleEditTask(task)}
-                          className="text-gray-400 hover:text-gray-300 flex gap-2 text-sm"
+                          className="text-slate-500 hover:text-slate-600 flex gap-2 text-sm"
                         >
                           <TiPencil className="w-4 h-4" /> Editar
                         </motion.button>
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           onClick={() => handleDeleteTask(task.id)}
-                          className="text-gray-400 hover:text-gray-300 flex gap-2 text-sm"
+                          className="text-slate-500 hover:text-slate-600 flex gap-2 text-sm"
                         >
                           <TiTrash className="w-4 h-4" /> Eliminar
                         </motion.button>
@@ -742,7 +742,7 @@ const Project = () => {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="mt-4 bg-app-two text-white px-4 py-2 rounded-lg hover:bg-app-three transition font-semibold"
+                  className="btn-primary mt-4"
                   onClick={() => setShowAdd(true)}
                 >
                   + Agregar Tarea
@@ -785,18 +785,18 @@ const Project = () => {
               leave="ease-in duration-200"
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
-              className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-[#23262F] to-[#2A2D32] border border-gray-700 rounded-xl shadow-2xl"
+              className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-[#23262F] to-[#2A2D32] border border-slate-200 rounded-xl shadow-2xl"
             >
               <Dialog.Title
                 as="h2"
-                className="text-xl font-bold text-white mb-4"
+                className="text-xl font-bold text-slate-800 mb-4"
               >
                 Agregar Nueva Tarea
               </Dialog.Title>
               <form onSubmit={handleAddTask} className="flex flex-col gap-4">
                 <motion.input
                   whileFocus={{ scale: 1.02 }}
-                  className="bg-[#1F2125] border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   placeholder="Título"
                   value={newTask.title}
                   onChange={(e) =>
@@ -807,7 +807,7 @@ const Project = () => {
                 />
                 <motion.textarea
                   whileFocus={{ scale: 1.02 }}
-                  className="bg-[#1F2125] border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   placeholder="Descripción"
                   value={newTask.description}
                   onChange={(e) =>
@@ -822,7 +822,7 @@ const Project = () => {
                   step="0.5"
                   min="0"
                   placeholder="Horas estimadas"
-                  className="bg-[#1F2125] border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   value={newTask.estimated_hours}
                   onChange={(e) =>
                     setNewTask((t) => ({
@@ -844,7 +844,7 @@ const Project = () => {
                 <motion.input
                   whileFocus={{ scale: 1.02 }}
                   type="date"
-                  className="bg-[#1F2125] border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   value={newTask.due_date}
                   onChange={(e) =>
                     setNewTask((t) => ({ ...t, due_date: e.target.value }))
@@ -853,7 +853,7 @@ const Project = () => {
                 />
                 <motion.select
                   whileFocus={{ scale: 1.02 }}
-                  className="bg-[#1F2125] border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   value={newTask.priority}
                   onChange={(e) =>
                     setNewTask((t) => ({ ...t, priority: e.target.value }))
@@ -869,7 +869,7 @@ const Project = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     type="submit"
-                    className="bg-app-two text-white px-4 py-2 rounded-lg hover:bg-app-three transition font-semibold"
+                    className="btn-primary"
                     disabled={adding}
                   >
                     {adding ? "Agregando..." : "Agregar"}
@@ -878,7 +878,7 @@ const Project = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     type="button"
-                    className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-500 transition"
+                    className="btn-secondary"
                     onClick={() => setShowAdd(false)}
                     disabled={adding}
                   >
@@ -923,11 +923,11 @@ const Project = () => {
               leave="ease-in duration-200"
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
-              className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-[#23262F] to-[#2A2D32] border border-gray-700 rounded-xl shadow-2xl"
+              className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-[#23262F] to-[#2A2D32] border border-slate-200 rounded-xl shadow-2xl"
             >
               <Dialog.Title
                 as="h2"
-                className="text-xl font-bold text-white mb-4"
+                className="text-xl font-bold text-slate-800 mb-4"
               >
                 Editar Tarea
               </Dialog.Title>
@@ -935,7 +935,7 @@ const Project = () => {
                 {/* Campos similares al modal de agregar */}
                 <motion.input
                   whileFocus={{ scale: 1.02 }}
-                  className="bg-[#1F2125] border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   placeholder="Título"
                   value={newTask.title}
                   onChange={(e) =>
@@ -945,7 +945,7 @@ const Project = () => {
                 />
                 <motion.textarea
                   whileFocus={{ scale: 1.02 }}
-                  className="bg-[#1F2125] border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   placeholder="Descripción"
                   value={newTask.description}
                   onChange={(e) =>
@@ -960,7 +960,7 @@ const Project = () => {
                   step="0.5"
                   min="0"
                   placeholder="Horas estimadas"
-                  className="bg-[#1F2125] border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   value={newTask.estimated_hours}
                   onChange={(e) =>
                     setNewTask((t) => ({
@@ -982,7 +982,7 @@ const Project = () => {
                 <motion.input
                   whileFocus={{ scale: 1.02 }}
                   type="date"
-                  className="bg-[#1F2125] border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   value={newTask.due_date}
                   onChange={(e) =>
                     setNewTask((t) => ({ ...t, due_date: e.target.value }))
@@ -991,7 +991,7 @@ const Project = () => {
                 />
                 <motion.select
                   whileFocus={{ scale: 1.02 }}
-                  className="bg-[#1F2125] border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   value={newTask.priority}
                   onChange={(e) =>
                     setNewTask((t) => ({ ...t, priority: e.target.value }))
@@ -1007,7 +1007,7 @@ const Project = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     type="submit"
-                    className="bg-app-two text-white px-4 py-2 rounded-lg hover:bg-app-three transition font-semibold"
+                    className="btn-primary"
                     disabled={adding}
                   >
                     {adding ? "Actualizando..." : "Actualizar"}
@@ -1016,7 +1016,7 @@ const Project = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     type="button"
-                    className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-500 transition"
+                    className="btn-secondary"
                     onClick={() => setShowEdit(false)}
                     disabled={adding}
                   >
@@ -1061,17 +1061,17 @@ const Project = () => {
               leave="ease-in duration-200"
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
-              className="inline-block w-full max-w-5xl p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-[#1B1D21] border border-gray-700 rounded-xl shadow-2xl"
+              className="inline-block w-full max-w-5xl p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-slate-50 border border-slate-200 rounded-xl shadow-2xl"
             >
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
                 <div className="flex items-center gap-3">
                   <button
                     onClick={toggleComplete}
                     className={`h-5 w-5 rounded border ${
                       taskDetail?.status === "completed"
                         ? "bg-green-500 border-green-500"
-                        : "border-gray-500"
+                        : "border-slate-300"
                     } inline-flex items-center justify-center`}
                     title={
                       taskDetail?.status === "completed"
@@ -1084,13 +1084,13 @@ const Project = () => {
                   <input
                     defaultValue={taskDetail?.title || ""}
                     onBlur={handleTitleBlur}
-                    className="bg-transparent text-white text-xl md:text-2xl font-semibold outline-none placeholder-gray-500"
+                    className="bg-transparent text-slate-800 text-xl md:text-2xl font-semibold outline-none placeholder-gray-500"
                     placeholder="Título de la tarea"
                   />
                 </div>
                 <button
                   onClick={() => setShowTask(false)}
-                  className="text-gray-300 hover:text-white text-sm bg-gray-700/40 px-3 py-1.5 rounded-lg"
+                  className="text-slate-600 hover:text-slate-800 text-sm bg-gray-700/40 px-3 py-1.5 rounded-lg"
                 >
                   Cerrar
                 </button>
@@ -1104,7 +1104,7 @@ const Project = () => {
                   <div className="space-y-5">
                     {/* Responsable */}
                     <div className="flex items-center gap-4">
-                      <div className="min-w-[120px] text-xs uppercase tracking-wide text-gray-400">
+                      <div className="min-w-[120px] text-xs uppercase tracking-wide text-slate-500">
                         Responsable
                       </div>
                       <div className="flex items-center gap-3">
@@ -1134,18 +1134,18 @@ const Project = () => {
 
                     {/* Fecha de entrega */}
                     <div className="flex items-center gap-4">
-                      <div className="min-w-[120px] text-xs uppercase tracking-wide text-gray-400">
+                      <div className="min-w-[120px] text-xs uppercase tracking-wide text-slate-500">
                         Fecha de entrega
                       </div>
                       <input
                         type="date"
                         value={taskDetail?.due_date || ""}
                         onChange={handleDueDateChange}
-                        className="bg-[#23262F] border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-app-two"
+                        className="admin-input"
                       />
                       {taskDetail?.due_date && (
                         <button
-                          className="text-gray-400 hover:text-white text-xs underline"
+                          className="text-slate-500 hover:text-slate-800 text-xs underline"
                           onClick={() => updateTaskField({ due_date: "" })}
                         >
                           Quitar fecha
@@ -1155,7 +1155,7 @@ const Project = () => {
 
                     {/* Descripción */}
                     <div>
-                      <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">
+                      <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
                         Descripción
                       </div>
                       <textarea
@@ -1163,7 +1163,7 @@ const Project = () => {
                         onBlur={handleDescBlur}
                         rows={4}
                         placeholder="¿De qué se trata esta tarea?"
-                        className="w-full bg-[#23262F] border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-app-two"
+                        className="admin-input"
                       />
                     </div>
 
@@ -1171,7 +1171,7 @@ const Project = () => {
                     <div>
                       <button
                         type="button"
-                        className="text-sm bg-[#23262F] hover:bg-[#2A2D32] text-white px-3 py-2 rounded-lg border border-gray-700"
+                        className="text-sm bg-white hover:bg-slate-50 text-slate-800 px-3 py-2 rounded-lg border border-slate-200"
                         title="(Opcional) Implementar endpoint de subtareas"
                       >
                         + Agregar subtarea
@@ -1181,12 +1181,12 @@ const Project = () => {
 
                   {/* Tabs Comentarios / Actividad */}
                   <div className="mt-6">
-                    <div className="flex items-center gap-6 border-b border-gray-700 mb-4">
+                    <div className="flex items-center gap-6 border-b border-slate-200 mb-4">
                       <button
                         className={`py-2 ${
                           taskTab === "comments"
-                            ? "text-white border-b-2 border-app-two"
-                            : "text-gray-400"
+                            ? "border-b-2 border-brand-700 text-brand-700"
+                            : "text-slate-500"
                         }`}
                         onClick={() => setTaskTab("comments")}
                       >
@@ -1195,8 +1195,8 @@ const Project = () => {
                       <button
                         className={`py-2 ${
                           taskTab === "activity"
-                            ? "text-white border-b-2 border-app-two"
-                            : "text-gray-400"
+                            ? "border-b-2 border-brand-700 text-brand-700"
+                            : "text-slate-500"
                         }`}
                         onClick={() => setTaskTab("activity")}
                       >
@@ -1208,7 +1208,7 @@ const Project = () => {
                       <>
                         <div className="space-y-3 max-h-64 overflow-auto pr-1">
                           {comments.length === 0 && (
-                            <div className="text-gray-400 text-sm">
+                            <div className="text-slate-500 text-sm">
                               Sin comentarios
                             </div>
                           )}
@@ -1232,13 +1232,13 @@ const Project = () => {
                                       c.user?.email ||
                                       `#${c.user_id || ""}`}
                                   </span>{" "}
-                                  <span className="text-xs text-gray-400">
+                                  <span className="text-xs text-slate-500">
                                     {new Date(
                                       c.created_at || Date.now()
                                     ).toLocaleString()}
                                   </span>
                                 </div>
-                                <div className="text-gray-200 text-sm">
+                                <div className="text-slate-700 text-sm">
                                   {c.comment}
                                 </div>
                               </div>
@@ -1249,7 +1249,7 @@ const Project = () => {
                           <input
                             type="text"
                             placeholder="Agregar un comentario"
-                            className="flex-1 bg-[#23262F] border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-app-two"
+                            className="admin-input flex-1"
                             value={newComment}
                             onChange={(e) => setNewComment(e.target.value)}
                             onKeyDown={(e) => {
@@ -1261,14 +1261,14 @@ const Project = () => {
                           />
                           <button
                             onClick={addComment}
-                            className="bg-app-two text-white px-3 py-2 rounded-lg hover:bg-app-three transition"
+                            className="btn-primary"
                           >
                             Enviar
                           </button>
                         </div>
                       </>
                     ) : (
-                      <div className="text-gray-400 text-sm">
+                      <div className="text-slate-500 text-sm">
                         Sin actividad disponible por ahora.
                       </div>
                     )}
@@ -1276,11 +1276,11 @@ const Project = () => {
                 </div>
 
                 {/* Columna derecha (1/3): Archivos */}
-                <div className="px-6 py-5 border-l border-gray-700 bg-[#191B1F]">
-                  <h3 className="text-white font-semibold mb-3">Archivos</h3>
+                <div className="px-6 py-5 border-l border-slate-200 bg-slate-100">
+                  <h3 className="text-slate-800 font-semibold mb-3">Archivos</h3>
                   <div className="space-y-2 max-h-72 overflow-auto pr-1">
                     {attachments.length === 0 && (
-                      <div className="text-gray-400 text-sm">Sin archivos</div>
+                      <div className="text-slate-500 text-sm">Sin archivos</div>
                     )}
                     {attachments.map((f) => (
                       <a
@@ -1288,12 +1288,12 @@ const Project = () => {
                         href={f.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center justify-between bg-[#23262F] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white hover:border-gray-500"
+                        className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 hover:border-slate-300"
                       >
                         <span className="truncate">
                           {f.file_name || "archivo"}
                         </span>
-                        <span className="text-gray-400 text-xs">
+                        <span className="text-slate-500 text-xs">
                           {(f.file_size &&
                             `${Math.round(f.file_size / 1024)} KB`) ||
                             ""}
@@ -1306,14 +1306,14 @@ const Project = () => {
                       type="file"
                       multiple
                       onChange={onFilesChange}
-                      className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-app-two file:text-white hover:file:bg-app-three"
+                      className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-800 hover:file:bg-brand-800"
                     />
                     {selectedFiles.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-2">
                         {selectedFiles.map((f, idx) => (
                           <span
                             key={idx}
-                            className="bg-white/10 text-white text-xs px-2 py-1 rounded"
+                            className="bg-white/10 text-slate-800 text-xs px-2 py-1 rounded"
                           >
                             {f.name}
                           </span>
@@ -1323,7 +1323,7 @@ const Project = () => {
                     <button
                       onClick={uploadFiles}
                       disabled={uploading || selectedFiles.length === 0}
-                      className="mt-3 bg-app-two disabled:opacity-60 text-white px-3 py-2 rounded-lg hover:bg-app-three transition w-full"
+                      className="btn-primary mt-3 w-full"
                     >
                       {uploading ? "Subiendo..." : "Subir archivos"}
                     </button>

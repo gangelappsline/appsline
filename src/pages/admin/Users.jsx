@@ -242,58 +242,74 @@ const Users = () => {
   };
 
   return (
-    <LayoutAdmin title="Users">
+    <LayoutAdmin
+      title="Usuarios"
+      subtitle="Gestiona las cuentas y roles del equipo"
+      actions={
+        <button className="btn-primary" onClick={() => setShowAdd(true)}>
+          + Agregar usuario
+        </button>
+      }
+    >
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="bg-white rounded-lg shadow p-6"
+        transition={{ duration: 0.4 }}
+        className="admin-card overflow-hidden"
       >
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-          <h1 className="text-2xl font-bold text-app-one">Usuarios</h1>
-          <div className="flex gap-4 items-center">
-            <motion.input
-              whileFocus={{ scale: 1.05 }}
-              type="text"
-              placeholder="Buscar por nombre o email..."
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setShowAdd(true)}
-              className="bg-app-two text-white px-4 py-2 rounded-lg hover:bg-app-three transition font-semibold"
-            >
-              + Agregar Usuario
-            </motion.button>
-          </div>
+        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <input
+            type="search"
+            placeholder="Buscar por nombre o email..."
+            className="admin-input sm:max-w-xs"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <span className="text-sm text-slate-500">
+            {filteredUsers.length} usuario{filteredUsers.length === 1 ? "" : "s"}
+          </span>
         </div>
 
         {loading ? (
-          <div className="text-center py-10 text-app-one font-semibold">Cargando usuarios...</div>
+          <div className="space-y-3 p-6">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <div className="h-10 w-10 animate-pulse rounded-full bg-slate-200" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-40 animate-pulse rounded bg-slate-200" />
+                  <div className="h-3 w-56 animate-pulse rounded bg-slate-100" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : error ? (
-          <div className="text-center py-10 text-red-500">{error}</div>
+          <div className="p-10 text-center text-sm text-red-600">{error}</div>
         ) : filteredUsers.length === 0 ? (
-          <div className="text-center py-10 text-gray-400">
-            {search ? "No se encontraron usuarios con ese filtro." : "No hay usuarios registrados."}
+          <div className="p-16 text-center">
+            <p className="font-medium text-slate-700">
+              {search ? "Sin resultados" : "No hay usuarios registrados"}
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              {search
+                ? "Prueba con otro nombre o correo."
+                : "Agrega el primer usuario para comenzar."}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="admin-table-head">
+                  <th className="px-6 py-3.5">ID</th>
                   {/* Nueva columna Foto */}
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Foto</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                  <th className="px-6 py-3.5">Foto</th>
+                  <th className="px-6 py-3.5">Nombre</th>
+                  <th className="px-6 py-3.5">Email</th>
+                  <th className="px-6 py-3.5">Rol</th>
+                  <th className="px-6 py-3.5 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 <AnimatePresence>
                   {filteredUsers.map((user) => (
                     <motion.tr
@@ -302,15 +318,15 @@ const Users = () => {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.3 }}
-                      className="hover:bg-gray-50"
+                      className="transition hover:bg-slate-50"
                     >
-                      <td className="px-4 py-2 text-sm text-gray-700">{user.id}</td>
+                      <td className="px-6 py-4 text-slate-400 tabular-nums">{user.id}</td>
                       {/* Celda de foto con fallback */}
-                      <td className="px-4 py-2">
+                      <td className="px-6 py-4">
                         <img
                           src={getUserAvatar(user)}
                           alt={`Avatar de ${user.name || user.email || user.id}`}
-                          className="h-10 w-10 rounded-full object-cover border bg-white"
+                          className="h-10 w-10 rounded-full border border-slate-200 bg-white object-cover"
                           onError={(e) => {
                             const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(
                               user?.name || user?.email || "Usuario"
@@ -320,26 +336,28 @@ const Users = () => {
                           }}
                         />
                       </td>
-                      <td className="px-4 py-2 text-sm text-gray-700">{user.name}</td>
-                      <td className="px-4 py-2 text-sm text-gray-700">{user.email}</td>
-                      <td className="px-4 py-2 text-sm text-gray-700">
-                        {roles.find((role) => role.key === user.role)?.label || "-"}
+                      <td className="px-6 py-4 font-medium text-slate-800">{user.name}</td>
+                      <td className="px-6 py-4 text-slate-500">{user.email}</td>
+                      <td className="px-6 py-4">
+                        <span className="badge-slate">
+                          {roles.find((role) => role.key === user.role)?.label || "-"}
+                        </span>
                       </td>
-                      <td className="px-4 py-2 text-sm text-gray-700 flex gap-2">
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          onClick={() => handleEditUser(user)}
-                          className="text-blue-500 hover:text-blue-700 text-xs font-semibold"
-                        >
-                          ✏️ Editar
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="text-red-500 hover:text-red-700 text-xs font-semibold"
-                        >
-                          🗑️ Eliminar
-                        </motion.button>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleEditUser(user)}
+                            className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-brand-700 transition hover:bg-brand-50"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
                       </td>
                     </motion.tr>
                   ))}
@@ -373,9 +391,9 @@ const Users = () => {
               leave="ease-in duration-200"
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
-              className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white border border-gray-300 rounded-xl shadow-2xl"
+              className="my-8 inline-block w-full max-w-md transform overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-left align-middle shadow-card-lg transition-all"
             >
-              <Dialog.Title as="h2" className="text-xl font-bold text-app-one mb-4">
+              <Dialog.Title as="h2" className="mb-5 text-lg font-semibold text-slate-900">
                 Agregar Nuevo Usuario
               </Dialog.Title>
               <form onSubmit={handleAddUser} className="flex flex-col gap-4">
@@ -383,7 +401,7 @@ const Users = () => {
                   whileFocus={{ scale: 1.02 }}
                   type="text"
                   placeholder="Nombre"
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   value={newUser.name}
                   onChange={(e) => setNewUser((u) => ({ ...u, name: e.target.value }))}
                   disabled={adding}
@@ -393,14 +411,14 @@ const Users = () => {
                   whileFocus={{ scale: 1.02 }}
                   type="email"
                   placeholder="Email"
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   value={newUser.email}
                   onChange={(e) => setNewUser((u) => ({ ...u, email: e.target.value }))}
                   disabled={adding}
                 />
                 <motion.select
                   whileFocus={{ scale: 1.02 }}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   value={newUser.role}
                   onChange={(e) => setNewUser((u) => ({ ...u, role: e.target.value }))}
                   disabled={adding}
@@ -420,7 +438,7 @@ const Users = () => {
                     accept="image/*"
                     onChange={handleAddImageChange}
                     disabled={adding}
-                    className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-app-two file:text-white hover:file:bg-app-three"
+                    className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-brand-800"
                   />
                   {addAvatarPreview && (
                     <img src={addAvatarPreview} alt="Preview" className="mt-3 h-20 w-20 rounded-full object-cover border" />
@@ -431,7 +449,7 @@ const Users = () => {
                   whileFocus={{ scale: 1.02 }}
                   type="text"
                   placeholder="Password"
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   value={newUser.password}
                   onChange={(e) => setNewUser((u) => ({ ...u, password: e.target.value }))}
                   disabled={adding}
@@ -442,7 +460,7 @@ const Users = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     type="submit"
-                    className="bg-app-two text-white px-4 py-2 rounded-lg hover:bg-app-three transition font-semibold"
+                    className="btn-primary"
                     disabled={adding}
                   >
                     {adding ? "Agregando..." : "Agregar"}
@@ -451,7 +469,7 @@ const Users = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     type="button"
-                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition"
+                    className="btn-secondary"
                     onClick={() => setShowAdd(false)}
                     disabled={adding}
                   >
@@ -487,9 +505,9 @@ const Users = () => {
               leave="ease-in duration-200"
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
-              className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white border border-gray-300 rounded-xl shadow-2xl"
+              className="my-8 inline-block w-full max-w-md transform overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-left align-middle shadow-card-lg transition-all"
             >
-              <Dialog.Title as="h2" className="text-xl font-bold text-app-one mb-4">
+              <Dialog.Title as="h2" className="mb-5 text-lg font-semibold text-slate-900">
                 Editar Usuario
               </Dialog.Title>
               <form onSubmit={handleUpdateUser} className="flex flex-col gap-4">
@@ -497,7 +515,7 @@ const Users = () => {
                   whileFocus={{ scale: 1.02 }}
                   type="text"
                   placeholder="Nombre"
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   value={newUser.name}
                   onChange={(e) => setNewUser((u) => ({ ...u, name: e.target.value }))}
                   disabled={adding}
@@ -506,14 +524,14 @@ const Users = () => {
                   whileFocus={{ scale: 1.02 }}
                   type="email"
                   placeholder="Email"
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   value={newUser.email}
                   onChange={(e) => setNewUser((u) => ({ ...u, email: e.target.value }))}
                   disabled={adding}
                 />
                 <motion.select
                   whileFocus={{ scale: 1.02 }}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   value={newUser.role}
                   onChange={(e) => setNewUser((u) => ({ ...u, role: e.target.value }))}
                   disabled={adding}
@@ -533,7 +551,7 @@ const Users = () => {
                     accept="image/*"
                     onChange={handleEditImageChange}
                     disabled={adding}
-                    className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-app-two file:text-white hover:file:bg-app-three"
+                    className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-brand-800"
                   />
                   {editAvatarPreview && (
                     <img
@@ -549,7 +567,7 @@ const Users = () => {
                   whileFocus={{ scale: 1.02 }}
                   type="text"
                   placeholder="Password (opcional)"
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two"
+                  className="admin-input"
                   value={newUser.password}
                   onChange={(e) => setNewUser((u) => ({ ...u, password: e.target.value }))}
                   disabled={adding}
@@ -560,7 +578,7 @@ const Users = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     type="submit"
-                    className="bg-app-two text-white px-4 py-2 rounded-lg hover:bg-app-three transition font-semibold"
+                    className="btn-primary"
                     disabled={adding}
                   >
                     {adding ? "Actualizando..." : "Actualizar"}
@@ -569,7 +587,7 @@ const Users = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     type="button"
-                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition"
+                    className="btn-secondary"
                     onClick={() => setShowEdit(false)}
                     disabled={adding}
                   >
