@@ -75,7 +75,7 @@ const ProjectTaskForm = () => {
           <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
           <input
             type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two"
+            className="admin-input"
             value={form.title}
             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
             required
@@ -85,7 +85,7 @@ const ProjectTaskForm = () => {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
           <textarea
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two"
+            className="admin-input"
             rows={4}
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -102,7 +102,7 @@ const ProjectTaskForm = () => {
         <div className="flex gap-3 pt-2">
           <button
             type="submit"
-            className="bg-app-two text-white px-5 py-2 rounded-lg font-semibold hover:bg-app-three transition disabled:opacity-60"
+            className="btn-primary"
             disabled={saving}
           >
             {saving ? "Guardando..." : "Guardar"}

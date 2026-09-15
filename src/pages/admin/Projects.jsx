@@ -177,85 +177,97 @@ const Projects = () => {
   );
 
   return (
-    <LayoutAdmin title="Proyectos">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-        <div className="flex-1">
-          <input
-            type="text"
-            placeholder="Buscar proyecto..."
-            className="w-full md:w-80 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <button
-          className="bg-app-one text-white font-semibold px-6 py-2 rounded-lg shadow hover:bg-app-three hover:text-white transition"
-          onClick={handleOpenCreate}
-        >
-          + Nuevo Proyecto
+    <LayoutAdmin
+      title="Proyectos"
+      subtitle="Administra los proyectos activos y su información"
+      actions={
+        <button className="btn-primary" onClick={handleOpenCreate}>
+          + Nuevo proyecto
         </button>
+      }
+    >
+      <div className="mb-6">
+        <input
+          type="search"
+          placeholder="Buscar proyecto..."
+          className="admin-input md:max-w-sm"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
       {loading ? (
-        <div className="text-center py-10 text-app-one font-semibold">
-          Cargando proyectos...
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="admin-card p-5">
+              <div className="h-32 w-full animate-pulse rounded-lg bg-slate-100" />
+              <div className="mt-4 h-4 w-2/3 animate-pulse rounded bg-slate-200" />
+              <div className="mt-2 h-3 w-full animate-pulse rounded bg-slate-100" />
+            </div>
+          ))}
         </div>
       ) : filteredProjects.length === 0 ? (
-        <div className="text-center py-10 text-gray-400">
-          No se encontraron proyectos.
+        <div className="admin-card p-16 text-center">
+          <p className="font-medium text-slate-700">No se encontraron proyectos</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Ajusta la búsqueda o crea un nuevo proyecto para comenzar.
+          </p>
+          <button className="btn-primary mt-6" onClick={handleOpenCreate}>
+            + Nuevo proyecto
+          </button>
         </div>
       ) : (
-        <div className="w-full bg-white shadow-lg rounded-lg p-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8">
+        <div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredProjects.map((project) => (
               <div
                 key={project.id}
-                className="bg-white rounded-2xl shadow p-6 flex flex-col justify-between border border-gray-100 hover:shadow-lg transition"
+                className="admin-card admin-card-hover flex flex-col justify-between p-5"
               >
                 <div>
                   {project.logo && (
                     <img 
                       src={project.logo} 
                       alt={project.name}
-                      className="w-full h-32 object-cover rounded-lg mb-4"
+                      className="mb-4 h-32 w-full rounded-lg border border-slate-100 object-cover"
                     />
                   )}
-                  <h3 className="text-xl font-bold text-app-one mb-2 truncate">
+                  <h3 className="mb-2 truncate text-lg font-semibold text-slate-900">
                     {project.name}
                   </h3>
-                  <p className="text-gray-500 mb-4 line-clamp-3">
+                  <p className="mb-4 line-clamp-3 text-sm leading-6 text-slate-500">
                     {project.description}
                   </p>
                   {project.budget && (
-                    <p className="text-sm text-green-600 font-semibold mb-2">
-                      Presupuesto: ${Number(project.budget).toLocaleString()}
+                    <p className="mb-1.5 text-sm font-semibold text-emerald-600">
+                      ${Number(project.budget).toLocaleString()}
                     </p>
                   )}
                   {project.client_name && (
-                    <p className="text-sm text-gray-600 mb-1">
+                    <p className="mb-1 truncate text-sm text-slate-500">
                       Cliente: {project.client_name}
                     </p>
                   )}
                 </div>
-                <div className="flex items-center justify-center mt-4">
-                  <div className="flex justify-center items-center gap-2">
+                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+                  <div className="flex items-center gap-1">
                     <button
-                      className="p-2 rounded-lg shadow-lg transition-colors group"
+                      className="rounded-lg p-2 text-slate-500 transition hover:bg-brand-50 hover:text-brand-700"
                       onClick={() => navigate(`/admin/projects/${project.id}`)}
                       title="Ver proyecto"
                     >
-                      <TiEye className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                      <TiEye className="h-5 w-5" />
                     </button>
                     <button
-                      className="p-2 rounded-lg shadow-lg transition-colors group"
+                      className="rounded-lg p-2 text-slate-500 transition hover:bg-brand-50 hover:text-brand-700"
                       onClick={() => handleOpenEdit(project)}
                       title="Editar proyecto"
                     >
-                      <TiPencil className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                      <TiPencil className="h-5 w-5" />
                     </button>
                   </div>
                   {project.status && (
-                    <span className="text-xs px-3 py-1 rounded-full bg-app-two/10 text-app-two font-medium">
+                    <span className="badge-brand capitalize">
                       {project.status}
                     </span>
                   )}
@@ -268,24 +280,24 @@ const Projects = () => {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-xl font-bold text-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-card-lg">
+            <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-5">
+              <h2 className="text-lg font-semibold text-slate-900">
                 {isEditing ? "Editar Proyecto" : "Nuevo Proyecto"}
               </h2>
               <button
                 onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
               >
-                <TiTimes className="w-6 h-6" />
+                <TiTimes className="h-5 w-5" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="admin-label">
                     Nombre del Proyecto *
                   </label>
                   <input
@@ -293,13 +305,13 @@ const Projects = () => {
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                     required
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="admin-label">
                     Descripción
                   </label>
                   <textarea
@@ -307,12 +319,12 @@ const Projects = () => {
                     value={formData.description}
                     onChange={handleInputChange}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="admin-label">
                     Presupuesto
                   </label>
                   <input
@@ -321,12 +333,12 @@ const Projects = () => {
                     value={formData.budget}
                     onChange={handleInputChange}
                     step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="admin-label">
                     Fecha de Entrega
                   </label>
                   <input
@@ -334,12 +346,12 @@ const Projects = () => {
                     name="end_date"
                     value={formData.end_date}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="admin-label">
                     Logo
                   </label>
                   <input
@@ -347,7 +359,7 @@ const Projects = () => {
                     name="logo"
                     onChange={handleInputChange}
                     accept="image/*"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                   />
                   {isEditing && currentProject?.logo && (
                     <div className="mt-2">
@@ -362,7 +374,7 @@ const Projects = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="admin-label">
                     Nombre del Cliente
                   </label>
                   <input
@@ -370,12 +382,12 @@ const Projects = () => {
                     name="client_name"
                     value={formData.client_name}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="admin-label">
                     Correo del Cliente
                   </label>
                   <input
@@ -383,12 +395,12 @@ const Projects = () => {
                     name="client_email"
                     value={formData.client_email}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="admin-label">
                     Teléfono del Cliente
                   </label>
                   <input
@@ -396,7 +408,7 @@ const Projects = () => {
                     name="client_phone"
                     value={formData.client_phone}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two focus:border-transparent"
+                    className="admin-input"
                   />
                 </div>
               </div>
@@ -405,14 +417,14 @@ const Projects = () => {
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="btn-secondary"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-6 py-2 bg-app-one text-white rounded-lg hover:bg-app-three disabled:opacity-50 transition-colors"
+                  className="btn-primary"
                 >
                   {saving ? "Guardando..." : isEditing ? "Actualizar" : "Crear"}
                 </button>

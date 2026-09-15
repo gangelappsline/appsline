@@ -1,14 +1,22 @@
-import React, { useEffect, useState, useMemo } from "react";
+/* eslint-disable react/prop-types */
+import { useEffect, useState, useMemo } from "react";
 import LayoutAdmin from "../../layouts/LayoutAdmin";
 import ProgressBar from "../../components/ProgressBar";
 import UserAvatar from "../../components/UserAvatar";
+import {
+  FiActivity,
+  FiAlertTriangle,
+  FiCheckCircle,
+  FiClock,
+  FiLayers,
+} from "react-icons/fi";
 
 const API_DASH = `${import.meta.env.VITE_API_URL || ""}/dashboard`;
 
 // --- Simple BarChart & Donut (existente) ---
-function BarChart({ data = [], height = 160, color = "#60A5FA" }) {
+function BarChart({ data = [], height = 160, color = "#0060FC" }) {
   if (!data.length)
-    return <div className="text-sm text-gray-400">Sin datos</div>;
+    return <div className="py-8 text-center text-sm text-slate-400">Sin datos</div>;
   const max = Math.max(...data.map((d) => Number(d.value || 0)), 1);
   return (
     <svg viewBox={`0 0 ${data.length * 60} ${height}`} className="w-full h-40">
@@ -24,7 +32,7 @@ function BarChart({ data = [], height = 160, color = "#60A5FA" }) {
               x={x + w / 2}
               y={height - 4}
               fontSize="11"
-              fill="#cbd5e1"
+              fill="#94a3b8"
               textAnchor="middle"
             >
               {d.label}
@@ -33,7 +41,7 @@ function BarChart({ data = [], height = 160, color = "#60A5FA" }) {
               x={x + w / 2}
               y={y - 4}
               fontSize="11"
-              fill="#e6edf3"
+              fill="#334155"
               textAnchor="middle"
             >
               {d.value}
@@ -45,7 +53,7 @@ function BarChart({ data = [], height = 160, color = "#60A5FA" }) {
   );
 }
 
-function Donut({ value = 0, size = 120, stroke = 14, color = "#34d399" }) {
+function Donut({ value = 0, size = 120, stroke = 14, color = "#0060FC" }) {
   const v = Math.max(0, Math.min(1, Number(value)));
   const radius = (size - stroke) / 2;
   const circ = 2 * Math.PI * radius;
@@ -53,7 +61,7 @@ function Donut({ value = 0, size = 120, stroke = 14, color = "#34d399" }) {
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       <g transform={`translate(${size / 2},${size / 2})`}>
-        <circle r={radius} stroke="#24303a" strokeWidth={stroke} fill="none" />
+        <circle r={radius} stroke="#e2e8f0" strokeWidth={stroke} fill="none" />
         <circle
           r={radius}
           stroke={color}
@@ -68,7 +76,7 @@ function Donut({ value = 0, size = 120, stroke = 14, color = "#34d399" }) {
           y="6"
           fontSize="18"
           textAnchor="middle"
-          fill="#e6edf3"
+          fill="#334155"
           fontWeight="700"
         >
           {Math.round(v * 100)}%
@@ -96,7 +104,7 @@ function Gantt({
   headerHeight = 28,
 }) {
   if (!items || !items.length)
-    return <div className="text-sm text-gray-400">Sin datos para Gantt</div>;
+    return <div className="py-8 text-center text-sm text-slate-400">Sin datos para Gantt</div>;
 
   const starts = items.map((it) => it.start).filter(Boolean);
   const ends = items.map((it) => it.end).filter(Boolean);
@@ -132,7 +140,7 @@ function Gantt({
   const monthLabel = (d) => d.toLocaleString("es-ES", { month: "short" });
 
   return (
-    <div className="border border-gray-700 rounded bg-[#0b1114] overflow-auto">
+    <div className="overflow-auto rounded-xl border border-slate-200 bg-white">
       <div style={{ minWidth: width }} className="relative">
         <div style={{ height: headerHeight, display: "flex" }}>
           {labels.map((d, i) => (
@@ -140,10 +148,10 @@ function Gantt({
               key={i}
               style={{
                 width: pxPerDay,
-                borderLeft: "1px solid rgba(255,255,255,0.03)",
+                borderLeft: "1px solid #f1f5f9",
                 textAlign: "center",
                 fontSize: 11,
-                color: "#cbd5e1",
+                color: "#94a3b8",
                 paddingTop: 4,
               }}
               title={d.toLocaleDateString()}
@@ -167,7 +175,7 @@ function Gantt({
                   top: r.top,
                   width: "30%",
                   maxWidth: 240,
-                  color: "#e6edf3",
+                  color: "#334155",
                   fontSize: 13,
                   paddingLeft: 8,
                 }}
@@ -181,9 +189,9 @@ function Gantt({
                   top: r.top + 6,
                   height: rowHeight - 12,
                   width: r.widthPx,
-                  background: r.color || "#60a5fa",
+                  background: r.color || "#0060FC",
                   borderRadius: 6,
-                  boxShadow: "0 1px 0 rgba(0,0,0,0.3)",
+                  boxShadow: "0 1px 2px rgba(15,23,42,.15)",
                 }}
                 title={`${r.label} — ${r.start?.toLocaleDateString() || ""} → ${
                   r.end?.toLocaleDateString() || ""
@@ -394,7 +402,7 @@ const Dashboard = () => {
                 ? "#ef4444"
                 : t.priority === "medium"
                 ? "#f59e0b"
-                : "#60a5fa",
+                : "#0060FC",
           });
         });
       });
@@ -424,7 +432,7 @@ const Dashboard = () => {
               ? "#ef4444"
               : t.priority === "medium"
               ? "#f59e0b"
-              : "#60a5fa",
+              : "#0060FC",
         });
       });
     }
@@ -488,183 +496,287 @@ const Dashboard = () => {
     return Object.values(map);
   })();
 
+  // KPIs seguros: la API puede no devolver tasks_by_status.
+  const statusCounts = payload.tasks_by_status || {};
+  const kpiCompleted = Number(statusCounts.completed ?? 0);
+  const kpiInProgress = Number(statusCounts.in_progress ?? 0);
+  const kpiPending = Number(statusCounts.pending ?? 0);
+  const kpiTotal = kpiCompleted + kpiInProgress + kpiPending;
+  const perUser = Array.isArray(payload.tasks_per_user)
+    ? payload.tasks_per_user
+    : tasksPerUser;
+
+  const kpis = [
+    {
+      label: "Tareas completadas",
+      value: kpiCompleted,
+      icon: FiCheckCircle,
+      tone: "text-emerald-600 bg-emerald-50 ring-emerald-100",
+    },
+    {
+      label: "En progreso",
+      value: kpiInProgress,
+      icon: FiActivity,
+      tone: "text-brand-700 bg-brand-50 ring-brand-100",
+    },
+    {
+      label: "Pendientes",
+      value: kpiPending,
+      icon: FiClock,
+      tone: "text-amber-600 bg-amber-50 ring-amber-100",
+    },
+    {
+      label: "Total de tareas",
+      value: kpiTotal,
+      icon: FiLayers,
+      tone: "text-slate-600 bg-slate-100 ring-slate-200",
+    },
+  ];
+
   return (
-    <LayoutAdmin>
-      <div className="p-6">
+    <LayoutAdmin
+      title="Dashboard"
+      subtitle="Resumen de productividad y avance de tus proyectos"
+    >
+      {/* Estado de carga */}
+      {loading && (
+        <div className="space-y-6">
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="admin-card p-5">
+                <div className="h-3 w-28 animate-pulse rounded bg-slate-200" />
+                <div className="mt-4 h-8 w-16 animate-pulse rounded bg-slate-100" />
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="admin-card h-80 animate-pulse lg:col-span-2" />
+            <div className="admin-card h-80 animate-pulse" />
+          </div>
+        </div>
+      )}
 
-        {loading && <div className="text-gray-400">Cargando métricas...</div>}
-        {err && <div className="text-red-500">{err}</div>}
+      {/* Error */}
+      {!loading && err && (
+        <div className="admin-card flex items-start gap-3 border-red-200 bg-red-50 p-5 text-sm text-red-700">
+          <FiAlertTriangle className="mt-0.5 shrink-0 text-base" />
+          <div>
+            <p className="font-semibold">{err}</p>
+            <p className="mt-1 text-red-600/80">
+              Verifica tu conexión o vuelve a intentarlo más tarde.
+            </p>
+          </div>
+        </div>
+      )}
 
-        {!loading && payload && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-4 gap-6">
-              <div className="bg-[#0f1720] p-4 rounded-lg border border-gray-700">
-                <h2 className="text-lg font-semibold text-white">Tareas completas</h2>
-                <span className="text-3xl text-white">{data.data.tasks_by_status.completed}</span>                
+      {!loading && !err && (
+        <div className="space-y-6">
+          {/* ---------- KPIs ---------- */}
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            {kpis.map(({ label, value, icon: Icon, tone }) => (
+              <div key={label} className="admin-card admin-card-hover p-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">
+                      {label}
+                    </p>
+                    <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 tabular-nums">
+                      {value}
+                    </p>
+                  </div>
+                  <span
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl ring-1 ${tone}`}
+                  >
+                    <Icon className="text-lg" />
+                  </span>
+                </div>
+                {kpiTotal > 0 && (
+                  <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-brand-gradient"
+                      style={{
+                        width: `${Math.round((value / kpiTotal) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                )}
               </div>
-              <div className="bg-[#0f1720] p-4 rounded-lg border border-gray-700">
-                <h2 className="text-lg font-semibold text-white">Tareas en progreso</h2>
-                <span className="text-3xl text-white">{data.data.tasks_by_status.in_progress}</span>
-              </div>
-              <div className="bg-[#0f1720] p-4 rounded-lg border border-gray-700">
-                <h2 className="text-lg font-semibold text-white">Tareas pendientes</h2>
-                <span className="text-3xl text-white">{data.data.tasks_by_status.pending}</span>
-              </div>
-              <div className="bg-[#0f1720] p-4 rounded-lg border border-gray-700">
-                <h2 className="text-lg font-semibold text-white">Tareas</h2>
-                <span className="text-3xl text-white">{data.data.tasks_by_status.completed + data.data.tasks_by_status.in_progress + data.data.tasks_by_status.pending + data.data.tasks_by_status.completed}</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-[#0f1720] p-4 rounded-lg border border-gray-700">
-                <h2 className="text-lg font-semibold text-white mb-3">
+            ))}
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* ---------- Productividad ---------- */}
+            <section className="admin-card p-6 lg:col-span-2">
+              <header className="mb-5">
+                <h2 className="text-base font-semibold text-slate-800">
                   Productividad por usuario
                 </h2>
-                <div className="mb-4">
-                  {data.data.tasks_per_user.map((user) => {
-                    const productivity =
-                      100 -
-                      (user.late > 0 ? (user.late * 100) / user.total_completed : 0);
-                    return (
-                      <div
-                        key={user.id}
-                        className="flex flex-col gap-2 items-start justify-between"
-                      >
-                        <div className="text-sm flex gap-2 text-gray-200">
-                          <div>
-                            <UserAvatar profile={user} size={42} />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-semibold">{user.name}</span>{" "}
-                            <span className="text-gray-400">
-                              (Productividad: {Math.round(productivity)}%)
-                            </span>
-                          </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  Entregas a tiempo frente a entregas tardías.
+                </p>
+              </header>
+
+              <div className="space-y-5">
+                {perUser.length === 0 && (
+                  <p className="py-8 text-center text-sm text-slate-400">
+                    Aún no hay datos de usuarios.
+                  </p>
+                )}
+                {perUser.map((user) => {
+                  const base = user.total_completed || user.total || 0;
+                  const prod =
+                    100 - (user.late > 0 && base ? (user.late * 100) / base : 0);
+                  return (
+                    <div
+                      key={user.id}
+                      className="rounded-xl border border-slate-100 bg-slate-50/60 p-4"
+                    >
+                      <div className="mb-3 flex items-center gap-3">
+                        <UserAvatar profile={user} size={40} color="#0060FC" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-800">
+                            {user.name}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Productividad: {Math.round(prod)}%
+                          </p>
                         </div>
-                        <ProgressBar
-                          on_time={user.on_time}
-                          late={user.late}
-                          total={user.total}
-                        />
+                        <span
+                          className={
+                            prod >= 80
+                              ? "badge-green"
+                              : prod >= 50
+                              ? "badge-amber"
+                              : "badge-red"
+                          }
+                        >
+                          {Math.round(prod)}%
+                        </span>
+                      </div>
+                      <ProgressBar
+                        on_time={user.on_time}
+                        late={user.late}
+                        total={user.total}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              {productivity.length > 0 && (
+                <div className="mt-8 border-t border-slate-100 pt-6">
+                  <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                    Tareas completadas por usuario
+                  </h3>
+                  <BarChart data={productivity} />
+                </div>
+              )}
+
+              {tasksByStatus.length > 0 && (
+                <div className="mt-8 border-t border-slate-100 pt-6">
+                  <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                    Tareas por estado
+                  </h3>
+                  <BarChart data={tasksByStatus} color="#00A3FE" />
+                </div>
+              )}
+            </section>
+
+            {/* ---------- Entrega a tiempo ---------- */}
+            <section className="admin-card h-fit p-6">
+              <header className="mb-5">
+                <h2 className="text-base font-semibold text-slate-800">
+                  Entrega a tiempo
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Estimación global de cumplimiento.
+                </p>
+              </header>
+
+              <div className="flex flex-col items-center rounded-xl bg-slate-50 py-6">
+                <Donut value={onTimeRate} />
+                <p className="mt-3 text-center text-sm text-slate-500">
+                  Proyectos que se entregarán a tiempo
+                </p>
+              </div>
+
+              <div className="mt-6">
+                <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                  Pronóstico por proyecto
+                </h3>
+                <div className="space-y-3">
+                  {projectsForecast.length === 0 && (
+                    <p className="text-sm text-slate-400">
+                      Sin datos de proyectos.
+                    </p>
+                  )}
+                  {projectsForecast.map((p) => {
+                    const pct = Math.round((p.on_time_percent || 0) * 100);
+                    const color =
+                      pct >= 80
+                        ? "bg-emerald-500"
+                        : pct >= 50
+                        ? "bg-amber-400"
+                        : "bg-red-500";
+                    return (
+                      <div key={p.id}>
+                        <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                          <span className="truncate text-slate-600">
+                            {p.name}
+                          </span>
+                          <span className="font-semibold tabular-nums text-slate-800">
+                            {pct}%
+                          </span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className={`${color} h-full rounded-full transition-all`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
                       </div>
                     );
                   })}
-                  <BarChart data={productivity} />
-                </div>
-
-                <h2 className="text-lg font-semibold text-white mb-3 mt-6">
-                  Tareas por estado
-                </h2>
-                <div className="mb-4">
-                  <BarChart data={tasksByStatus} color="#F59E0B" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-                  {onTimeByUser.slice(0, 6).map((u) => (
-                    <div
-                      key={u.id}
-                      className="flex items-center justify-between bg-[#0b1320] p-2 rounded"
-                    >
-                      <div>
-                        <div className="text-sm text-gray-200 font-medium">
-                          {u.name}
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          {u.on_time}/{u.total} a tiempo
-                        </div>
-                      </div>
-                      <div className="text-sm text-white font-semibold">
-                        {Math.round((u.rate || 0) * 100)}%
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
 
-              <div className="bg-[#0f1720] p-4 rounded-lg border border-gray-700">
-                <h2 className="text-lg font-semibold text-white mb-3">
-                  Probabilidad de entrega a tiempo
-                </h2>
-                <div className="flex items-center gap-4">
-                  <Donut value={onTimeRate} />
-                  <div className="flex-1">
-                    <div className="text-white font-semibold text-2xl">
-                      {Math.round((onTimeRate || 0) * 100)}%
-                    </div>
-                    <div className="text-sm text-gray-400">
-                      Proyectos que se entregarán a tiempo (estimado)
-                    </div>
-
-                    <div className="mt-4 space-y-2">
-                      {projectsForecast.length === 0 && (
-                        <div className="text-sm text-gray-400">
-                          Sin datos de proyectos
+              <div className="mt-6 border-t border-slate-100 pt-5">
+                <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                  Cumplimiento por usuario
+                </h3>
+                <div className="space-y-2">
+                  {onTimeByUser.length === 0 && (
+                    <p className="text-sm text-slate-400">Sin datos.</p>
+                  )}
+                  {onTimeByUser.slice(0, 6).map((u) => {
+                    const pct = Math.round((u.rate || 0) * 100);
+                    return (
+                      <div
+                        key={u.id}
+                        className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-slate-700">
+                            {u.name}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {u.on_time}/{u.total} a tiempo
+                          </p>
                         </div>
-                      )}
-                      {projectsForecast.map((p) => {
-                        const pct = Math.round((p.on_time_percent || 0) * 100);
-                        const color =
-                          pct >= 80
-                            ? "bg-green-500"
-                            : pct >= 50
-                            ? "bg-yellow-400"
-                            : "bg-red-500";
-                        return (
-                          <div key={p.id} className="text-sm">
-                            <div className="flex justify-between mb-1">
-                              <div className="text-gray-200">{p.name}</div>
-                              <div className="text-white font-semibold">
-                                {pct}%
-                              </div>
-                            </div>
-                            <div className="w-full h-2 bg-gray-700 rounded">
-                              <div
-                                className={`${color} h-2 rounded`}
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <h3 className="text-sm text-gray-300 font-medium mb-2">
-                    Usuarios entregando a tiempo 80%
-                  </h3>
-                  <div className="space-y-2">
-                    {onTimeByUser.filter((u) => (u.rate || 0) >= 0.8).length ===
-                      0 && (
-                      <div className="text-sm text-gray-400">
-                        Nadie cumple 80%
-                      </div>
-                    )}
-                    {onTimeByUser
-                      .filter((u) => (u.rate || 0) >= 0.8)
-                      .map((u) => (
-                        <div
-                          key={u.id}
-                          className="flex items-center justify-between bg-[#071018] p-2 rounded"
+                        <span
+                          className={pct >= 80 ? "badge-green" : "badge-slate"}
                         >
-                          <div className="text-sm text-gray-200">{u.name}</div>
-                          <div className="text-xs text-green-300 font-semibold">
-                            {Math.round((u.rate || 0) * 100)}%
-                          </div>
-                        </div>
-                      ))}
-                  </div>
+                          {pct}%
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            </div>
+            </section>
           </div>
-        )}
-
-        {!loading && !payload && (
-          <div className="text-gray-400">No hay métricas disponibles.</div>
-        )}
-      </div>
+        </div>
+      )}
     </LayoutAdmin>
   );
 };

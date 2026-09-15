@@ -36,17 +36,17 @@ const Home = () => {
     <Layout title={t("nav.home")}>
       <div className="overflow-hidden bg-[#080a0f] text-white">
         <section className="relative min-h-[calc(100vh-5rem)]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_20%,rgba(1,88,255,.18),transparent_30%),radial-gradient(circle_at_15%_70%,rgba(89,66,255,.12),transparent_28%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_20%,rgba(0,96,252,.18),transparent_30%),radial-gradient(circle_at_15%_70%,rgba(0,163,254,.12),transparent_28%)]" />
           <div className="absolute inset-0 opacity-[.06] [background-image:linear-gradient(rgba(255,255,255,.8)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.8)_1px,transparent_1px)] [background-size:72px_72px]" />
           <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-5 py-24 lg:grid-cols-[1.15fr_.85fr] lg:px-8 lg:py-32">
             <div>
               <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[.2em] text-slate-300">
-                <span className="h-2 w-2 rounded-full bg-[#001cbd] shadow-[0_0_16px_#001cbd]" />
+                <span className="h-2 w-2 rounded-full bg-[#002EFD] shadow-[0_0_16px_#002EFD]" />
                 {t("home.eyebrow")}
               </div>
               <h1 className="max-w-4xl text-5xl font-semibold leading-[1.02] tracking-[-.055em] sm:text-6xl lg:text-8xl">
                 {t("home.heroTitleStart")}{" "}
-                <span className="bg-gradient-to-r from-[#001cbd] to-[#2e5bb6] bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-[#002EFD] to-[#00A3FE] bg-clip-text text-transparent">
                   {t("home.heroTitleAccent")}
                 </span>
               </h1>
@@ -56,7 +56,7 @@ const Home = () => {
               <div className="mt-10 flex flex-col gap-4 sm:flex-row">
                 <Link
                   to="/solicitar-proyecto"
-                  className="flex items-center justify-center gap-3 rounded-full bg-[#001cbd] px-7 py-4 font-semibold shadow-[0_15px_50px_rgba(1,88,255,.25)] transition hover:-translate-y-1 hover:bg-[#ff5572]"
+                  className="flex items-center justify-center gap-3 rounded-full bg-[#002EFD] px-7 py-4 font-semibold shadow-[0_15px_50px_rgba(0,96,252,.25)] transition hover:-translate-y-1 hover:bg-[#0060FC]"
                 >
                   {t("home.primaryCta")} <FiArrowUpRight />
                 </Link>
@@ -69,13 +69,13 @@ const Home = () => {
               </div>
             </div>
             <div className="relative mx-auto flex aspect-square w-full max-w-lg items-center justify-center">
-              <div className="absolute inset-[5%] animate-pulse rounded-full border border-[#001cbd]/25" />
+              <div className="absolute inset-[5%] animate-pulse rounded-full border border-[#002EFD]/25" />
               <div className="absolute inset-[18%] rounded-full border border-dashed border-white/15" />
-              <div className="absolute h-64 w-64 rounded-full bg-[#ff2952]/20 blur-3xl" />
+              <div className="absolute h-64 w-64 rounded-full bg-[#0060FC]/20 blur-3xl" />
               <div className="relative rounded-[3rem] border border-white/10 bg-white/[.04] p-12 shadow-2xl backdrop-blur-md">
                 <img
                   src={Mark}
-                  className="w-52 drop-shadow-[0_20px_45px_rgba(1,88,255,.35)]"
+                  className="w-52 drop-shadow-[0_20px_45px_rgba(0,96,252,.35)]"
                   alt="Appsline"
                 />
               </div>
@@ -118,10 +118,10 @@ const Home = () => {
             {services.map(({ icon: Icon, title, text }, index) => (
               <article
                 key={title}
-                className="group rounded-3xl border border-white/10 bg-white/[.025] p-7 transition hover:-translate-y-2 hover:border-[#001cbd]/50 hover:bg-white/[.05]"
+                className="group rounded-3xl border border-white/10 bg-white/[.025] p-7 transition hover:-translate-y-2 hover:border-[#002EFD]/50 hover:bg-white/[.05]"
               >
                 <div className="mb-12 flex items-start justify-between">
-                  <span className="rounded-2xl bg-[#001cbd]/10 p-4 text-2xl text-[#0158FF]">
+                  <span className="rounded-2xl bg-[#002EFD]/10 p-4 text-2xl text-[#00A3FE]">
                     <Icon />
                   </span>
                   <span className="text-sm text-slate-600">0{index + 1}</span>
@@ -130,7 +130,7 @@ const Home = () => {
                 <p className="mt-4 leading-7 text-slate-400">{text}</p>
                 <Link
                   to="/what-we-do"
-                  className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-[#0158FF]"
+                  className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-[#00A3FE]"
                 >
                   {t("home.learnMore")} <FiArrowUpRight />
                 </Link>
@@ -154,7 +154,7 @@ const Home = () => {
                   key={step}
                   className="flex gap-6 border-t border-white/10 py-7"
                 >
-                  <span className="text-sm font-bold text-[#0158FF]">
+                  <span className="text-sm font-bold text-[#00A3FE]">
                     0{index + 1}
                   </span>
                   <div>
@@ -172,7 +172,7 @@ const Home = () => {
         </section>
 
         <section className="mx-auto max-w-7xl px-5 py-24 lg:px-8 lg:py-32">
-          <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-[#002EFD] to-[#c81754] px-7 py-16 text-center sm:px-12 lg:py-24">
+          <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-[#002EFD] to-[#0025c4] px-7 py-16 text-center sm:px-12 lg:py-24">
             <div className="absolute -right-16 -top-24 h-72 w-72 rounded-full border-[45px] border-white/10" />
             <FiZap className="mx-auto mb-6 text-3xl" />
             <h2 className="mx-auto max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl">

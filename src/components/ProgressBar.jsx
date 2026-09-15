@@ -25,13 +25,13 @@ export default function ProgressBar({ on_time = 0, late = 0, total = 0, height =
 
   return (
     <div className="w-full">
-      <div className="relative w-full rounded-md overflow-hidden" style={{ height }}>
+      <div className="relative w-full overflow-hidden rounded-full" style={{ height }}>
         {/* background for remaining */}
-        <div className="absolute inset-0 bg-gray-800" />
+        <div className="absolute inset-0 bg-slate-200" />
         {/* on-time segment */}
         {onPct > 0 && (
           <div
-            className="absolute top-0 text-center py-2  text-white left-0 bg-green-500"
+            className="absolute left-0 top-0 h-full bg-emerald-500"
             style={{ width: `${onPct}%` }}
             title={`A tiempo: ${on} (${onPct}%)`}
           ></div>
@@ -49,16 +49,16 @@ export default function ProgressBar({ on_time = 0, late = 0, total = 0, height =
       </div>
 
       {showLabels && (
-        <div className="mt-2 flex gap-3 justify-start items-start text-xs text-gray-300">
+        <div className="mt-2 flex gap-3 justify-start items-start text-xs text-slate-500">
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-sm bg-green-500 inline-block" />
-            <span>A tiempo: <strong className="text-white ml-1">{on}</strong></span>
+            <span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block" />
+            <span>A tiempo: <strong className="ml-1 text-slate-800">{on}</strong></span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-sm bg-red-500 inline-block" />
-            <span>Tarde: <strong className="text-white ml-1">{l}</strong></span>
+            <span>Tarde: <strong className="ml-1 text-slate-800">{l}</strong></span>
           </div>
-          <div className=" text-gray-400">Total: <strong className="text-white ml-1">{t}</strong></div>
+          <div className="text-slate-500">Total: <strong className="ml-1 text-slate-800">{t}</strong></div>
         </div>
       )}
     </div>

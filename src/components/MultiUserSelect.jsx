@@ -65,12 +65,12 @@ const MultiUserSelect = ({ value = [], onChange, label = "Asignar a", disabled =
             return (
               <span
                 key={id}
-                className="inline-flex items-center gap-2 bg-app-two/10 text-app-two text-xs px-2 py-1 rounded"
+                className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 ring-1 ring-inset ring-brand-200"
               >
                 {text}
                 <button
                   type="button"
-                  className="text-app-two/80 hover:text-app-two"
+                  className="text-brand-400 transition hover:text-brand-700"
                   onClick={() => removeOne(id)}
                   disabled={disabled}
                   aria-label={`Quitar ${text}`}
@@ -94,7 +94,7 @@ const MultiUserSelect = ({ value = [], onChange, label = "Asignar a", disabled =
       {/* Buscador */}
       <input
         type="text"
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-app-two mb-2"
+        className="admin-input mb-2"
         placeholder="Buscar por nombre o email..."
         value={q}
         onChange={(e) => setQ(e.target.value)}
@@ -119,7 +119,7 @@ const MultiUserSelect = ({ value = [], onChange, label = "Asignar a", disabled =
                   <label className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50">
                     <input
                       type="checkbox"
-                      className="h-4 w-4 text-app-two focus:ring-app-two border-gray-300 rounded"
+                      className="h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500"
                       checked={checked}
                       onChange={() => toggle(id)}
                       disabled={disabled}

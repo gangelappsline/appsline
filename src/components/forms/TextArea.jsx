@@ -1,10 +1,14 @@
-const TextArea = ({ name, placeholder='', value='', extraClasses, onChange}) =>{
-
+const TextArea = ({ name, placeholder = '', value = '', extraClasses = '', onChange }) => {
     return (
-        <>
-        <textarea name={name} rows="6" className={"p-2 rounded-md border-2 border-gray-300 focus:border-app-two active:border-app-two "+extraClasses} placeholder={placeholder} value={value} onChange={onChange}></textarea>
-        </>
-    )
-}
+        <textarea
+            name={name}
+            rows="6"
+            placeholder={placeholder}
+            value={value}
+            onChange={onChange}
+            className={`admin-input resize-y ${extraClasses}`}
+        ></textarea>
+    );
+};
 
 export default TextArea;
