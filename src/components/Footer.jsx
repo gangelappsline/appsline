@@ -32,6 +32,9 @@ const Footer = () => {
               <Link to="/portfolio" className="text-slate-300 hover:text-white">
                 {t("nav.projects")}
               </Link>
+              <Link to="/herramientas" className="text-slate-300 hover:text-white">
+                {t("nav.tools")}
+              </Link>
 
               {/* Nuevo botón Contacto */}
               <button

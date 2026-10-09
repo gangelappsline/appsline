@@ -1,10 +1,10 @@
-import { StrictMode } from "react";
+import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import "./font_awesome_full.css";
 import "./i18n"; // Importa la configuración de i18n
 
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import Home from "./pages/Home.jsx";
 import NoPage from "./pages/NoPage.jsx";
 import AboutUs from "./pages/AboutUs.jsx";
@@ -20,6 +20,24 @@ import Projects from "./pages/admin/Projects.jsx";
 import Project from "./pages/admin/Project.jsx";
 import Product from "./pages/admin/Product.jsx";
 import ProjectLead from "./pages/ProjectLead";
+import ToolsAliasRedirect from "./routes/ToolsAliasRedirect.jsx";
+import ToolsFallback from "./components/tools/ToolsFallback.jsx";
+
+/* Las herramientas se cargan bajo demanda (pdf.js, docx y qrcode pesan). */
+const ToolsIndex = lazy(() => import("./pages/tools/ToolsIndex.jsx"));
+const QrGenerator = lazy(() => import("./pages/tools/QrGenerator.jsx"));
+const PdfToWord = lazy(() => import("./pages/tools/PdfToWord.jsx"));
+const PdfSummary = lazy(() => import("./pages/tools/PdfSummary.jsx"));
+const PdfToText = lazy(() => import("./pages/tools/PdfToText.jsx"));
+const ImageToWebp = lazy(() => import("./pages/tools/ImageToWebp.jsx"));
+const AudioToText = lazy(() => import("./pages/tools/AudioToText.jsx"));
+const JsonFormatter = lazy(() => import("./pages/tools/JsonFormatter.jsx"));
+const Base64Tool = lazy(() => import("./pages/tools/Base64Tool.jsx"));
+const HashGenerator = lazy(() => import("./pages/tools/HashGenerator.jsx"));
+const PasswordGenerator = lazy(() => import("./pages/tools/PasswordGenerator.jsx"));
+const UuidGenerator = lazy(() => import("./pages/tools/UuidGenerator.jsx"));
+const JwtDecoder = lazy(() => import("./pages/tools/JwtDecoder.jsx"));
+const ColorConverter = lazy(() => import("./pages/tools/ColorConverter.jsx"));
 import { HelmetProvider } from "react-helmet-async";
 
 createRoot(document.getElementById("root")).render(
@@ -34,6 +52,37 @@ createRoot(document.getElementById("root")).render(
               <Route path="about-us" element={<AboutUs />} />
               <Route path="what-we-do" element={<WhatWeDo />} />
               <Route path="portfolio" element={<Portfolio />} />
+
+              {/* Herramientas gratuitas para desarrolladores */}
+              <Route
+                path="herramientas"
+                element={
+                  <Suspense fallback={<ToolsFallback />}>
+                    <Outlet />
+                  </Suspense>
+                }
+              >
+                <Route index element={<ToolsIndex />} />
+                <Route path="generador-de-qr" element={<QrGenerator />} />
+                <Route path="pdf-a-word" element={<PdfToWord />} />
+                <Route path="resumen-de-pdf" element={<PdfSummary />} />
+                <Route path="extraer-texto-de-pdf" element={<PdfToText />} />
+                <Route path="imagen-a-webp" element={<ImageToWebp />} />
+                <Route path="audio-a-texto" element={<AudioToText />} />
+                <Route path="formateador-json" element={<JsonFormatter />} />
+                <Route path="base64" element={<Base64Tool />} />
+                <Route path="generador-de-hash" element={<HashGenerator />} />
+                <Route
+                  path="generador-de-contrasenas"
+                  element={<PasswordGenerator />}
+                />
+                <Route path="generador-de-uuid" element={<UuidGenerator />} />
+                <Route path="decodificador-jwt" element={<JwtDecoder />} />
+                <Route path="conversor-de-color" element={<ColorConverter />} />
+              </Route>
+              {/* Alias en inglés */}
+              <Route path="tools" element={<Navigate to="/herramientas" replace />} />
+              <Route path="tools/:slug" element={<ToolsAliasRedirect />} />
               <Route path="*" element={<NoPage />} />
             </Route>
             <Route path="/login" element={<Login />} />

@@ -1,36 +1,184 @@
 {
-  "nav": {"home":"Inicio","about":"Quiénes somos","whatWeDo":"Qué hacemos","projects":"Proyectos","contact":"Contacto","login":"Iniciar sesión","startProject":"Iniciar un proyecto","menu":"Abrir menú"},
+  "nav": {
+    "home": "Inicio",
+    "about": "Quiénes somos",
+    "whatWeDo": "Qué hacemos",
+    "projects": "Proyectos",
+    "contact": "Contacto",
+    "login": "Iniciar sesión",
+    "startProject": "Iniciar un proyecto",
+    "menu": "Abrir menú",
+    "tools": "Herramientas"
+  },
   "home": {
-    "eyebrow":"Soluciones digitales que avanzan",
-    "heroTitleStart":"Creamos productos digitales que hacen crecer",
-    "heroTitleAccent":"tu negocio.",
-    "heroSubtitle":"Diseñamos y desarrollamos experiencias web y móviles de alto impacto. Tecnología, estrategia y diseño trabajando para convertir ideas ambiciosas en productos reales.",
-    "primaryCta":"Cuéntanos tu idea","secondaryCta":"Explorar servicios","years":"años creando","projects":"proyectos lanzados",
-    "servicesEyebrow":"Lo que hacemos","servicesTitle":"De la idea al producto, sin atajos.","servicesIntro":"Nos integramos a tu equipo para diseñar, construir y evolucionar soluciones digitales sólidas, rápidas y preparadas para crecer.",
-    "servicesList":{"web":{"title":"Desarrollo web","text":"Plataformas, e-commerce y aplicaciones web rápidas, escalables y centradas en resultados."},"mobile":{"title":"Apps móviles","text":"Experiencias nativas y multiplataforma fluidas que tus usuarios querrán usar cada día."},"product":{"title":"Producto y UX/UI","text":"Estrategia, investigación y diseño para transformar problemas complejos en productos simples."}},
-    "learnMore":"Saber más","processEyebrow":"Nuestra forma de trabajar","processTitle":"Claridad en cada etapa.","processIntro":"Un proceso colaborativo, transparente y enfocado en entregar valor desde el primer día.",
-    "steps":{"strategy":{"title":"Entender y alinear","text":"Definimos objetivos, usuarios y oportunidades."},"design":{"title":"Diseñar la experiencia","text":"Convertimos la estrategia en flujos y prototipos."},"build":{"title":"Construir y validar","text":"Desarrollamos en iteraciones cortas y medibles."},"scale":{"title":"Lanzar y evolucionar","text":"Medimos, aprendemos y hacemos crecer el producto."}},
-    "ctaTitle":"Tu próxima gran idea merece hacerse realidad.","ctaText":"Hablemos de tus objetivos y construyamos juntos el camino para alcanzarlos."
+    "eyebrow": "Soluciones digitales que avanzan",
+    "heroTitleStart": "Creamos productos digitales que hacen crecer",
+    "heroTitleAccent": "tu negocio.",
+    "heroSubtitle": "Diseñamos y desarrollamos experiencias web y móviles de alto impacto. Tecnología, estrategia y diseño trabajando para convertir ideas ambiciosas en productos reales.",
+    "primaryCta": "Cuéntanos tu idea",
+    "secondaryCta": "Explorar servicios",
+    "years": "años creando",
+    "projects": "proyectos lanzados",
+    "servicesEyebrow": "Lo que hacemos",
+    "servicesTitle": "De la idea al producto, sin atajos.",
+    "servicesIntro": "Nos integramos a tu equipo para diseñar, construir y evolucionar soluciones digitales sólidas, rápidas y preparadas para crecer.",
+    "servicesList": {
+      "web": {
+        "title": "Desarrollo web",
+        "text": "Plataformas, e-commerce y aplicaciones web rápidas, escalables y centradas en resultados."
+      },
+      "mobile": {
+        "title": "Apps móviles",
+        "text": "Experiencias nativas y multiplataforma fluidas que tus usuarios querrán usar cada día."
+      },
+      "product": {
+        "title": "Producto y UX/UI",
+        "text": "Estrategia, investigación y diseño para transformar problemas complejos en productos simples."
+      }
+    },
+    "learnMore": "Saber más",
+    "processEyebrow": "Nuestra forma de trabajar",
+    "processTitle": "Claridad en cada etapa.",
+    "processIntro": "Un proceso colaborativo, transparente y enfocado en entregar valor desde el primer día.",
+    "steps": {
+      "strategy": {
+        "title": "Entender y alinear",
+        "text": "Definimos objetivos, usuarios y oportunidades."
+      },
+      "design": {
+        "title": "Diseñar la experiencia",
+        "text": "Convertimos la estrategia en flujos y prototipos."
+      },
+      "build": {
+        "title": "Construir y validar",
+        "text": "Desarrollamos en iteraciones cortas y medibles."
+      },
+      "scale": {
+        "title": "Lanzar y evolucionar",
+        "text": "Medimos, aprendemos y hacemos crecer el producto."
+      }
+    },
+    "ctaTitle": "Tu próxima gran idea merece hacerse realidad.",
+    "ctaText": "Hablemos de tus objetivos y construyamos juntos el camino para alcanzarlos."
   },
   "about": {
-    "pageTitle":"Quiénes somos","eyebrow":"Quiénes somos","heroTitle":"Personas curiosas creando tecnología con","heroAccent":"propósito.","heroText":"Somos un estudio de producto digital. Unimos negocio, diseño y tecnología para resolver desafíos reales y generar impacto duradero.",
-    "storyEyebrow":"Nuestra historia","storyTitle":"Nacimos para hacer las cosas de otra manera.","storyOne":"Appsline nació de una convicción sencilla: la tecnología funciona mejor cuando entiende a las personas. Desde nuestros inicios acompañamos a empresas y emprendedores a convertir sus retos en oportunidades digitales.","storyTwo":"Hoy somos un equipo multidisciplinario que combina pensamiento estratégico, diseño y desarrollo. Trabajamos cerca de cada cliente, con honestidad, curiosidad y un compromiso absoluto con la calidad.",
-    "mission":{"label":"Misión","title":"Construir tecnología que mueve negocios.","text":"Creamos productos digitales útiles, sostenibles y preparados para evolucionar, ayudando a nuestros clientes a competir y crecer."},
-    "vision":{"label":"Visión","title":"Ser el aliado digital que deja huella.","text":"Queremos ser reconocidos por crear relaciones duraderas y soluciones que mejoran genuinamente la vida de quienes las usan."},
-    "valuesEyebrow":"Lo que nos define","valuesTitle":"Nuestros valores se ven en el trabajo.",
-    "values":{"innovation":{"title":"Curiosidad","text":"Cuestionamos, exploramos y buscamos siempre una mejor forma."},"commitment":{"title":"Compromiso","text":"Hacemos nuestros tus objetivos y cuidamos cada detalle."},"team":{"title":"Colaboración","text":"Las mejores ideas nacen cuando trabajamos como un solo equipo."},"impact":{"title":"Impacto","text":"Priorizamos lo que aporta valor real a usuarios y negocio."}},
-    "ctaTitle":"Construyamos algo extraordinario.","ctaText":"Tu desafío puede ser nuestro próximo gran proyecto."
+    "pageTitle": "Quiénes somos",
+    "eyebrow": "Quiénes somos",
+    "heroTitle": "Personas curiosas creando tecnología con",
+    "heroAccent": "propósito.",
+    "heroText": "Somos un estudio de producto digital. Unimos negocio, diseño y tecnología para resolver desafíos reales y generar impacto duradero.",
+    "storyEyebrow": "Nuestra historia",
+    "storyTitle": "Nacimos para hacer las cosas de otra manera.",
+    "storyOne": "Appsline nació de una convicción sencilla: la tecnología funciona mejor cuando entiende a las personas. Desde nuestros inicios acompañamos a empresas y emprendedores a convertir sus retos en oportunidades digitales.",
+    "storyTwo": "Hoy somos un equipo multidisciplinario que combina pensamiento estratégico, diseño y desarrollo. Trabajamos cerca de cada cliente, con honestidad, curiosidad y un compromiso absoluto con la calidad.",
+    "mission": {
+      "label": "Misión",
+      "title": "Construir tecnología que mueve negocios.",
+      "text": "Creamos productos digitales útiles, sostenibles y preparados para evolucionar, ayudando a nuestros clientes a competir y crecer."
+    },
+    "vision": {
+      "label": "Visión",
+      "title": "Ser el aliado digital que deja huella.",
+      "text": "Queremos ser reconocidos por crear relaciones duraderas y soluciones que mejoran genuinamente la vida de quienes las usan."
+    },
+    "valuesEyebrow": "Lo que nos define",
+    "valuesTitle": "Nuestros valores se ven en el trabajo.",
+    "values": {
+      "innovation": {
+        "title": "Curiosidad",
+        "text": "Cuestionamos, exploramos y buscamos siempre una mejor forma."
+      },
+      "commitment": {
+        "title": "Compromiso",
+        "text": "Hacemos nuestros tus objetivos y cuidamos cada detalle."
+      },
+      "team": {
+        "title": "Colaboración",
+        "text": "Las mejores ideas nacen cuando trabajamos como un solo equipo."
+      },
+      "impact": {
+        "title": "Impacto",
+        "text": "Priorizamos lo que aporta valor real a usuarios y negocio."
+      }
+    },
+    "ctaTitle": "Construyamos algo extraordinario.",
+    "ctaText": "Tu desafío puede ser nuestro próximo gran proyecto."
   },
   "whatWeDo": {
-    "pageTitle":"Qué hacemos","eyebrow":"Qué hacemos","heroTitle":"Convertimos desafíos complejos en soluciones digitales","heroAccent":"simples.","heroText":"Cubrimos todo el ciclo de vida de un producto, desde la estrategia inicial hasta su lanzamiento, operación y crecimiento.",
-    "servicesEyebrow":"Capacidades","servicesTitle":"Todo lo necesario para avanzar.","servicesIntro":"Equipos flexibles y experiencia especializada para crear el producto correcto y construirlo de la manera correcta.",
-    "services":{"web":{"title":"Desarrollo web","text":"Aplicaciones y plataformas robustas, accesibles y optimizadas para cualquier dispositivo."},"mobile":{"title":"Desarrollo móvil","text":"Apps intuitivas y de alto rendimiento para iOS y Android."},"design":{"title":"Diseño UX/UI","text":"Experiencias claras y memorables basadas en necesidades reales."},"consulting":{"title":"Estrategia digital","text":"Decisiones tecnológicas alineadas con tus objetivos de negocio."},"cloud":{"title":"Cloud y DevOps","text":"Infraestructura segura, automatizada y lista para escalar."},"support":{"title":"Evolución y soporte","text":"Mejora continua para que tu producto nunca deje de avanzar."}},
-    "methodEyebrow":"Metodología","methodTitle":"Pensamos, hacemos, medimos.","method":{"discover":{"title":"Descubrir","text":"Entendemos el contexto, el usuario y el reto."},"define":{"title":"Definir","text":"Priorizamos oportunidades y trazamos la ruta."},"create":{"title":"Crear","text":"Diseñamos y construimos de forma iterativa."},"improve":{"title":"Mejorar","text":"Medimos resultados y evolucionamos continuamente."}},
-    "ctaTitle":"¿Tienes un reto entre manos?","ctaText":"Conversemos. Te ayudaremos a encontrar el mejor camino para convertirlo en una oportunidad."
+    "pageTitle": "Qué hacemos",
+    "eyebrow": "Qué hacemos",
+    "heroTitle": "Convertimos desafíos complejos en soluciones digitales",
+    "heroAccent": "simples.",
+    "heroText": "Cubrimos todo el ciclo de vida de un producto, desde la estrategia inicial hasta su lanzamiento, operación y crecimiento.",
+    "servicesEyebrow": "Capacidades",
+    "servicesTitle": "Todo lo necesario para avanzar.",
+    "servicesIntro": "Equipos flexibles y experiencia especializada para crear el producto correcto y construirlo de la manera correcta.",
+    "services": {
+      "web": {
+        "title": "Desarrollo web",
+        "text": "Aplicaciones y plataformas robustas, accesibles y optimizadas para cualquier dispositivo."
+      },
+      "mobile": {
+        "title": "Desarrollo móvil",
+        "text": "Apps intuitivas y de alto rendimiento para iOS y Android."
+      },
+      "design": {
+        "title": "Diseño UX/UI",
+        "text": "Experiencias claras y memorables basadas en necesidades reales."
+      },
+      "consulting": {
+        "title": "Estrategia digital",
+        "text": "Decisiones tecnológicas alineadas con tus objetivos de negocio."
+      },
+      "cloud": {
+        "title": "Cloud y DevOps",
+        "text": "Infraestructura segura, automatizada y lista para escalar."
+      },
+      "support": {
+        "title": "Evolución y soporte",
+        "text": "Mejora continua para que tu producto nunca deje de avanzar."
+      }
+    },
+    "methodEyebrow": "Metodología",
+    "methodTitle": "Pensamos, hacemos, medimos.",
+    "method": {
+      "discover": {
+        "title": "Descubrir",
+        "text": "Entendemos el contexto, el usuario y el reto."
+      },
+      "define": {
+        "title": "Definir",
+        "text": "Priorizamos oportunidades y trazamos la ruta."
+      },
+      "create": {
+        "title": "Crear",
+        "text": "Diseñamos y construimos de forma iterativa."
+      },
+      "improve": {
+        "title": "Mejorar",
+        "text": "Medimos resultados y evolucionamos continuamente."
+      }
+    },
+    "ctaTitle": "¿Tienes un reto entre manos?",
+    "ctaText": "Conversemos. Te ayudaremos a encontrar el mejor camino para convertirlo en una oportunidad."
   },
-  "projects":{"title":"Nuestro portafolio","filterAll":"Todos","filterWeb":"Web","filterMobile":"Móvil","filterEcommerce":"E-commerce","viewProject":"Ver proyecto"},
-  "footer":{"tagline":"Soluciones inteligentes para una era digital.","rights":"Todos los derechos reservados."},
-  "common":{"loading":"Cargando...","error":"Error","submit":"Enviar"},
+  "projects": {
+    "title": "Nuestro portafolio",
+    "filterAll": "Todos",
+    "filterWeb": "Web",
+    "filterMobile": "Móvil",
+    "filterEcommerce": "E-commerce",
+    "viewProject": "Ver proyecto"
+  },
+  "footer": {
+    "tagline": "Soluciones inteligentes para una era digital.",
+    "rights": "Todos los derechos reservados."
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "submit": "Enviar"
+  },
   "contact": {
     "title": "Cuéntanos tu idea",
     "subtitle": "Comparte tu visión con nosotros y te contactaremos pronto.",
@@ -59,6 +207,302 @@
       "photoSize": "La imagen no debe superar los 5MB",
       "photoType": "Formato no válido (JPG, PNG, WEBP, GIF)",
       "server": "Ocurrió un error. Intenta de nuevo."
+    }
+  },
+  "tools": {
+    "pageTitle": "Herramientas",
+    "eyebrow": "Herramientas gratuitas",
+    "heroTitle": "Utilidades que usamos cada día,",
+    "heroAccent": "gratis para ti.",
+    "heroText": "Una colección de herramientas rápidas para desarrolladores, diseñadores y equipos de producto. Todo se procesa en tu navegador: tus archivos nunca salen de tu computadora.",
+    "searchPlaceholder": "Buscar una herramienta…",
+    "all": "Todas",
+    "seeAll": "Ver todas las herramientas",
+    "noResults": "No encontramos herramientas con ese nombre.",
+    "categories": {
+      "documents": "Documentos",
+      "media": "Imagen y audio",
+      "developers": "Desarrollo"
+    },
+    "items": {
+      "pdfToWord": {
+        "name": "PDF a Word",
+        "desc": "Convierte el contenido de un PDF en un documento .docx editable.",
+        "intro": "Extrae el texto de tu PDF y descárgalo como documento de Word (.docx) listo para editar. La conversión ocurre completamente en tu navegador."
+      },
+      "pdfSummary": {
+        "name": "Resumen de PDF",
+        "desc": "Obtén un resumen con las ideas clave de un PDF o de un texto largo.",
+        "intro": "Sube un PDF (o pega un texto) y obtén un resumen con las frases más relevantes, palabras clave y estadísticas de lectura."
+      },
+      "pdfToText": {
+        "name": "Extraer texto de PDF",
+        "desc": "Convierte cualquier PDF en texto plano listo para copiar.",
+        "intro": "Obtén todo el texto de un PDF, página por página, listo para copiar o descargar como .txt."
+      },
+      "imageToWebp": {
+        "name": "Imágenes a WebP",
+        "desc": "Convierte PNG, JPG, GIF o AVIF a WebP y reduce el peso de tu sitio.",
+        "intro": "Convierte imágenes de cualquier formato a WebP (también a PNG o JPG), ajusta la calidad y redimensiona en lote sin salir del navegador."
+      },
+      "audioToText": {
+        "name": "Audio a texto",
+        "desc": "Transcribe voz a texto en tiempo real en varios idiomas.",
+        "intro": "Dicta o reproduce audio y obtén la transcripción en tiempo real con el motor de reconocimiento de voz de tu navegador."
+      },
+      "qrGenerator": {
+        "name": "Generador de códigos QR",
+        "desc": "Crea códigos QR para enlaces, WiFi, contactos y más.",
+        "intro": "Genera códigos QR personalizados para URLs, redes WiFi, correos, teléfonos o tarjetas de contacto y descárgalos en PNG o SVG."
+      },
+      "jsonFormatter": {
+        "name": "Formateador JSON",
+        "desc": "Formatea, minifica y valida JSON al instante.",
+        "intro": "Ordena, indenta, minifica y valida tus estructuras JSON con mensajes de error claros."
+      },
+      "base64": {
+        "name": "Base64",
+        "desc": "Codifica y decodifica texto o archivos en Base64.",
+        "intro": "Convierte texto a Base64 y de vuelta, con soporte UTF-8, variante URL-safe y conversión de archivos a Data URL."
+      },
+      "hashGenerator": {
+        "name": "Generador de hash",
+        "desc": "Calcula SHA-1, SHA-256, SHA-384 y SHA-512 de texto o archivos.",
+        "intro": "Genera hashes criptográficos de un texto o de un archivo para verificar integridad, usando la Web Crypto API del navegador."
+      },
+      "passwordGenerator": {
+        "name": "Generador de contraseñas",
+        "desc": "Crea contraseñas seguras y aleatorias con entropía real.",
+        "intro": "Genera contraseñas robustas con aleatoriedad criptográfica, controla longitud, símbolos y revisa su entropía en bits."
+      },
+      "uuidGenerator": {
+        "name": "Generador de UUID",
+        "desc": "Genera identificadores únicos UUID v4, ULID o Nano ID.",
+        "intro": "Crea identificadores únicos en lote para bases de datos, APIs o pruebas, con formato UUID v4, ULID o Nano ID."
+      },
+      "jwtDecoder": {
+        "name": "Decodificador JWT",
+        "desc": "Inspecciona el header, el payload y la expiración de un token.",
+        "intro": "Pega un JSON Web Token y revisa su contenido, claims y fecha de expiración sin enviarlo a ningún servidor."
+      },
+      "colorConverter": {
+        "name": "Conversor de colores",
+        "desc": "Convierte entre HEX, RGB, HSL y CMYK y revisa el contraste.",
+        "intro": "Convierte colores entre formatos, genera una escala de tonos y verifica el contraste según los criterios WCAG."
+      }
+    },
+    "ui": {
+      "copy": "Copiar",
+      "copied": "¡Copiado!",
+      "clear": "Limpiar",
+      "download": "Descargar",
+      "preview": "Vista previa",
+      "result": "Resultado",
+      "processing": "Procesando…",
+      "related": "Otras herramientas",
+      "genericError": "Ocurrió un error inesperado. Intenta de nuevo.",
+      "privacy": "100% en tu navegador: tus archivos no se suben a ningún servidor.",
+      "dropLabel": "Arrastra un archivo o haz clic para seleccionarlo",
+      "dropHint": "El archivo se procesa localmente",
+      "ctaTitle": "¿Necesitas una herramienta a la medida?",
+      "ctaText": "En Appsline construimos plataformas, automatizaciones e integraciones para empresas. Cuéntanos tu caso."
+    },
+    "qr": {
+      "contentTitle": "Contenido del código",
+      "styleTitle": "Personalización",
+      "presets": {
+        "text": "Texto",
+        "url": "Enlace",
+        "wifi": "WiFi",
+        "email": "Correo",
+        "phone": "Teléfono",
+        "vcard": "Contacto"
+      },
+      "fields": {
+        "text": "Texto",
+        "url": "URL",
+        "ssid": "Nombre de la red (SSID)",
+        "password": "Contraseña",
+        "encryption": "Seguridad",
+        "email": "Correo electrónico",
+        "subject": "Asunto",
+        "body": "Mensaje",
+        "phone": "Teléfono",
+        "fullName": "Nombre completo",
+        "org": "Empresa"
+      },
+      "noPassword": "Sin contraseña",
+      "size": "Tamaño",
+      "margin": "Margen",
+      "foreground": "Color del código",
+      "background": "Color de fondo",
+      "level": "Corrección de errores",
+      "levelHint": "Un nivel alto permite leer el QR aunque esté parcialmente dañado.",
+      "empty": "Escribe algo para generar tu código QR."
+    },
+    "pdfToWord": {
+      "uploadTitle": "Sube tu PDF",
+      "uploadHint": "Archivos de hasta ~50 MB. Se procesa en tu navegador.",
+      "drop": "Arrastra tu PDF aquí",
+      "keepBreaks": "Conservar saltos de página",
+      "action": "Convertir a Word",
+      "success": "Listo: {{pages}} páginas y {{chars}} caracteres convertidos. La descarga inició automáticamente.",
+      "noText": "Este PDF no contiene texto seleccionable (probablemente es un escaneo). Necesitarías OCR para convertirlo.",
+      "note": "La conversión conserva el texto y los saltos de página. Los diseños complejos, columnas e imágenes no se replican en el documento de Word."
+    },
+    "pdfSummary": {
+      "sourceTitle": "Fuente del contenido",
+      "modes": {
+        "pdf": "Desde un PDF",
+        "text": "Pegar texto"
+      },
+      "drop": "Arrastra el PDF que quieres resumir",
+      "textPlaceholder": "Pega aquí el texto que quieres resumir…",
+      "length": "Longitud del resumen:",
+      "levels": {
+        "short": "Breve",
+        "medium": "Equilibrado",
+        "long": "Detallado"
+      },
+      "action": "Generar resumen",
+      "resultTitle": "Resumen",
+      "keywords": "Palabras clave",
+      "noText": "No encontramos texto para resumir.",
+      "stats": {
+        "pages": "Páginas",
+        "words": "Palabras",
+        "summaryWords": "Palabras del resumen",
+        "minutes": "Lectura"
+      },
+      "note": "El resumen es extractivo: selecciona las frases más representativas del documento sin enviar tu archivo a ningún servicio externo."
+    },
+    "pdfToText": {
+      "uploadTitle": "Sube tu PDF",
+      "drop": "Arrastra tu PDF aquí",
+      "separator": "Marcar el inicio de cada página",
+      "action": "Extraer texto",
+      "page": "Página",
+      "noText": "Este PDF no contiene texto seleccionable (probablemente es un escaneo).",
+      "stats": "{{words}} palabras · {{chars}} caracteres"
+    },
+    "imageToWebp": {
+      "uploadTitle": "Sube tus imágenes",
+      "uploadHint": "Puedes convertir varias imágenes a la vez.",
+      "drop": "Arrastra tus imágenes aquí",
+      "format": "Formato de salida",
+      "quality": "Calidad",
+      "maxWidth": "Ancho máximo (px)",
+      "maxWidthHint": "Déjalo vacío para conservar el tamaño original.",
+      "action": "Convertir imágenes",
+      "downloadAll": "Descargar todas",
+      "saved": "Ahorro de {{percent}}% · {{before}} → {{after}}",
+      "unsupported": "Tu navegador no pudo generar este formato."
+    },
+    "audioToText": {
+      "liveTitle": "Transcripción en vivo",
+      "liveHint": "Habla por el micrófono y el texto aparecerá al instante.",
+      "language": "Idioma del audio",
+      "start": "Iniciar transcripción",
+      "stop": "Detener",
+      "listening": "Escuchando…",
+      "fileTitle": "Archivo de audio",
+      "fileHint": "Reprodúcelo y transcríbelo con el micrófono activo.",
+      "drop": "Arrastra tu archivo de audio o video",
+      "fileNote": "Los navegadores no permiten transcribir un archivo directamente. Reproduce el audio en voz alta con la transcripción en vivo activada, o escríbenos si necesitas transcripción automática de archivos a gran escala.",
+      "transcriptTitle": "Transcripción",
+      "transcriptPlaceholder": "Aquí aparecerá tu transcripción. También puedes editarla a mano.",
+      "unsupported": "Tu navegador no soporta reconocimiento de voz. Te recomendamos Google Chrome o Microsoft Edge en escritorio.",
+      "errors": {
+        "not-allowed": "Necesitamos permiso para usar el micrófono.",
+        "service-not-allowed": "El servicio de reconocimiento de voz no está disponible.",
+        "audio-capture": "No detectamos ningún micrófono conectado.",
+        "network": "Error de red al conectar con el servicio de reconocimiento."
+      }
+    },
+    "json": {
+      "inputTitle": "Tu JSON",
+      "indent": "Indentación",
+      "sortKeys": "Ordenar claves alfabéticamente",
+      "format": "Formatear",
+      "minify": "Minificar",
+      "validate": "Validar",
+      "valid": "✓ El JSON es válido.",
+      "type": "Tipo",
+      "keys": "Claves de primer nivel",
+      "size": "Tamaño"
+    },
+    "base64": {
+      "inputTitle": "Texto",
+      "modes": {
+        "encode": "Codificar",
+        "decode": "Decodificar"
+      },
+      "placeholders": {
+        "encode": "Escribe el texto que quieres codificar…",
+        "decode": "Pega aquí el Base64 que quieres decodificar…"
+      },
+      "urlSafe": "Variante URL-safe (sin +, / ni =)",
+      "error": "El contenido no es Base64 válido.",
+      "fileTitle": "Archivo a Data URL",
+      "fileHint": "Convierte imágenes o documentos en una cadena Base64 lista para usar en CSS o HTML.",
+      "fileDrop": "Arrastra un archivo para convertirlo"
+    },
+    "hash": {
+      "inputTitle": "Texto a cifrar",
+      "placeholder": "Escribe o pega el texto…",
+      "action": "Generar hashes",
+      "fromText": "Desde texto",
+      "fileTitle": "Hash de un archivo",
+      "fileHint": "Verifica la integridad de un archivo comparando su checksum.",
+      "fileDrop": "Arrastra un archivo para calcular su hash"
+    },
+    "password": {
+      "optionsTitle": "Configuración",
+      "length": "Longitud",
+      "quantity": "Cantidad",
+      "action": "Generar de nuevo",
+      "sets": {
+        "lower": "Minúsculas (a-z)",
+        "upper": "Mayúsculas (A-Z)",
+        "numbers": "Números (2-9)",
+        "symbols": "Símbolos (!@#$)",
+        "ambiguous": "Incluir caracteres ambiguos (i, l, 1, O, 0)"
+      }
+    },
+    "uuid": {
+      "optionsTitle": "Configuración",
+      "types": {
+        "v4": "UUID v4",
+        "ulid": "ULID",
+        "nano": "Nano ID"
+      },
+      "quantity": "Cantidad",
+      "uppercase": "Mayúsculas",
+      "braces": "Entre llaves { }",
+      "action": "Generar de nuevo"
+    },
+    "jwt": {
+      "inputTitle": "Token",
+      "inputHint": "El token se decodifica localmente; nunca se envía a un servidor.",
+      "invalid": "El token no tiene un formato JWT válido.",
+      "header": "Header",
+      "payload": "Payload",
+      "claims": "Claims principales",
+      "expired": "Token expirado el {{date}}.",
+      "validUntil": "Token vigente hasta el {{date}}.",
+      "note": "Esta herramienta solo decodifica el token: no verifica la firma. Nunca compartas tokens de producción."
+    },
+    "color": {
+      "inputTitle": "Color de entrada",
+      "inputHint": "Acepta HEX, RGB, RGBA y HSL.",
+      "value": "Valor",
+      "picker": "Selector",
+      "invalid": "No pudimos interpretar ese color.",
+      "formats": "Formatos",
+      "scale": "Escala de tonos",
+      "contrast": "Contraste (WCAG)",
+      "onWhite": "Sobre blanco",
+      "onDark": "Sobre oscuro"
     }
   }
 }
