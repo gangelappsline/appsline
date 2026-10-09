@@ -117,13 +117,30 @@ const ProjectLead = () => {
 
     setLoading(true);
     try {
-      const response = await fetch("https://api.appsline.com.mx/api/leads", {
+      const apiUrl = import.meta.env.VITE_API_URL;
+      const response = await fetch(`${apiUrl}/leads`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "accept": "application/json"
         },
         body: JSON.stringify({
           ...formData,
+          //Get browser and environment metadata
+          metadata: {
+            userAgent: navigator.userAgent,
+            platform: navigator.platform,
+            language: navigator.language,
+            url: window.location.href,
+            referrer: document.referrer,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            screenWidth: window.screen.width,
+            screenHeight: window.screen.height,
+            colorDepth: window.screen.colorDepth,
+            orientation: window.screen.orientation?.type || null,
+            colorScheme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+            deviceMemory: navigator.deviceMemory || null,
+          },
           usuarios_estimados: formData.usuarios_estimados ? parseInt(formData.usuarios_estimados) : null
         }),
       });
