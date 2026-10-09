@@ -30,5 +30,35 @@
   },
   "projects":{"title":"Nuestro portafolio","filterAll":"Todos","filterWeb":"Web","filterMobile":"Móvil","filterEcommerce":"E-commerce","viewProject":"Ver proyecto"},
   "footer":{"tagline":"Soluciones inteligentes para una era digital.","rights":"Todos los derechos reservados."},
-  "common":{"loading":"Cargando...","error":"Error","submit":"Enviar"}
+  "common":{"loading":"Cargando...","error":"Error","submit":"Enviar"},
+  "contact": {
+    "title": "Cuéntanos tu idea",
+    "subtitle": "Comparte tu visión con nosotros y te contactaremos pronto.",
+    "optional": "opcional",
+    "send": "Enviar mensaje",
+    "sending": "Enviando...",
+    "successTitle": "¡Mensaje enviado!",
+    "successMessage": "Gracias por contactarnos. Te responderemos lo antes posible.",
+    "fields": {
+      "name": "Nombre",
+      "email": "Correo electrónico",
+      "photo": "Foto o referencia",
+      "message": "Mensaje"
+    },
+    "placeholders": {
+      "name": "Tu nombre completo",
+      "email": "tu@email.com",
+      "photo": "Sube una imagen (opcional)",
+      "message": "Cuéntanos sobre tu idea..."
+    },
+    "errors": {
+      "name": "El nombre es requerido",
+      "emailRequired": "El correo es requerido",
+      "emailInvalid": "Ingresa un correo válido",
+      "message": "El mensaje es requerido",
+      "photoSize": "La imagen no debe superar los 5MB",
+      "photoType": "Formato no válido (JPG, PNG, WEBP, GIF)",
+      "server": "Ocurrió un error. Intenta de nuevo."
+    }
+  }
 }
