@@ -1,7 +1,9 @@
 import LayoutAdmin from "../../layouts/LayoutAdmin";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { TiEye, TiPencil, TiTimes } from "react-icons/ti";
+import { TiPencil, TiTimes } from "react-icons/ti";
+import { FiArrowUpRight, FiBriefcase, FiCalendar, FiCheckCircle, FiClock, FiGrid, FiList, FiMoreHorizontal, FiPlus, FiSearch, FiUsers } from "react-icons/fi";
+import "./Projects.css";
 
 const Projects = () => {
   const [projects, setProjects] = useState([]);
@@ -10,6 +12,7 @@ const Projects = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [view, setView] = useState("grid");
   const [currentProject, setCurrentProject] = useState(null);
   const navigate = useNavigate();
 
@@ -50,7 +53,7 @@ const Projects = () => {
       setProjects(
         Array.isArray(data.data) ? data.data : data.data?.projects || []
       );
-    } catch (err) {
+    } catch {
       setProjects([]);
     } finally {
       setLoading(false);
@@ -173,110 +176,62 @@ const Projects = () => {
   };
 
   const filteredProjects = projects.filter((p) =>
-    p.name?.toLowerCase().includes(search.toLowerCase())
+    `${p.name || ""} ${p.client_name || ""}`.toLowerCase().includes(search.toLowerCase())
   );
 
-  return (
-    <LayoutAdmin
-      title="Proyectos"
-      subtitle="Administra los proyectos activos y su información"
-      actions={
-        <button className="btn-primary" onClick={handleOpenCreate}>
-          + Nuevo proyecto
-        </button>
-      }
-    >
-      <div className="mb-6">
-        <input
-          type="search"
-          placeholder="Buscar proyecto..."
-          className="admin-input md:max-w-sm"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+  const completedCount = projects.filter((item) => ["completed", "finished", "finalizado"].includes(item.status)).length;
+  const activeCount = projects.filter((item) => !["completed", "finished", "finalizado", "rejected"].includes(item.status)).length;
+  const totalBudget = projects.reduce((sum, item) => sum + Number(item.budget || 0), 0);
+  const projectProgress = (item) => item.progress ?? (item.tasks_count ? Math.round((Number(item.completed_tasks || 0) / Number(item.tasks_count)) * 100) : 0);
 
-      {loading ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="admin-card p-5">
-              <div className="h-32 w-full animate-pulse rounded-lg bg-slate-100" />
-              <div className="mt-4 h-4 w-2/3 animate-pulse rounded bg-slate-200" />
-              <div className="mt-2 h-3 w-full animate-pulse rounded bg-slate-100" />
-            </div>
-          ))}
-        </div>
-      ) : filteredProjects.length === 0 ? (
-        <div className="admin-card p-16 text-center">
-          <p className="font-medium text-slate-700">No se encontraron proyectos</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Ajusta la búsqueda o crea un nuevo proyecto para comenzar.
-          </p>
-          <button className="btn-primary mt-6" onClick={handleOpenCreate}>
-            + Nuevo proyecto
-          </button>
-        </div>
-      ) : (
-        <div>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredProjects.map((project) => (
-              <div
-                key={project.id}
-                className="admin-card admin-card-hover flex flex-col justify-between p-5"
-              >
-                <div>
-                  {project.logo && (
-                    <img 
-                      src={project.logo} 
-                      alt={project.name}
-                      className="mb-4 h-32 w-full rounded-lg border border-slate-100 object-cover"
-                    />
-                  )}
-                  <h3 className="mb-2 truncate text-lg font-semibold text-slate-900">
-                    {project.name}
-                  </h3>
-                  <p className="mb-4 line-clamp-3 text-sm leading-6 text-slate-500">
-                    {project.description}
-                  </p>
-                  {project.budget && (
-                    <p className="mb-1.5 text-sm font-semibold text-emerald-600">
-                      ${Number(project.budget).toLocaleString()}
-                    </p>
-                  )}
-                  {project.client_name && (
-                    <p className="mb-1 truncate text-sm text-slate-500">
-                      Cliente: {project.client_name}
-                    </p>
-                  )}
-                </div>
-                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
-                  <div className="flex items-center gap-1">
-                    <button
-                      className="rounded-lg p-2 text-slate-500 transition hover:bg-brand-50 hover:text-brand-700"
-                      onClick={() => navigate(`/admin/projects/${project.id}`)}
-                      title="Ver proyecto"
-                    >
-                      <TiEye className="h-5 w-5" />
-                    </button>
-                    <button
-                      className="rounded-lg p-2 text-slate-500 transition hover:bg-brand-50 hover:text-brand-700"
-                      onClick={() => handleOpenEdit(project)}
-                      title="Editar proyecto"
-                    >
-                      <TiPencil className="h-5 w-5" />
-                    </button>
-                  </div>
-                  {project.status && (
-                    <span className="badge-brand capitalize">
-                      {project.status}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
+  return (
+    <LayoutAdmin>
+      <div className="projects-page">
+        <section className="projects-heading">
+          <div>
+            <span className="projects-eyebrow"><FiBriefcase /> PORTAFOLIO DE TRABAJO</span>
+            <h1>Proyectos</h1>
+            <p>Organiza el trabajo, supervisa avances y mantén a tu equipo alineado.</p>
           </div>
-        </div>
-      )}
+          <button className="new-project-btn" onClick={handleOpenCreate}><FiPlus /> Nuevo proyecto</button>
+        </section>
+
+        <section className="project-summary-grid">
+          <article><span className="summary-icon blue"><FiBriefcase /></span><div><small>PROYECTOS TOTALES</small><strong>{projects.length}</strong><p><b>{activeCount}</b> actualmente activos</p></div></article>
+          <article><span className="summary-icon violet"><FiClock /></span><div><small>EN PROGRESO</small><strong>{activeCount}</strong><p>Proyectos en ejecución</p></div></article>
+          <article><span className="summary-icon green"><FiCheckCircle /></span><div><small>COMPLETADOS</small><strong>{completedCount}</strong><p>Entregados exitosamente</p></div></article>
+          <article><span className="summary-icon amber"><FiArrowUpRight /></span><div><small>PRESUPUESTO TOTAL</small><strong>${totalBudget.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</strong><p>Valor del portafolio</p></div></article>
+        </section>
+
+        <section className="projects-panel">
+          <div className="projects-tools">
+            <label><FiSearch /><input type="search" placeholder="Buscar proyecto o cliente..." value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+            <div className="projects-view-toggle"><button className={view === "grid" ? "active" : ""} onClick={() => setView("grid")} title="Cuadrícula"><FiGrid /></button><button className={view === "list" ? "active" : ""} onClick={() => setView("list")} title="Lista"><FiList /></button></div>
+          </div>
+
+          {loading ? (
+            <div className="project-cards-grid">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="project-card project-loading"><i /><i /><i /></div>)}</div>
+          ) : filteredProjects.length === 0 ? (
+            <div className="projects-empty"><span><FiBriefcase /></span><h3>No encontramos proyectos</h3><p>Ajusta tu búsqueda o crea un proyecto para comenzar.</p><button className="new-project-btn" onClick={handleOpenCreate}><FiPlus /> Crear proyecto</button></div>
+          ) : view === "grid" ? (
+            <div className="project-cards-grid">
+              {filteredProjects.map((item, index) => {
+                const pct = projectProgress(item);
+                const palettes = ["indigo", "cyan", "violet", "orange"];
+                return <article className="portfolio-card" key={item.id} onClick={() => navigate(`/admin/projects/${item.id}`)}>
+                  <div className="portfolio-card-top"><span className={`project-letter ${palettes[index % palettes.length]}`}>{item.logo ? <img src={item.logo} alt="" /> : (item.name || "P").slice(0, 2).toUpperCase()}</span><div className="portfolio-card-actions"><button onClick={(event) => { event.stopPropagation(); handleOpenEdit(item); }} title="Editar"><TiPencil /></button><button onClick={(event) => event.stopPropagation()}><FiMoreHorizontal /></button></div></div>
+                  <div className="portfolio-title"><span className={`portfolio-status ${item.status || "active"}`}><i /> {item.status === "completed" ? "Finalizado" : item.status === "rejected" ? "Rechazado" : "En curso"}</span><h3>{item.name}</h3><p>{item.description || "Sin descripción del proyecto."}</p></div>
+                  <div className="portfolio-client"><span>{(item.client_name || "AP").split(/\s+/).slice(0,2).map((x) => x[0]).join("").toUpperCase()}</span><div><small>CLIENTE</small><strong>{item.client_name || "Appsline"}</strong></div></div>
+                  <div className="portfolio-progress"><div><span>Progreso</span><b>{pct}%</b></div><i><em style={{ width: `${pct}%` }} /></i></div>
+                  <div className="portfolio-footer"><span><FiCalendar /> {item.end_date ? new Date(item.end_date).toLocaleDateString("es-MX", { day:"numeric", month:"short", year:"numeric" }) : "Sin fecha"}</span><span><FiUsers /> {item.members_count || item.users_count || 0}</span><button>Ver tablero <FiArrowUpRight /></button></div>
+                </article>;
+              })}
+            </div>
+          ) : (
+            <div className="projects-list"><div className="projects-list-head"><span>Proyecto</span><span>Cliente</span><span>Progreso</span><span>Entrega</span><span>Estado</span></div>{filteredProjects.map((item, index) => <button key={item.id} onClick={() => navigate(`/admin/projects/${item.id}`)}><span className={`project-letter ${["indigo","cyan","violet","orange"][index%4]}`}>{(item.name || "P").slice(0,2).toUpperCase()}</span><span className="list-project-name"><strong>{item.name}</strong><small>{item.description}</small></span><span>{item.client_name || "—"}</span><span className="list-progress"><i><em style={{ width: `${projectProgress(item)}%` }} /></i><b>{projectProgress(item)}%</b></span><span>{item.end_date ? new Date(item.end_date).toLocaleDateString("es-MX") : "—"}</span><span className={`portfolio-status ${item.status || "active"}`}><i />{item.status === "completed" ? "Finalizado" : "En curso"}</span></button>)}</div>
+          )}
+        </section>
+      </div>
 
       {/* Modal */}
       {showModal && (

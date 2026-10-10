@@ -1,1341 +1,370 @@
-import { useEffect, useState } from "react";
-import { Dialog, Transition } from "@headlessui/react";
-import { motion, AnimatePresence } from "framer-motion";
+/* eslint-disable react/prop-types */
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  FiActivity, FiArchive, FiArrowLeft, FiCalendar, FiCheck,
+  FiCheckCircle, FiChevronDown, FiClock, FiColumns, FiDownload, FiFile,
+  FiFilter, FiFlag, FiGrid, FiLink, FiList, FiMessageSquare, FiMoreHorizontal,
+  FiPaperclip, FiPlus, FiSearch, FiSend, FiTrash2, FiUpload,
+  FiUser, FiUsers, FiX,
+} from "react-icons/fi";
 import LayoutAdmin from "../../layouts/LayoutAdmin";
-import UserSelect from "../../components/UserSelect";
-import { TiFlag,TiPencil, TiTrash  } from "react-icons/ti";
-import { useParams } from 'react-router-dom';
+import "./Project.css";
 
-const columns = [
-  { key: "pending", label: "Pendientes" },
-  { key: "in_progress", label: "Activas" },
-  { key: "completed", label: "Finalizadas" },
-  { key: "rejected", label: "Rechazadas" },
+const COLUMNS = [
+  { key: "pending", label: "Pendientes", color: "#8b5cf6", icon: FiArchive },
+  { key: "in_progress", label: "En progreso", color: "#0ea5e9", icon: FiActivity },
+  { key: "completed", label: "Finalizadas", color: "#10b981", icon: FiCheckCircle },
+  { key: "rejected", label: "Rechazadas", color: "#f43f5e", icon: FiX },
 ];
+const PRIORITIES = {
+  high: { label: "Alta", color: "#ef4444" },
+  medium: { label: "Media", color: "#f59e0b" },
+  low: { label: "Baja", color: "#3b82f6" },
+};
+const EMPTY_TASK = { title: "", description: "", status: "pending", priority: "medium", assigned_to: "", due_date: "", estimated_hours: "" };
 
-//Obten el parametro de id de la URL
+const initials = (name = "Usuario") => name.split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join("");
+const assigneeOf = (task) => {
+  const raw = task?.assigned_to ?? task?.assignees?.[0] ?? task?.user;
+  return typeof raw === "object" && raw ? raw : null;
+};
+const assigneeId = (task) => {
+  const raw = task?.assigned_to ?? task?.assignees?.[0] ?? task?.user_id ?? "";
+  return typeof raw === "object" && raw ? raw.id : raw;
+};
+const dateLabel = (value) => {
+  if (!value) return "Sin fecha";
+  const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("es-MX", { day: "numeric", month: "short" }).replace(".", "");
+};
+const isLate = (value, status) => value && status !== "completed" && new Date(value) < new Date(new Date().toDateString());
 
-const Project = () => {
+function Avatar({ user, size = "md", className = "" }) {
+  const name = user?.name || user?.email || "Sin asignar";
+  return (
+    <span className={`task-avatar task-avatar-${size} ${className}`} title={name}>
+      {user?.photo || user?.avatar ? <img src={user.photo || user.avatar} alt={name} /> : initials(name)}
+    </span>
+  );
+}
+
+function Project() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const fileRef = useRef(null);
+  const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
-  const [draggedTask, setDraggedTask] = useState(null);
-  const [showAdd, setShowAdd] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
-  const [editingTask, setEditingTask] = useState(null);
-  const [adding, setAdding] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [dragged, setDragged] = useState(null);
+  const [dropColumn, setDropColumn] = useState(null);
   const [search, setSearch] = useState("");
-  const [filterPriority, setFilterPriority] = useState("");
-  const [filterUser, setFilterUser] = useState("");
-  const [usersList, setUsersList] = useState([]); // lista de usuarios para el filtro
-  const [compactView, setCompactView] = useState(false);
-  const [newTask, setNewTask] = useState({
-    title: "",
-    description: "",
-    assigned_to: "", // <- único usuario
-    due_date: "",
-    priority: "medium",
-    status: "pending",
-    estimated_hours: "", // nuevo campo
-  });
-
-  // Modal de detalle de tarea
-  const [showTask, setShowTask] = useState(false);
-  const [taskDetail, setTaskDetail] = useState(null);
+  const [priority, setPriority] = useState("");
+  const [person, setPerson] = useState("");
+  const [view, setView] = useState("board");
+  const [taskModal, setTaskModal] = useState(false);
+  const [draft, setDraft] = useState(EMPTY_TASK);
+  const [saving, setSaving] = useState(false);
+  const [selected, setSelected] = useState(null);
   const [comments, setComments] = useState([]);
-  const [newComment, setNewComment] = useState("");
   const [attachments, setAttachments] = useState([]);
-  const [selectedFiles, setSelectedFiles] = useState([]);
-  const [uploading, setUploading] = useState(false);
-  const [taskTab, setTaskTab] = useState("comments"); // comments | activity
-
-  // Toasts simples (local)
+  const [comment, setComment] = useState("");
+  const [detailTab, setDetailTab] = useState("comments");
+  const [newSubtask, setNewSubtask] = useState("");
   const [toasts, setToasts] = useState([]);
-  const showToast = (message, type = "success", duration = 4000) => {
-    const id = Date.now() + Math.random();
-    setToasts((t) => [...t, { id, message, type }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), duration);
-  };
+  const api = import.meta.env.VITE_API_URL;
 
-  const apiBase = import.meta.env.VITE_API_URL;
-
-  const getAvatar = (userLike) => {
-    // userLike puede ser un objeto o null, o un id
-    const u = userLike && typeof userLike === "object" ? userLike : null;
-    const src = u?.photo || u?.avatar || u?.image || "";
-    const name = u?.name || u?.email || "Usuario";
-    const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-      name
-    )}`;
-    return src && src !== "null" ? src : fallback;
+  const notify = (message, type = "success") => {
+    const toastId = `${Date.now()}-${Math.random()}`;
+    setToasts((old) => [...old, { id: toastId, message, type }]);
+    setTimeout(() => setToasts((old) => old.filter((item) => item.id !== toastId)), 3500);
   };
+  const headers = (json = false) => ({
+    ...(json ? { "Content-Type": "application/json", Accept: "application/json" } : {}),
+    ...(localStorage.getItem("user_token") ? { Authorization: `Bearer ${localStorage.getItem("user_token")}` } : {}),
+  });
 
   useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const token = localStorage.getItem("user_token");
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/projects/${id}/tasks`,
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        const data = await res.json();
-        setTasks(data.data?.tasks || []);
-      } catch (err) {
-        setTasks([]);
+    let active = true;
+    const load = async () => {
+      setLoading(true);
+      const getJson = async (url) => {
+        const response = await fetch(url, { headers: headers(true) });
+        if (!response.ok) throw new Error("No fue posible cargar la información");
+        return response.json();
+      };
+      const [projectResult, taskResult, userResult] = await Promise.allSettled([
+        getJson(`${api}/projects/${id}`),
+        getJson(`${api}/projects/${id}/tasks`),
+        getJson(`${api}/users`),
+      ]);
+      if (!active) return;
+      if (projectResult.status === "fulfilled") {
+        const payload = projectResult.value;
+        setProject(payload?.data?.project || payload?.data || payload?.project || payload);
       }
+      if (taskResult.status === "fulfilled") {
+        const payload = taskResult.value;
+        setTasks(Array.isArray(payload?.data?.tasks) ? payload.data.tasks : Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : []);
+      }
+      if (userResult.status === "fulfilled") {
+        const payload = userResult.value;
+        setUsers(Array.isArray(payload?.data?.users) ? payload.data.users : Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.users) ? payload.users : []);
+      }
+      setLoading(false);
     };
-    fetchTasks();
-    // cargar usuarios para el filtro desde /api/v1/users
-    const fetchUsers = async () => {
-      try {
-        const token = localStorage.getItem("user_token");
-        const res = await fetch(`${apiBase}/users`, {
-          headers: {
-            Accept: "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-        if (!res.ok) throw new Error("users fetch failed");
-        const j = await res.json();
-        const list = Array.isArray(j?.data)
-          ? j.data
-          : Array.isArray(j?.users)
-          ? j.users
-          : Array.isArray(j?.data?.users)
-          ? j.data.users
-          : Array.isArray(j)
-          ? j
-          : [];
-        setUsersList(list);
-      } catch (e) {
-        setUsersList([]);
-      }
-    };
-    fetchUsers();
-  }, []);
+    load();
+    return () => { active = false; };
+  }, [api, id]);
 
-  // Filtrar tareas
-  const filteredTasks = tasks.filter((task) => {
-    const matchesSearch =
-      (task.title || "").toLowerCase().includes(search.toLowerCase()) ||
-      (task.description || "").toLowerCase().includes(search.toLowerCase());
+  const filtered = useMemo(() => tasks.filter((task) => {
+    const term = search.toLowerCase();
+    const matchesSearch = !term || `${task.title || ""} ${task.description || ""}`.toLowerCase().includes(term);
+    return matchesSearch && (!priority || task.priority === priority) && (!person || String(assigneeId(task)) === String(person));
+  }), [tasks, search, priority, person]);
 
-    const matchesPriority = !filterPriority || task.priority === filterPriority;
+  const progress = tasks.length ? Math.round((tasks.filter((task) => task.status === "completed").length / tasks.length) * 100) : 0;
+  const projectName = project?.name || "Detalle del proyecto";
 
-    // Compatibilidad: usa assigned_to y fallback a assignees[0] o user_id
-    const assignedRaw =
-      task.assigned_to ??
-      (Array.isArray(task.assignees) && task.assignees.length
-        ? task.assignees[0]
-        : undefined) ??
-      task.user_id ??
-      "";
-    // normalizar a id para comparación
-    const assignedId =
-      typeof assignedRaw === "object" ? assignedRaw.id ?? "" : assignedRaw ?? "";
-    const matchesUser = !filterUser || String(assignedId) === String(filterUser);
-
-    return matchesSearch && matchesPriority && matchesUser;
-  });
-
-  // Agrupa tareas filtradas por estado
-  const getTasksByStatus = (status) =>
-    filteredTasks.filter((t) => t.status === status);
-
-  // Drag events nativos con animaciones
-  const handleDragStart = (task) => {
-    setDraggedTask(task);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = async (status) => {
-    if (!draggedTask || draggedTask.status === status) return;
-    setTasks((prev) =>
-      prev.map((t) => (t.id === draggedTask.id ? { ...t, status } : t))
-    );
+  const updateTask = async (taskId, patch, quiet = false) => {
+    const previous = tasks;
+    setTasks((old) => old.map((task) => task.id === taskId ? { ...task, ...patch } : task));
+    setSelected((old) => old?.id === taskId ? { ...old, ...patch } : old);
     try {
-      const token = localStorage.getItem("user_token");
-      await fetch(
-        `${import.meta.env.VITE_API_URL}/projects/${id}/tasks/${
-          draggedTask.id
-        }`,
-        {
-          method: "PUT",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ status }),
-        }
-      );
-    } catch (err) {}
-    setDraggedTask(null);
-  };
-
-  // Agregar nueva tarea
-  const handleAddTask = async (e) => {
-    e.preventDefault();
-    if (!newTask.title.trim()) return;
-    setAdding(true);
-    try {
-      const token = localStorage.getItem("user_token");
-      const payload = { ...newTask }; // envía assigned_to y estimated_hours
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/projects/${id}/tasks`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-      const data = await res.json();
-      const created = data?.data || data;
-      setTasks((prev) => [created, ...prev]);
-      showToast("Tarea creada correctamente", "success");
-      setNewTask({
-        title: "",
-        description: "",
-        assigned_to: "", // reset
-        due_date: "",
-        priority: "medium",
-        status: "pending",
-        estimated_hours: "", // reset
-      });
-      setShowAdd(false);
-    } catch (err) {
-      console.error(err);
-      showToast("Error al crear la tarea", "error");
-      // opcional: manejar error
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  // Editar tarea
-  const handleEditTask = (task) => {
-    setEditingTask(task);
-    setNewTask({
-      title: task.title || "",
-      description: task.description || "",
-      assigned_to:
-        task.assigned_to ??
-        (Array.isArray(task.assignees) && task.assignees.length
-          ? task.assignees[0]
-          : "") ??
-        task.user_id ??
-        "",
-      due_date: task.due_date || "",
-      priority: task.priority || "medium",
-      status: task.status || "pending",
-      estimated_hours: task.estimated_hours ?? "", // cargar valor existente
-    });
-    setShowEdit(true);
-  };
-
-  const handleUpdateTask = async (e) => {
-    e.preventDefault();
-    if (!newTask.title.trim()) return;
-    setAdding(true);
-    try {
-      const token = localStorage.getItem("user_token");
-      const payload = { ...newTask }; // envía assigned_to
-      await fetch(
-        `${import.meta.env.VITE_API_URL}/projects/${id}/tasks/${
-          editingTask.id
-        }`,
-        {
-          method: "PUT",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-      setTasks((prev) =>
-        prev.map((t) => (t.id === editingTask.id ? { ...t, ...payload } : t))
-      );
-      showToast("Tarea actualizada correctamente", "success");
-      setShowEdit(false);
-      setEditingTask(null);
-      setNewTask({
-        title: "",
-        description: "",
-        assigned_to: "",
-        due_date: "",
-        priority: "medium",
-        status: "pending",
-      });
-    } catch (err) {
-      console.error(err);
-      showToast("Error al actualizar la tarea", "error");
-      // opcional: manejar error
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  // Eliminar tarea
-  const handleDeleteTask = async (taskId) => {
-    if (!confirm("¿Estás seguro de eliminar esta tarea?")) return;
-    try {
-      const token = localStorage.getItem("user_token");
-      await fetch(
-        `${
-          import.meta.env.VITE_API_URL
-        }/projects/${id}/tasks/${taskId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    } catch (err) {}
-  };
-
-  // Obtener color de prioridad (clases para el icono TiFlag)
-  const getPriorityFlagColor = (priority) => {
-    switch (priority) {
-      case "high":
-        return "text-red-500";
-      case "medium":
-        return "text-yellow-400";
-      case "low":
-        return "text-blue-400";
-      default:
-        return "text-slate-500";
-    }
-  };
-
-  const openTaskModal = async (task) => {
-    setTaskDetail(task); // muestra algo mientras carga
-    setShowTask(true);
-    const token = localStorage.getItem("user_token");
-    try {
-      // Detalle de la tarea
-      const res = await fetch(
-        `${apiBase}/projects/${id}/tasks/${task.id}`,
-        {
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      const json = await res.json().catch(() => ({}));
-      const detail = json?.data || json || task;
-      setTaskDetail(detail);
-
-      // Comentarios (si no vinieron en el detalle)
-      const comm =
-        detail?.comments ??
-        (await (async () => {
-          try {
-            const r = await fetch(
-              `${apiBase}/projects/${id}/tasks/${task.id}/comments`,
-              {
-                headers: {
-                  Accept: "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              }
-            );
-            if (!r.ok) return [];
-            const j = await r.json();
-            return Array.isArray(j?.data) ? j.data : j?.comments || [];
-          } catch {
-            return [];
-          }
-        })());
-      setComments(Array.isArray(comm) ? comm : []);
-
-      // Adjuntos: intenta primero el endpoint /api/v1/.../files (requerido),
-      // y si falla intenta el path anterior como fallback.
-      try {
-        let filesList = [];
-        // Intento 1: ruta explícita /api/v1/...
-        const r1 = await fetch(
-          `${apiBase}/api/v1/projects/${id}/tasks/${task.id}/files`,
-          {
-            headers: {
-              Accept: "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        if (r1.ok) {
-          const j1 = await r1.json().catch(() => ({}));
-          filesList = j1?.data ?? j1?.files ?? j1 ?? [];
-        } else {
-          // Intento 2: fallback al endpoint /projects/.../files (compatibilidad)
-          const r2 = await fetch(
-            `${apiBase}/projects/${id}/tasks/${task.id}/files`,
-            {
-              headers: {
-                Accept: "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-          if (r2.ok) {
-            const j2 = await r2.json().catch(() => ({}));
-            filesList = j2?.data ?? j2?.attachments ?? j2 ?? [];
-          } else {
-            // Si ambos fallan, intenta tomar adjuntos desde el detalle ya cargado
-            filesList = detail?.attachments ?? detail?.files ?? [];
-          }
-        }
-        setAttachments(Array.isArray(filesList) ? filesList : [filesList]);
-      } catch {
-        // fallback final: usar lo que venga en el detalle
-        const atts = detail?.attachments ?? detail?.files ?? [];
-        setAttachments(Array.isArray(atts) ? atts : []);
-      }
+      const response = await fetch(`${api}/projects/${id}/tasks/${taskId}`, { method: "PUT", headers: headers(true), body: JSON.stringify(patch) });
+      if (!response.ok) throw new Error();
+      if (!quiet) notify("Cambios guardados");
     } catch {
-      // mantener datos básicos
+      setTasks(previous);
+      notify("No se pudieron guardar los cambios", "error");
     }
+  };
+
+  const handleDrop = (status) => {
+    setDropColumn(null);
+    if (!dragged || dragged.status === status) return setDragged(null);
+    updateTask(dragged.id, { status }, true);
+    notify(`Tarea movida a ${COLUMNS.find((column) => column.key === status)?.label}`);
+    setDragged(null);
+  };
+
+  const saveNewTask = async (event) => {
+    event.preventDefault();
+    if (!draft.title.trim()) return;
+    setSaving(true);
+    try {
+      const response = await fetch(`${api}/projects/${id}/tasks`, { method: "POST", headers: headers(true), body: JSON.stringify(draft) });
+      if (!response.ok) throw new Error();
+      const json = await response.json();
+      setTasks((old) => [json?.data?.task || json?.data || json?.task || json, ...old]);
+      setTaskModal(false);
+      setDraft(EMPTY_TASK);
+      notify("Tarea creada correctamente");
+    } catch {
+      notify("No se pudo crear la tarea", "error");
+    } finally { setSaving(false); }
+  };
+
+  const openTask = async (task) => {
+    setSelected(task);
+    setComments(Array.isArray(task.comments) ? task.comments : []);
+    setAttachments(Array.isArray(task.attachments || task.files) ? (task.attachments || task.files) : []);
+    setDetailTab("comments");
+    try {
+      const [detailResponse, commentResponse, fileResponse] = await Promise.allSettled([
+        fetch(`${api}/projects/${id}/tasks/${task.id}`, { headers: headers(true) }),
+        fetch(`${api}/projects/${id}/tasks/${task.id}/comments`, { headers: headers(true) }),
+        fetch(`${api}/projects/${id}/tasks/${task.id}/files`, { headers: headers(true) }),
+      ]);
+      if (detailResponse.status === "fulfilled" && detailResponse.value.ok) {
+        const data = await detailResponse.value.json();
+        setSelected(data?.data || data);
+      }
+      if (commentResponse.status === "fulfilled" && commentResponse.value.ok) {
+        const data = await commentResponse.value.json();
+        setComments(Array.isArray(data?.data) ? data.data : data?.comments || []);
+      }
+      if (fileResponse.status === "fulfilled" && fileResponse.value.ok) {
+        const data = await fileResponse.value.json();
+        const list = data?.data || data?.attachments || data?.files || [];
+        setAttachments(Array.isArray(list) ? list : []);
+      }
+    } catch { /* Los datos básicos ya están visibles. */ }
   };
 
   const addComment = async () => {
-    const comment = (newComment || "").trim();
-    if (!taskDetail?.id || !comment) return;
-    const token = localStorage.getItem("user_token");
+    const value = comment.trim();
+    if (!value || !selected) return;
+    const optimistic = { id: `local-${Date.now()}`, comment: value, user: { name: "Tú" }, created_at: new Date().toISOString() };
+    setComments((old) => [...old, optimistic]);
+    setComment("");
     try {
-      const res = await fetch(
-        `${apiBase}/projects/${id}/tasks/${taskDetail.id}/comments`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ comment }), // <-- enviar 'comment'
-        }
-      );
-      const data = await res.json().catch(() => ({}));
-      const created = data?.data || data || {};
-      // Fallback si la API no devuelve el texto:
-      const normalized = created.comment ? created : { ...created, comment };
-      setComments((prev) => [normalized, ...prev]);
-      setNewComment("");
-    } catch {
-      // opcional: manejar error
-    }
+      const response = await fetch(`${api}/projects/${id}/tasks/${selected.id}/comments`, { method: "POST", headers: headers(true), body: JSON.stringify({ comment: value }) });
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      setComments((old) => old.map((item) => item.id === optimistic.id ? (data?.data || data) : item));
+    } catch { notify("El comentario no pudo sincronizarse", "error"); }
   };
 
-  const onFilesChange = (e) => {
-    const files = Array.from(e.target.files || []);
-    setSelectedFiles(files);
-  };
-
-  const uploadFiles = async () => {
-    if (!taskDetail?.id || selectedFiles.length === 0) return;
-    setUploading(true);
-    const token = localStorage.getItem("user_token");
+  const uploadFiles = async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length || !selected) return;
+    const localFiles = files.map((file) => ({ id: `local-${file.name}`, name: file.name, size: file.size }));
+    setAttachments((old) => [...old, ...localFiles]);
+    const form = new FormData();
+    files.forEach((file) => form.append("files[]", file));
     try {
-      const form = new FormData();
-      // API común: files[] o file. Enviamos ambos para mayor compatibilidad.
-      selectedFiles.forEach((f) => form.append("files[]", f));
-      if (selectedFiles[0]) form.append("file", selectedFiles[0]);
-      const res = await fetch(
-        `${apiBase}/projects/${id}/tasks/${taskDetail.id}/files`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` }, // no seteamos Content-Type
-          body: form,
-        }
-      );
-      const data = await res.json().catch(() => ({}));
-      const list = data?.data || data?.attachments || data || [];
-      const normalized = Array.isArray(list) ? list : [list];
-      setAttachments((prev) => [...normalized, ...prev]);
-      setSelectedFiles([]);
-    } catch {
-      // opcional: toast error
-    } finally {
-      setUploading(false);
-    }
+      const response = await fetch(`${api}/projects/${id}/tasks/${selected.id}/files`, { method: "POST", headers: headers(), body: form });
+      if (!response.ok) throw new Error();
+      notify(`${files.length} archivo${files.length > 1 ? "s" : ""} adjuntado${files.length > 1 ? "s" : ""}`);
+    } catch { notify("Los archivos no pudieron sincronizarse", "error"); }
   };
 
-  const formatDate = (d) => {
-    if (!d) return "—";
+  const addSubtask = async () => {
+    const title = newSubtask.trim();
+    if (!title || !selected) return;
+    const subtask = { id: `local-${Date.now()}`, title, completed: false };
+    const subtasks = [...(selected.subtasks || []), subtask];
+    setNewSubtask("");
+    await updateTask(selected.id, { subtasks });
+  };
+  const toggleSubtask = (subtaskId) => {
+    const subtasks = (selected?.subtasks || []).map((item) => item.id === subtaskId ? { ...item, completed: !item.completed } : item);
+    updateTask(selected.id, { subtasks }, true);
+  };
+
+  const removeTask = async () => {
+    if (!selected || !window.confirm("¿Eliminar esta tarea definitivamente?")) return;
     try {
-      return new Date(d).toLocaleString();
-    } catch {
-      return String(d);
-    }
-  };
-
-  // Formato "Agosto 8" para due_date en las tarjetas
-  const capitalize = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
-  const formatDueDate = (value) => {
-    if (!value) return null;
-    try {
-      const dt = new Date(value);
-      if (isNaN(dt)) return String(value);
-      const month = dt.toLocaleString("es-ES", { month: "long" });
-      const day = dt.getDate();
-      return `${capitalize(month)} ${day}`;
-    } catch {
-      return String(value);
-    }
-  };
-
-  // === Helpers del modal de detalle (faltaban) ===
-  const updateTaskField = async (patch) => {
-    if (!taskDetail?.id) return;
-
-    // actualización optimista en modal y tablero
-    setTaskDetail((td) => ({ ...td, ...patch }));
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskDetail.id ? { ...t, ...patch } : t))
-    );
-
-    try {
-      const token = localStorage.getItem("user_token");
-      await fetch(`${apiBase}/projects/${id}/tasks/${taskDetail.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(patch),
-      });
-    } catch (e) {
-      // opcional: revertir si falla
-    }
-  };
-
-  const toggleComplete = () => {
-    const next = taskDetail?.status === "completed" ? "pending" : "completed";
-    updateTaskField({ status: next });
-  };
-
-  const handleTitleBlur = (e) => {
-    const title = (e.target.value || "").trim();
-    if (!title || title === taskDetail?.title) return;
-    updateTaskField({ title });
-  };
-
-  const handleDescBlur = (e) => {
-    const description = (e.target.value || "").trim();
-    if (description === (taskDetail?.description || "")) return;
-    updateTaskField({ description });
-  };
-
-  const handleAssignedChange = (id) => {
-    updateTaskField({ assigned_to: id || "" });
-  };
-
-  const handleDueDateChange = (e) => {
-    updateTaskField({ due_date: e.target.value || "" });
+      const response = await fetch(`${api}/projects/${id}/tasks/${selected.id}`, { method: "DELETE", headers: headers() });
+      if (!response.ok) throw new Error();
+      setTasks((old) => old.filter((task) => task.id !== selected.id));
+      setSelected(null);
+      notify("Tarea eliminada");
+    } catch { notify("No se pudo eliminar la tarea", "error"); }
   };
 
   return (
-    <LayoutAdmin title="Tablero Kanban">
-      {/* Contenedor de toasts */}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={`min-w-[200px] max-w-sm px-4 py-2 rounded shadow-lg text-sm ${
-              t.type === "success"
-                ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200"
-                : "bg-red-100 text-red-700 ring-1 ring-red-200"
-            }`}
-          >
-            {t.message}
-          </div>
-        ))}
-      </div>
-      {/* Header con filtros */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-lg shadow"
-      >
-        <div className="flex gap-4 items-center">
-          <motion.input
-            whileFocus={{ scale: 1.05 }}
-            type="text"
-            placeholder="Buscar tareas..."
-            className="admin-input"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <motion.select
-            whileHover={{ scale: 1.02 }}
-            className="px-4 py-2 border border-slate-300 rounded-lg"
-            value={filterPriority}
-            onChange={(e) => setFilterPriority(e.target.value)}
-          >
-            <option value="">Todas las prioridades</option>
-            <option value="high">Alta</option>
-            <option value="medium">Media</option>
-            <option value="low">Baja</option>
-          </motion.select>
-          <motion.select
-            whileHover={{ scale: 1.02 }}
-            className="px-4 py-2 border border-slate-300 rounded-lg"
-            value={filterUser}
-            onChange={(e) => setFilterUser(e.target.value)}
-          >
-            <option value="">Todos los usuarios</option>
-            {usersList.map((u) => (
-              <option key={u.email} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </motion.select>
+    <LayoutAdmin>
+      <div className="project-page">
+        <div className="toast-stack" aria-live="polite">
+          {toasts.map((toast) => <div key={toast.id} className={`project-toast ${toast.type}`}><span>{toast.type === "success" ? <FiCheck /> : <FiX />}</span>{toast.message}</div>)}
         </div>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setCompactView(!compactView)}
-          className="btn-primary"
-        >
-          {compactView ? "Vista Expandida" : "Vista Compacta"}
-        </motion.button>
-      </motion.div>
 
-      <div className="overflow-x-auto">
-        <div className="grid grid-cols-4 gap-4">
-          {columns.map((col, index) => (
-            <motion.div
-              key={col.key}
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              onDragOver={handleDragOver}
-              onDrop={() => handleDrop(col.key)}
-              className="bg-gradient-to-br from-[#181A20] to-[#1F2125] rounded-xl p-4 min-h-[500px] flex flex-col shadow-2xl border border-[#23262F] hover:shadow-3xl transition-shadow"
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <span className="text-slate-800 font-bold text-lg">
-                  {col.label}
-                </span>
-                <motion.span
-                  key={getTasksByStatus(col.key).length}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="badge-brand"
-                >
-                  {getTasksByStatus(col.key).length}
-                </motion.span>
-              </div>
-              <div className="flex-1 space-y-3">
-                <AnimatePresence>
-                  {getTasksByStatus(col.key).map((task) => (
-                    <motion.div
-                      key={task.id}
-                      layout
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.3 }}
-                      draggable
-                      onDragStart={() => handleDragStart(task)}
-                      whileHover={{ scale: 1.02 }}
-                      whileDrag={{ scale: 1.05, rotate: 5 }}
-                      onDoubleClick={() => openTaskModal(task)} // <- abrir modal de detalle con doble click
-                      className={`bg-gradient-to-br from-[#23262F] to-[#2A2D32] border border-slate-200 rounded-lg p-4 shadow-lg text-slate-800 flex flex-col gap-2 cursor-move ${
-                        compactView ? "p-2" : ""
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-green-400 text-sm">✔</span>
-                          <span
-                            className={`font-semibold ${
-                              compactView ? "text-sm" : ""
-                            }`}
-                          >
-                            {task.title}
-                          </span>
-                        </div>
-                        <motion.div whileHover={{ scale: 1.2 }} className="flex items-center">
-                          <TiFlag
-                            className={`w-4 h-4 ${getPriorityFlagColor(task.priority)}`}
-                            title={
-                              task.priority === "high"
-                                ? "Alta"
-                                : task.priority === "medium"
-                                ? "Media"
-                                : task.priority === "low"
-                                ? "Baja"
-                                : "Sin prioridad"
-                            }
-                          />
-                        </motion.div>
-                      </div>
-                      {!compactView && (
-                        <>
-                          <p className="text-slate-600 text-sm line-clamp-2">
-                            {task.description}
-                          </p>
-                          <div className="flex items-center justify-between text-xs text-slate-500">
-                            <span className="flex items-center gap-1">
-                              <span className="flex flex-wrap gap-1">
-                                <img
-                                  src={
-                                    task.assigned_to?.photo == null
-                                      ? `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                          task.assigned_to?.name ||
-                                            task.assigned_to?.email ||
-                                            "Usuario"
-                                        )}`
-                                      : task.assigned_to?.photo
-                                  }
-                                  alt=""
-                                  className="rounded-full w-8 h-8"
-                                />
-                              </span>
-                            </span>
-                            <span>
-                              📅{" "}
-                              {task.due_date
-                                ? formatDueDate(task.due_date)
-                                : "Sin fecha"}
-                            </span>
-                          </div>
-                        </>
-                      )}
-                      <hr className="my-1 w-full border-slate-300" />
-                      <div className="flex  justify-center gap-6 mt-2">
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          onClick={() => handleEditTask(task)}
-                          className="text-slate-500 hover:text-slate-600 flex gap-2 text-sm"
-                        >
-                          <TiPencil className="w-4 h-4" /> Editar
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          onClick={() => handleDeleteTask(task.id)}
-                          className="text-slate-500 hover:text-slate-600 flex gap-2 text-sm"
-                        >
-                          <TiTrash className="w-4 h-4" /> Eliminar
-                        </motion.button>
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-              {col.key === "pending" && (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="btn-primary mt-4"
-                  onClick={() => setShowAdd(true)}
-                >
-                  + Agregar Tarea
-                </motion.button>
-              )}
-            </motion.div>
-          ))}
+        <header className="project-hero">
+          <div className="project-breadcrumb"><button onClick={() => navigate("/admin/projects")}><FiArrowLeft /> Proyectos</button><span>/</span><span>{projectName}</span></div>
+          <div className="project-heading-row">
+            <div className="project-identity">
+              <div className="project-mark">{initials(projectName)}</div>
+              <div><div className="project-title-line"><h1>{projectName}</h1><span className="status-live"><i /> En curso</span></div><p>{project?.description || "Planificación, diseño y desarrollo del proyecto"}</p></div>
+            </div>
+            <div className="project-actions">
+              <div className="member-stack">{users.slice(0, 4).map((user) => <Avatar key={user.id} user={user} />)}{users.length > 4 && <span className="more-members">+{users.length - 4}</span>}</div>
+              <button className="soft-button"><FiUsers /> Compartir</button>
+              <button className="icon-button" aria-label="Más opciones"><FiMoreHorizontal /></button>
+            </div>
+          </div>
+          <div className="project-metrics">
+            <div><span>PROGRESO GENERAL</span><strong>{progress}%</strong><div className="hero-progress"><i style={{ width: `${progress}%` }} /></div></div>
+            <div><span>FECHA DE ENTREGA</span><strong><FiCalendar /> {dateLabel(project?.end_date)}</strong></div>
+            <div><span>EQUIPO</span><strong><FiUsers /> {users.length || "—"} miembros</strong></div>
+            <div><span>TAREAS</span><strong><FiCheckCircle /> {tasks.filter((task) => task.status === "completed").length} de {tasks.length}</strong></div>
+          </div>
+        </header>
+
+        <div className="board-nav">
+          <div className="view-tabs">
+            <button className={view === "board" ? "active" : ""} onClick={() => setView("board")}><FiColumns /> Tablero</button>
+            <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}><FiList /> Lista</button>
+            <button disabled title="Próximamente"><FiCalendar /> Calendario</button>
+            <button disabled title="Próximamente"><FiPaperclip /> Archivos</button>
+          </div>
+          <button className="new-task-button" onClick={() => setTaskModal(true)}><FiPlus /> Nueva tarea</button>
         </div>
+
+        <div className="board-toolbar">
+          <label className="board-search"><FiSearch /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por título o descripción..." />{search && <button onClick={() => setSearch("")}><FiX /></button>}</label>
+          <div className="toolbar-filters">
+            <label><FiFlag /><select value={priority} onChange={(event) => setPriority(event.target.value)}><option value="">Prioridad</option><option value="high">Alta</option><option value="medium">Media</option><option value="low">Baja</option></select><FiChevronDown /></label>
+            <label><FiUser /><select value={person} onChange={(event) => setPerson(event.target.value)}><option value="">Responsable</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select><FiChevronDown /></label>
+            <button className={priority || person ? "filter-active" : ""} onClick={() => { setPriority(""); setPerson(""); }}><FiFilter /> Filtros{(priority || person) && <b>{Number(Boolean(priority)) + Number(Boolean(person))}</b>}</button>
+          </div>
+        </div>
+
+        {loading ? <BoardSkeleton /> : view === "board" ? (
+          <div className="kanban-scroll"><div className="kanban-grid">
+            {COLUMNS.map((column) => {
+              const columnTasks = filtered.filter((task) => task.status === column.key);
+              const Icon = column.icon;
+              return <section key={column.key} className={`kanban-column ${dropColumn === column.key ? "drag-over" : ""}`} onDragOver={(event) => { event.preventDefault(); setDropColumn(column.key); }} onDragLeave={() => setDropColumn(null)} onDrop={() => handleDrop(column.key)}>
+                <div className="column-heading"><div><span className="column-icon" style={{ color: column.color, background: `${column.color}14` }}><Icon /></span><h2>{column.label}</h2><b>{columnTasks.length}</b></div><button onClick={() => { setDraft({ ...EMPTY_TASK, status: column.key }); setTaskModal(true); }}><FiPlus /></button></div>
+                <div className="task-list">
+                  {columnTasks.map((task) => <TaskCard key={task.id} task={task} projectId={id} color={column.color} onOpen={() => openTask(task)} onDrag={() => setDragged(task)} />)}
+                  {!columnTasks.length && <div className="empty-column"><FiGrid /><p>{search || priority || person ? "Sin coincidencias" : "No hay tareas"}</p><span>Arrastra una tarea aquí</span></div>}
+                </div>
+                <button className="column-add" onClick={() => { setDraft({ ...EMPTY_TASK, status: column.key }); setTaskModal(true); }}><FiPlus /> Agregar tarea</button>
+              </section>;
+            })}
+          </div></div>
+        ) : <TaskTable tasks={filtered} onOpen={openTask} />}
       </div>
 
-      {/* Modal para agregar tarea con Headless UI */}
-      <Transition appear show={showAdd} as={motion.div}>
-        <Dialog
-          as="div"
-          className="fixed inset-0 z-50 overflow-y-auto"
-          onClose={() => setShowAdd(false)}
-        >
-          <div className="min-h-screen px-4 text-center">
-            <Transition.Child
-              as={motion.div}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0"
-              enterTo="opacity-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-              className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm"
-            />
-            <span
-              className="inline-block h-screen align-middle"
-              aria-hidden="true"
-            >
-              &#8203;
-            </span>
-            <Transition.Child
-              as={motion.div}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-              className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-[#23262F] to-[#2A2D32] border border-slate-200 rounded-xl shadow-2xl"
-            >
-              <Dialog.Title
-                as="h2"
-                className="text-xl font-bold text-slate-800 mb-4"
-              >
-                Agregar Nueva Tarea
-              </Dialog.Title>
-              <form onSubmit={handleAddTask} className="flex flex-col gap-4">
-                <motion.input
-                  whileFocus={{ scale: 1.02 }}
-                  className="admin-input"
-                  placeholder="Título"
-                  value={newTask.title}
-                  onChange={(e) =>
-                    setNewTask((t) => ({ ...t, title: e.target.value }))
-                  }
-                  disabled={adding}
-                  autoFocus
-                />
-                <motion.textarea
-                  whileFocus={{ scale: 1.02 }}
-                  className="admin-input"
-                  placeholder="Descripción"
-                  value={newTask.description}
-                  onChange={(e) =>
-                    setNewTask((t) => ({ ...t, description: e.target.value }))
-                  }
-                  disabled={adding}
-                  rows={3}
-                />
-                <motion.input
-                  whileFocus={{ scale: 1.02 }}
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  placeholder="Horas estimadas"
-                  className="admin-input"
-                  value={newTask.estimated_hours}
-                  onChange={(e) =>
-                    setNewTask((t) => ({
-                      ...t,
-                      estimated_hours: e.target.value,
-                    }))
-                  }
-                  disabled={adding}
-                />
-                {/* Selector único de usuario */}
-                <UserSelect
-                  label="Asignar usuario"
-                  value={newTask.assigned_to}
-                  onChange={(id) =>
-                    setNewTask((t) => ({ ...t, assigned_to: id }))
-                  }
-                  disabled={adding}
-                />
-                <motion.input
-                  whileFocus={{ scale: 1.02 }}
-                  type="date"
-                  className="admin-input"
-                  value={newTask.due_date}
-                  onChange={(e) =>
-                    setNewTask((t) => ({ ...t, due_date: e.target.value }))
-                  }
-                  disabled={adding}
-                />
-                <motion.select
-                  whileFocus={{ scale: 1.02 }}
-                  className="admin-input"
-                  value={newTask.priority}
-                  onChange={(e) =>
-                    setNewTask((t) => ({ ...t, priority: e.target.value }))
-                  }
-                  disabled={adding}
-                >
-                  <option value="low">Baja</option>
-                  <option value="medium">Media</option>
-                  <option value="high">Alta</option>
-                </motion.select>
-                <div className="flex gap-3 mt-4">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="submit"
-                    className="btn-primary"
-                    disabled={adding}
-                  >
-                    {adding ? "Agregando..." : "Agregar"}
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => setShowAdd(false)}
-                    disabled={adding}
-                  >
-                    Cancelar
-                  </motion.button>
-                </div>
-              </form>
-            </Transition.Child>
-          </div>
-        </Dialog>
-      </Transition>
-
-      {/* Modal para editar tarea con Headless UI */}
-      <Transition appear show={showEdit} as={motion.div}>
-        <Dialog
-          as="div"
-          className="fixed inset-0 z-50 overflow-y-auto"
-          onClose={() => setShowEdit(false)}
-        >
-          <div className="min-h-screen px-4 text-center">
-            <Transition.Child
-              as={motion.div}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0"
-              enterTo="opacity-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-              className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm"
-            />
-            <span
-              className="inline-block h-screen align-middle"
-              aria-hidden="true"
-            >
-              &#8203;
-            </span>
-            <Transition.Child
-              as={motion.div}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-              className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gradient-to-br from-[#23262F] to-[#2A2D32] border border-slate-200 rounded-xl shadow-2xl"
-            >
-              <Dialog.Title
-                as="h2"
-                className="text-xl font-bold text-slate-800 mb-4"
-              >
-                Editar Tarea
-              </Dialog.Title>
-              <form onSubmit={handleUpdateTask} className="flex flex-col gap-4">
-                {/* Campos similares al modal de agregar */}
-                <motion.input
-                  whileFocus={{ scale: 1.02 }}
-                  className="admin-input"
-                  placeholder="Título"
-                  value={newTask.title}
-                  onChange={(e) =>
-                    setNewTask((t) => ({ ...t, title: e.target.value }))
-                  }
-                  disabled={adding}
-                />
-                <motion.textarea
-                  whileFocus={{ scale: 1.02 }}
-                  className="admin-input"
-                  placeholder="Descripción"
-                  value={newTask.description}
-                  onChange={(e) =>
-                    setNewTask((t) => ({ ...t, description: e.target.value }))
-                  }
-                  disabled={adding}
-                  rows={3}
-                />
-                <motion.input
-                  whileFocus={{ scale: 1.02 }}
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  placeholder="Horas estimadas"
-                  className="admin-input"
-                  value={newTask.estimated_hours}
-                  onChange={(e) =>
-                    setNewTask((t) => ({
-                      ...t,
-                      estimated_hours: e.target.value,
-                    }))
-                  }
-                  disabled={adding}
-                />
-                {/* Selector único de usuario */}
-                <UserSelect
-                  label="Asignar usuario"
-                  value={newTask.assigned_to}
-                  onChange={(id) =>
-                    setNewTask((t) => ({ ...t, assigned_to: id }))
-                  }
-                  disabled={adding}
-                />
-                <motion.input
-                  whileFocus={{ scale: 1.02 }}
-                  type="date"
-                  className="admin-input"
-                  value={newTask.due_date}
-                  onChange={(e) =>
-                    setNewTask((t) => ({ ...t, due_date: e.target.value }))
-                  }
-                  disabled={adding}
-                />
-                <motion.select
-                  whileFocus={{ scale: 1.02 }}
-                  className="admin-input"
-                  value={newTask.priority}
-                  onChange={(e) =>
-                    setNewTask((t) => ({ ...t, priority: e.target.value }))
-                  }
-                  disabled={adding}
-                >
-                  <option value="low">Baja</option>
-                  <option value="medium">Media</option>
-                  <option value="high">Alta</option>
-                </motion.select>
-                <div className="flex gap-3 mt-4">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="submit"
-                    className="btn-primary"
-                    disabled={adding}
-                  >
-                    {adding ? "Actualizando..." : "Actualizar"}
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => setShowEdit(false)}
-                    disabled={adding}
-                  >
-                    Cancelar
-                  </motion.button>
-                </div>
-              </form>
-            </Transition.Child>
-          </div>
-        </Dialog>
-      </Transition>
-
-      {/* Modal de detalle de tarea (doble click) */}
-      <Transition appear show={showTask} as={motion.div}>
-        <Dialog
-          as="div"
-          className="fixed inset-0 z-50 overflow-y-auto"
-          onClose={() => setShowTask(false)}
-        >
-          <div className="min-h-screen px-4 text-center">
-            <Transition.Child
-              as={motion.div}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0"
-              enterTo="opacity-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-              className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm"
-            />
-            <span
-              className="inline-block h-screen align-middle"
-              aria-hidden="true"
-            >
-              &#8203;
-            </span>
-            <Transition.Child
-              as={motion.div}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-              className="inline-block w-full max-w-5xl p-0 my-8 overflow-hidden text-left align-middle transition-all transform bg-slate-50 border border-slate-200 rounded-xl shadow-2xl"
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={toggleComplete}
-                    className={`h-5 w-5 rounded border ${
-                      taskDetail?.status === "completed"
-                        ? "bg-green-500 border-green-500"
-                        : "border-slate-300"
-                    } inline-flex items-center justify-center`}
-                    title={
-                      taskDetail?.status === "completed"
-                        ? "Marcar como pendiente"
-                        : "Marcar como finalizada"
-                    }
-                  >
-                    {taskDetail?.status === "completed" ? "✓" : ""}
-                  </button>
-                  <input
-                    defaultValue={taskDetail?.title || ""}
-                    onBlur={handleTitleBlur}
-                    className="bg-transparent text-slate-800 text-xl md:text-2xl font-semibold outline-none placeholder-gray-500"
-                    placeholder="Título de la tarea"
-                  />
-                </div>
-                <button
-                  onClick={() => setShowTask(false)}
-                  className="text-slate-600 hover:text-slate-800 text-sm bg-gray-700/40 px-3 py-1.5 rounded-lg"
-                >
-                  Cerrar
-                </button>
-              </div>
-
-              {/* Body: 2 columnas */}
-              <div className="grid md:grid-cols-3 gap-0">
-                {/* Columna izquierda (2/3): Info + Comentarios/Actividad */}
-                <div className="md:col-span-2 px-6 py-5">
-                  {/* Campos tipo Asana */}
-                  <div className="space-y-5">
-                    {/* Responsable */}
-                    <div className="flex items-center gap-4">
-                      <div className="min-w-[120px] text-xs uppercase tracking-wide text-slate-500">
-                        Responsable
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={getAvatar(
-                            typeof taskDetail?.assigned_to === "object"
-                              ? taskDetail.assigned_to
-                              : null
-                          )}
-                          alt="avatar"
-                          className="h-8 w-8 rounded-full object-cover"
-                        />
-                        <div className="w-64">
-                          <UserSelect
-                            label=""
-                            value={
-                              typeof taskDetail?.assigned_to === "object"
-                                ? taskDetail?.assigned_to?.id
-                                : taskDetail?.assigned_to || ""
-                            }
-                            onChange={handleAssignedChange}
-                            placeholder="Seleccionar responsable"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Fecha de entrega */}
-                    <div className="flex items-center gap-4">
-                      <div className="min-w-[120px] text-xs uppercase tracking-wide text-slate-500">
-                        Fecha de entrega
-                      </div>
-                      <input
-                        type="date"
-                        value={taskDetail?.due_date || ""}
-                        onChange={handleDueDateChange}
-                        className="admin-input"
-                      />
-                      {taskDetail?.due_date && (
-                        <button
-                          className="text-slate-500 hover:text-slate-800 text-xs underline"
-                          onClick={() => updateTaskField({ due_date: "" })}
-                        >
-                          Quitar fecha
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Descripción */}
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
-                        Descripción
-                      </div>
-                      <textarea
-                        defaultValue={taskDetail?.description || ""}
-                        onBlur={handleDescBlur}
-                        rows={4}
-                        placeholder="¿De qué se trata esta tarea?"
-                        className="admin-input"
-                      />
-                    </div>
-
-                    {/* Subtareas (placeholder) */}
-                    <div>
-                      <button
-                        type="button"
-                        className="text-sm bg-white hover:bg-slate-50 text-slate-800 px-3 py-2 rounded-lg border border-slate-200"
-                        title="(Opcional) Implementar endpoint de subtareas"
-                      >
-                        + Agregar subtarea
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Tabs Comentarios / Actividad */}
-                  <div className="mt-6">
-                    <div className="flex items-center gap-6 border-b border-slate-200 mb-4">
-                      <button
-                        className={`py-2 ${
-                          taskTab === "comments"
-                            ? "border-b-2 border-brand-700 text-brand-700"
-                            : "text-slate-500"
-                        }`}
-                        onClick={() => setTaskTab("comments")}
-                      >
-                        Comentarios
-                      </button>
-                      <button
-                        className={`py-2 ${
-                          taskTab === "activity"
-                            ? "border-b-2 border-brand-700 text-brand-700"
-                            : "text-slate-500"
-                        }`}
-                        onClick={() => setTaskTab("activity")}
-                      >
-                        Toda la actividad
-                      </button>
-                    </div>
-
-                    {taskTab === "comments" ? (
-                      <>
-                        <div className="space-y-3 max-h-64 overflow-auto pr-1">
-                          {comments.length === 0 && (
-                            <div className="text-slate-500 text-sm">
-                              Sin comentarios
-                            </div>
-                          )}
-                          {comments.map((c) => (
-                            <div
-                              key={
-                                c.id ||
-                                `${c.user_id}-${c.created_at}-${c.comment}`
-                              }
-                              className="flex gap-3"
-                            >
-                              <img
-                                src={getAvatar(c.user || null)}
-                                className="h-8 w-8 rounded-full object-cover"
-                                alt="user"
-                              />
-                              <div className="flex-1">
-                                <div className="text-sm">
-                                  <span className="font-semibold">
-                                    {c.user?.name ||
-                                      c.user?.email ||
-                                      `#${c.user_id || ""}`}
-                                  </span>{" "}
-                                  <span className="text-xs text-slate-500">
-                                    {new Date(
-                                      c.created_at || Date.now()
-                                    ).toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="text-slate-700 text-sm">
-                                  {c.comment}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-3 flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Agregar un comentario"
-                            className="admin-input flex-1"
-                            value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                addComment();
-                              }
-                            }}
-                          />
-                          <button
-                            onClick={addComment}
-                            className="btn-primary"
-                          >
-                            Enviar
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-slate-500 text-sm">
-                        Sin actividad disponible por ahora.
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Columna derecha (1/3): Archivos */}
-                <div className="px-6 py-5 border-l border-slate-200 bg-slate-100">
-                  <h3 className="text-slate-800 font-semibold mb-3">Archivos</h3>
-                  <div className="space-y-2 max-h-72 overflow-auto pr-1">
-                    {attachments.length === 0 && (
-                      <div className="text-slate-500 text-sm">Sin archivos</div>
-                    )}
-                    {attachments.map((f) => (
-                      <a
-                        key={f.id || f.url || f.path}
-                        href={f.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 hover:border-slate-300"
-                      >
-                        <span className="truncate">
-                          {f.file_name || "archivo"}
-                        </span>
-                        <span className="text-slate-500 text-xs">
-                          {(f.file_size &&
-                            `${Math.round(f.file_size / 1024)} KB`) ||
-                            ""}
-                        </span>
-                      </a>
-                    ))}
-                  </div>
-                  <div className="mt-3">
-                    <input
-                      type="file"
-                      multiple
-                      onChange={onFilesChange}
-                      className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-800 hover:file:bg-brand-800"
-                    />
-                    {selectedFiles.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {selectedFiles.map((f, idx) => (
-                          <span
-                            key={idx}
-                            className="bg-white/10 text-slate-800 text-xs px-2 py-1 rounded"
-                          >
-                            {f.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <button
-                      onClick={uploadFiles}
-                      disabled={uploading || selectedFiles.length === 0}
-                      className="btn-primary mt-3 w-full"
-                    >
-                      {uploading ? "Subiendo..." : "Subir archivos"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </Transition.Child>
-          </div>
-        </Dialog>
-      </Transition>
+      {taskModal && <TaskFormModal draft={draft} setDraft={setDraft} users={users} saving={saving} onClose={() => { setTaskModal(false); setDraft(EMPTY_TASK); }} onSubmit={saveNewTask} />}
+      {selected && <TaskDrawer task={selected} users={users} comments={comments} attachments={attachments} tab={detailTab} setTab={setDetailTab} comment={comment} setComment={setComment} onComment={addComment} fileRef={fileRef} onFiles={uploadFiles} onClose={() => setSelected(null)} onUpdate={(patch) => updateTask(selected.id, patch)} onDelete={removeTask} newSubtask={newSubtask} setNewSubtask={setNewSubtask} onAddSubtask={addSubtask} onToggleSubtask={toggleSubtask} />}
     </LayoutAdmin>
   );
-};
+}
+
+function TaskCard({ task, projectId, color, onOpen, onDrag }) {
+  const user = assigneeOf(task);
+  const subtasks = task.subtasks || [];
+  const done = subtasks.filter((item) => item.completed || item.status === "completed").length;
+  const tags = task.tags || task.labels || [];
+  const commentCount = task.comments_count ?? task.comments?.length ?? 0;
+  const fileCount = task.attachments_count ?? task.files_count ?? task.attachments?.length ?? task.files?.length ?? 0;
+  return <article className="task-card" draggable onDragStart={onDrag} onClick={onOpen}>
+    <div className="task-card-top"><span className="task-code">PR-{projectId}-{task.id}</span><button onClick={(event) => event.stopPropagation()}><FiMoreHorizontal /></button></div>
+    {tags.length > 0 && <div className="task-tags">{tags.slice(0, 2).map((tag) => <span key={tag.id || tag.name || tag} style={{ "--tag": tag.color || color }}>{tag.name || tag}</span>)}</div>}
+    <h3>{task.title}</h3>{task.description && <p>{task.description}</p>}
+    {subtasks.length > 0 && <div className="subtask-progress"><div><span><FiCheckCircle /> {done}/{subtasks.length} subtareas</span><b>{Math.round(done / subtasks.length * 100)}%</b></div><i><em style={{ width: `${done / subtasks.length * 100}%`, background: color }} /></i></div>}
+    <div className="task-card-meta"><span className={`due-date ${isLate(task.due_date, task.status) ? "late" : ""}`}><FiCalendar /> {dateLabel(task.due_date)}</span><span className="priority-dot"><i style={{ background: PRIORITIES[task.priority]?.color || "#94a3b8" }} />{PRIORITIES[task.priority]?.label || "Normal"}</span></div>
+    <div className="task-card-footer"><Avatar user={user} /><div>{commentCount > 0 && <span><FiMessageSquare /> {commentCount}</span>}{fileCount > 0 && <span><FiPaperclip /> {fileCount}</span>}</div></div>
+  </article>;
+}
+
+function TaskTable({ tasks, onOpen }) {
+  return <div className="task-table-wrap"><table className="task-table"><thead><tr><th>Tarea</th><th>Estado</th><th>Prioridad</th><th>Responsable</th><th>Entrega</th></tr></thead><tbody>{tasks.map((task) => <tr key={task.id} onClick={() => onOpen(task)}><td><strong>{task.title}</strong><small>{task.description}</small></td><td><span className={`table-status ${task.status}`}>{COLUMNS.find((item) => item.key === task.status)?.label}</span></td><td><span className="priority-dot"><i style={{ background: PRIORITIES[task.priority]?.color }} />{PRIORITIES[task.priority]?.label}</span></td><td><div className="table-person"><Avatar user={assigneeOf(task)} />{assigneeOf(task)?.name || "Sin asignar"}</div></td><td>{dateLabel(task.due_date)}</td></tr>)}</tbody></table>{!tasks.length && <div className="table-empty">No se encontraron tareas</div>}</div>;
+}
+
+function TaskFormModal({ draft, setDraft, users, saving, onClose, onSubmit }) {
+  const set = (key) => (event) => setDraft((old) => ({ ...old, [key]: event.target.value }));
+  return <div className="project-modal-backdrop" onMouseDown={onClose}><div className="task-form-modal" onMouseDown={(event) => event.stopPropagation()}><div className="modal-title"><div><span><FiPlus /></span><div><h2>Nueva tarea</h2><p>Agrega una tarea al tablero del proyecto.</p></div></div><button onClick={onClose}><FiX /></button></div><form onSubmit={onSubmit}>
+    <label className="field"><span>Título de la tarea</span><input autoFocus required value={draft.title} onChange={set("title")} placeholder="Ej. Diseñar página de inicio" /></label>
+    <label className="field"><span>Descripción</span><textarea rows="4" value={draft.description} onChange={set("description")} placeholder="Agrega contexto, criterios de aceptación o enlaces..." /></label>
+    <div className="field-grid"><label className="field"><span>Estado</span><select value={draft.status} onChange={set("status")}>{COLUMNS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label><label className="field"><span>Prioridad</span><select value={draft.priority} onChange={set("priority")}><option value="high">Alta</option><option value="medium">Media</option><option value="low">Baja</option></select></label></div>
+    <div className="field-grid"><label className="field"><span>Responsable</span><select value={draft.assigned_to} onChange={set("assigned_to")}><option value="">Sin asignar</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label><label className="field"><span>Fecha de entrega</span><input type="date" value={draft.due_date} onChange={set("due_date")} /></label></div>
+    <label className="field"><span>Estimación (horas)</span><input type="number" min="0" step="0.5" value={draft.estimated_hours} onChange={set("estimated_hours")} placeholder="0" /></label>
+    <div className="modal-footer"><button type="button" className="soft-button" onClick={onClose}>Cancelar</button><button className="new-task-button" disabled={saving}>{saving ? "Creando..." : <><FiPlus /> Crear tarea</>}</button></div>
+  </form></div></div>;
+}
+
+function TaskDrawer({ task, users, comments, attachments, tab, setTab, comment, setComment, onComment, fileRef, onFiles, onClose, onUpdate, onDelete, newSubtask, setNewSubtask, onAddSubtask, onToggleSubtask }) {
+  const subtasks = task.subtasks || [];
+  return <div className="drawer-backdrop" onMouseDown={onClose}><aside className="task-drawer" onMouseDown={(event) => event.stopPropagation()}>
+    <div className="drawer-header"><div><span className="task-code">TAREA #{task.id}</span><span className="saved-state"><FiCheck /> Guardado</span></div><div><button title="Copiar enlace" onClick={() => navigator.clipboard?.writeText(window.location.href)}><FiLink /></button><button title="Eliminar" className="delete-icon" onClick={onDelete}><FiTrash2 /></button><button title="Cerrar" onClick={onClose}><FiX /></button></div></div>
+    <div className="drawer-scroll"><div className="drawer-content"><input key={`title-${task.id}`} className="drawer-title" defaultValue={task.title || ""} onBlur={(event) => event.target.value.trim() && event.target.value !== task.title && onUpdate({ title: event.target.value.trim() })} /><textarea key={`description-${task.id}`} className="drawer-description" rows="3" defaultValue={task.description || ""} onBlur={(event) => event.target.value !== (task.description || "") && onUpdate({ description: event.target.value })} placeholder="Agregar una descripción..." />
+      <div className="task-properties"><Property icon={FiActivity} label="Estado"><select value={task.status} onChange={(event) => onUpdate({ status: event.target.value })}>{COLUMNS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></Property><Property icon={FiFlag} label="Prioridad"><select value={task.priority} onChange={(event) => onUpdate({ priority: event.target.value })}><option value="high">Alta</option><option value="medium">Media</option><option value="low">Baja</option></select></Property><Property icon={FiUser} label="Responsable"><select value={assigneeId(task) || ""} onChange={(event) => onUpdate({ assigned_to: event.target.value })}><option value="">Sin asignar</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></Property><Property icon={FiCalendar} label="Fecha límite"><input type="date" value={task.due_date?.slice?.(0, 10) || ""} onChange={(event) => onUpdate({ due_date: event.target.value })} /></Property><Property icon={FiClock} label="Estimación"><input type="number" value={task.estimated_hours || ""} onChange={(event) => onUpdate({ estimated_hours: event.target.value })} placeholder="Sin estimar" /></Property></div>
+      <section className="drawer-section"><div className="section-heading"><h3><FiCheckCircle /> Subtareas</h3><span>{subtasks.filter((item) => item.completed || item.status === "completed").length}/{subtasks.length}</span></div>{subtasks.length > 0 && <div className="drawer-progress"><i style={{ width: `${subtasks.filter((item) => item.completed || item.status === "completed").length / subtasks.length * 100}%` }} /></div>}<div className="subtask-list">{subtasks.map((item) => <label key={item.id}><input type="checkbox" checked={Boolean(item.completed || item.status === "completed")} onChange={() => onToggleSubtask(item.id)} /><i><FiCheck /></i><span>{item.title}</span></label>)}</div><div className="add-subtask"><FiPlus /><input value={newSubtask} onChange={(event) => setNewSubtask(event.target.value)} onKeyDown={(event) => event.key === "Enter" && onAddSubtask()} placeholder="Agregar subtarea..." /><button onClick={onAddSubtask}>Agregar</button></div></section>
+      <section className="drawer-section"><div className="section-heading"><h3><FiPaperclip /> Archivos</h3><button onClick={() => fileRef.current?.click()}><FiUpload /> Adjuntar</button><input ref={fileRef} type="file" multiple hidden onChange={onFiles} /></div><div className="file-list">{attachments.map((file, index) => <div key={file.id || index}><span><FiFile /></span><div><strong>{file.name || file.file_name || `Archivo ${index + 1}`}</strong><small>{file.size ? `${Math.ceil(file.size / 1024)} KB` : "Archivo adjunto"}</small></div><a href={file.url || file.path || "#"} download title="Descargar"><FiDownload /></a></div>)}{!attachments.length && <button className="upload-zone" onClick={() => fileRef.current?.click()}><FiUpload /><span>Arrastra archivos o <b>selecciona desde tu equipo</b></span><small>Máximo 10 MB por archivo</small></button>}</div></section>
+    </div>
+    <div className="drawer-activity"><div className="activity-tabs"><button className={tab === "comments" ? "active" : ""} onClick={() => setTab("comments")}><FiMessageSquare /> Comentarios <b>{comments.length}</b></button><button className={tab === "activity" ? "active" : ""} onClick={() => setTab("activity")}><FiActivity /> Actividad</button></div>{tab === "comments" ? <><div className="comment-list">{comments.map((item, index) => <div className="comment-item" key={item.id || index}><Avatar user={item.user || item.author} /><div><p><strong>{item.user?.name || item.author?.name || "Usuario"}</strong><time>{item.created_at ? new Date(item.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "Ahora"}</time></p><span>{item.comment || item.content || item.body}</span></div></div>)}{!comments.length && <div className="no-comments"><FiMessageSquare /> Inicia la conversación sobre esta tarea</div>}</div><div className="comment-box"><Avatar user={{ name: "Tú" }} /><div><textarea rows="2" value={comment} onChange={(event) => setComment(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) onComment(); }} placeholder="Escribe un comentario..." /><footer><span>⌘ + Enter para enviar</span><button disabled={!comment.trim()} onClick={onComment}><FiSend /> Enviar</button></footer></div></div></> : <div className="activity-feed"><span><i><FiCheckCircle /></i><p><strong>Tarea actualizada</strong><small>Los cambios más recientes aparecen aquí.</small></p></span><span><i><FiActivity /></i><p><strong>Actividad del equipo</strong><small>El historial se sincroniza con el proyecto.</small></p></span></div>}</div>
+    </div>
+  </aside></div>;
+}
+
+function Property({ icon: Icon, label, children }) { return <label className="task-property"><span><Icon />{label}</span>{children}</label>; }
+function BoardSkeleton() { return <div className="kanban-grid skeleton-board">{COLUMNS.map((column) => <div className="kanban-column" key={column.key}><div className="skeleton-line short" />{[1, 2, 3].map((item) => <div className="skeleton-card" key={item}><div className="skeleton-line tiny" /><div className="skeleton-line" /><div className="skeleton-line medium" /></div>)}</div>)}</div>; }
 
 export default Project;
