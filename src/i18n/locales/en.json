@@ -7,7 +7,8 @@
     "contact": "Contact",
     "login": "Login",
     "startProject": "Start a project",
-    "menu": "Open menu"
+    "menu": "Open menu",
+    "tools": "Tools"
   },
   "home": {
     "eyebrow": "Digital solutions that move forward",
@@ -177,5 +178,301 @@
     "loading": "Loading...",
     "error": "Error",
     "submit": "Submit"
+  },
+  "tools": {
+    "pageTitle": "Tools",
+    "eyebrow": "Free tools",
+    "heroTitle": "The utilities we use every day,",
+    "heroAccent": "free for you.",
+    "heroText": "A collection of fast tools for developers, designers and product teams. Everything runs in your browser: your files never leave your computer.",
+    "searchPlaceholder": "Search a tool…",
+    "all": "All",
+    "seeAll": "See all tools",
+    "noResults": "We couldn't find any tool with that name.",
+    "categories": {
+      "documents": "Documents",
+      "media": "Image & audio",
+      "developers": "Development"
+    },
+    "items": {
+      "pdfToWord": {
+        "name": "PDF to Word",
+        "desc": "Turn the content of a PDF into an editable .docx document.",
+        "intro": "Extract the text from your PDF and download it as a ready-to-edit Word document (.docx). The conversion happens entirely in your browser."
+      },
+      "pdfSummary": {
+        "name": "PDF summary",
+        "desc": "Get the key ideas of a PDF or a long text in seconds.",
+        "intro": "Upload a PDF (or paste text) and get a summary with the most relevant sentences, keywords and reading stats."
+      },
+      "pdfToText": {
+        "name": "PDF to text",
+        "desc": "Turn any PDF into plain text ready to copy.",
+        "intro": "Get all the text from a PDF, page by page, ready to copy or download as .txt."
+      },
+      "imageToWebp": {
+        "name": "Images to WebP",
+        "desc": "Convert PNG, JPG, GIF or AVIF to WebP and make your site lighter.",
+        "intro": "Convert images from any format to WebP (also PNG or JPG), tune quality and resize in batch without leaving your browser."
+      },
+      "audioToText": {
+        "name": "Audio to text",
+        "desc": "Transcribe speech to text in real time, in several languages.",
+        "intro": "Dictate or play audio and get a real-time transcription powered by your browser's speech recognition engine."
+      },
+      "qrGenerator": {
+        "name": "QR code generator",
+        "desc": "Create QR codes for links, WiFi, contacts and more.",
+        "intro": "Generate custom QR codes for URLs, WiFi networks, emails, phones or contact cards and download them as PNG or SVG."
+      },
+      "jsonFormatter": {
+        "name": "JSON formatter",
+        "desc": "Format, minify and validate JSON instantly.",
+        "intro": "Sort, indent, minify and validate your JSON structures with clear error messages."
+      },
+      "base64": {
+        "name": "Base64",
+        "desc": "Encode and decode text or files in Base64.",
+        "intro": "Convert text to Base64 and back, with UTF-8 support, URL-safe variant and file to Data URL conversion."
+      },
+      "hashGenerator": {
+        "name": "Hash generator",
+        "desc": "Compute SHA-1, SHA-256, SHA-384 and SHA-512 of text or files.",
+        "intro": "Generate cryptographic hashes from text or a file to verify integrity, using the browser's Web Crypto API."
+      },
+      "passwordGenerator": {
+        "name": "Password generator",
+        "desc": "Create secure random passwords with real entropy.",
+        "intro": "Generate strong passwords with cryptographic randomness, control length and symbols, and check entropy in bits."
+      },
+      "uuidGenerator": {
+        "name": "UUID generator",
+        "desc": "Generate unique IDs: UUID v4, ULID or Nano ID.",
+        "intro": "Create unique identifiers in bulk for databases, APIs or tests, in UUID v4, ULID or Nano ID format."
+      },
+      "jwtDecoder": {
+        "name": "JWT decoder",
+        "desc": "Inspect the header, payload and expiration of a token.",
+        "intro": "Paste a JSON Web Token and review its content, claims and expiration date without sending it to any server."
+      },
+      "colorConverter": {
+        "name": "Color converter",
+        "desc": "Convert between HEX, RGB, HSL and CMYK and check contrast.",
+        "intro": "Convert colors between formats, generate a shade scale and verify contrast against WCAG criteria."
+      }
+    },
+    "ui": {
+      "copy": "Copy",
+      "copied": "Copied!",
+      "clear": "Clear",
+      "download": "Download",
+      "preview": "Preview",
+      "result": "Result",
+      "processing": "Processing…",
+      "related": "Other tools",
+      "genericError": "Something went wrong. Please try again.",
+      "privacy": "100% in your browser: your files are never uploaded to a server.",
+      "dropLabel": "Drag a file here or click to browse",
+      "dropHint": "The file is processed locally",
+      "ctaTitle": "Need a custom tool?",
+      "ctaText": "At Appsline we build platforms, automations and integrations for companies. Tell us about your case."
+    },
+    "qr": {
+      "contentTitle": "QR content",
+      "styleTitle": "Customization",
+      "presets": {
+        "text": "Text",
+        "url": "Link",
+        "wifi": "WiFi",
+        "email": "Email",
+        "phone": "Phone",
+        "vcard": "Contact"
+      },
+      "fields": {
+        "text": "Text",
+        "url": "URL",
+        "ssid": "Network name (SSID)",
+        "password": "Password",
+        "encryption": "Security",
+        "email": "Email",
+        "subject": "Subject",
+        "body": "Message",
+        "phone": "Phone",
+        "fullName": "Full name",
+        "org": "Company"
+      },
+      "noPassword": "No password",
+      "size": "Size",
+      "margin": "Margin",
+      "foreground": "Code color",
+      "background": "Background color",
+      "level": "Error correction",
+      "levelHint": "A higher level keeps the code readable even if it gets damaged.",
+      "empty": "Type something to generate your QR code."
+    },
+    "pdfToWord": {
+      "uploadTitle": "Upload your PDF",
+      "uploadHint": "Files up to ~50 MB. Processed in your browser.",
+      "drop": "Drop your PDF here",
+      "keepBreaks": "Keep page breaks",
+      "action": "Convert to Word",
+      "success": "Done: {{pages}} pages and {{chars}} characters converted. The download started automatically.",
+      "noText": "This PDF has no selectable text (it is probably a scan). You would need OCR to convert it.",
+      "note": "The conversion keeps text and page breaks. Complex layouts, columns and images are not reproduced in the Word document."
+    },
+    "pdfSummary": {
+      "sourceTitle": "Content source",
+      "modes": {
+        "pdf": "From a PDF",
+        "text": "Paste text"
+      },
+      "drop": "Drop the PDF you want to summarize",
+      "textPlaceholder": "Paste here the text you want to summarize…",
+      "length": "Summary length:",
+      "levels": {
+        "short": "Short",
+        "medium": "Balanced",
+        "long": "Detailed"
+      },
+      "action": "Generate summary",
+      "resultTitle": "Summary",
+      "keywords": "Keywords",
+      "noText": "We couldn't find any text to summarize.",
+      "stats": {
+        "pages": "Pages",
+        "words": "Words",
+        "summaryWords": "Summary words",
+        "minutes": "Reading"
+      },
+      "note": "The summary is extractive: it picks the most representative sentences of the document without sending your file to any external service."
+    },
+    "pdfToText": {
+      "uploadTitle": "Upload your PDF",
+      "drop": "Drop your PDF here",
+      "separator": "Mark the start of each page",
+      "action": "Extract text",
+      "page": "Page",
+      "noText": "This PDF has no selectable text (it is probably a scan).",
+      "stats": "{{words}} words · {{chars}} characters"
+    },
+    "imageToWebp": {
+      "uploadTitle": "Upload your images",
+      "uploadHint": "You can convert several images at once.",
+      "drop": "Drop your images here",
+      "format": "Output format",
+      "quality": "Quality",
+      "maxWidth": "Max width (px)",
+      "maxWidthHint": "Leave empty to keep the original size.",
+      "action": "Convert images",
+      "downloadAll": "Download all",
+      "saved": "{{percent}}% smaller · {{before}} → {{after}}",
+      "unsupported": "Your browser couldn't generate this format."
+    },
+    "audioToText": {
+      "liveTitle": "Live transcription",
+      "liveHint": "Speak into the microphone and the text appears instantly.",
+      "language": "Audio language",
+      "start": "Start transcription",
+      "stop": "Stop",
+      "listening": "Listening…",
+      "fileTitle": "Audio file",
+      "fileHint": "Play it and transcribe it with the microphone on.",
+      "drop": "Drop your audio or video file",
+      "fileNote": "Browsers don't allow transcribing a file directly. Play the audio out loud with live transcription enabled, or contact us if you need automated transcription of files at scale.",
+      "transcriptTitle": "Transcript",
+      "transcriptPlaceholder": "Your transcript will appear here. You can also edit it by hand.",
+      "unsupported": "Your browser doesn't support speech recognition. We recommend Google Chrome or Microsoft Edge on desktop.",
+      "errors": {
+        "not-allowed": "We need permission to use the microphone.",
+        "service-not-allowed": "The speech recognition service is unavailable.",
+        "audio-capture": "No microphone detected.",
+        "network": "Network error while reaching the recognition service."
+      }
+    },
+    "json": {
+      "inputTitle": "Your JSON",
+      "indent": "Indentation",
+      "sortKeys": "Sort keys alphabetically",
+      "format": "Format",
+      "minify": "Minify",
+      "validate": "Validate",
+      "valid": "✓ The JSON is valid.",
+      "type": "Type",
+      "keys": "Top-level keys",
+      "size": "Size"
+    },
+    "base64": {
+      "inputTitle": "Text",
+      "modes": {
+        "encode": "Encode",
+        "decode": "Decode"
+      },
+      "placeholders": {
+        "encode": "Type the text you want to encode…",
+        "decode": "Paste the Base64 you want to decode…"
+      },
+      "urlSafe": "URL-safe variant (no +, / or =)",
+      "error": "The content is not valid Base64.",
+      "fileTitle": "File to Data URL",
+      "fileHint": "Turn images or documents into a Base64 string ready for CSS or HTML.",
+      "fileDrop": "Drop a file to convert it"
+    },
+    "hash": {
+      "inputTitle": "Text to hash",
+      "placeholder": "Type or paste the text…",
+      "action": "Generate hashes",
+      "fromText": "From text",
+      "fileTitle": "File hash",
+      "fileHint": "Verify a file's integrity by comparing its checksum.",
+      "fileDrop": "Drop a file to compute its hash"
+    },
+    "password": {
+      "optionsTitle": "Settings",
+      "length": "Length",
+      "quantity": "Quantity",
+      "action": "Generate again",
+      "sets": {
+        "lower": "Lowercase (a-z)",
+        "upper": "Uppercase (A-Z)",
+        "numbers": "Numbers (2-9)",
+        "symbols": "Symbols (!@#$)",
+        "ambiguous": "Include ambiguous characters (i, l, 1, O, 0)"
+      }
+    },
+    "uuid": {
+      "optionsTitle": "Settings",
+      "types": {
+        "v4": "UUID v4",
+        "ulid": "ULID",
+        "nano": "Nano ID"
+      },
+      "quantity": "Quantity",
+      "uppercase": "Uppercase",
+      "braces": "Wrapped in { }",
+      "action": "Generate again"
+    },
+    "jwt": {
+      "inputTitle": "Token",
+      "inputHint": "The token is decoded locally; it is never sent to a server.",
+      "invalid": "The token is not a valid JWT.",
+      "header": "Header",
+      "payload": "Payload",
+      "claims": "Main claims",
+      "expired": "Token expired on {{date}}.",
+      "validUntil": "Token valid until {{date}}.",
+      "note": "This tool only decodes the token: it does not verify the signature. Never share production tokens."
+    },
+    "color": {
+      "inputTitle": "Input color",
+      "inputHint": "Accepts HEX, RGB, RGBA and HSL.",
+      "value": "Value",
+      "picker": "Picker",
+      "invalid": "We couldn't parse that color.",
+      "formats": "Formats",
+      "scale": "Shade scale",
+      "contrast": "Contrast (WCAG)",
+      "onWhite": "On white",
+      "onDark": "On dark"
+    }
   }
 }
