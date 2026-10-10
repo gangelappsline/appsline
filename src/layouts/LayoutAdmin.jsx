@@ -168,7 +168,7 @@ const LayoutAdmin = ({ title, subtitle, actions, breadcrumbs = [], fluid = false
 
           {/* ---------- Contenido ---------- */}
           <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-            <div className={`mx-auto w-full ${fluid ? "" : "max-w-7xl"}`}>
+            <div className={`mx-auto w-full ${fluid ? "" : "max-w-9xl"}`}>
               {(title || actions || breadcrumbs.length > 0) && (
                 <div className="mb-6">
                   {breadcrumbs.length > 0 && (
