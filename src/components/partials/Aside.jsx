@@ -1,27 +1,50 @@
 /* eslint-disable react/prop-types */
 import { NavLink } from "react-router-dom";
 import {
+  FiBarChart2,
   FiBox,
+  FiBriefcase,
+  FiCalendar,
+  FiCheckSquare,
+  FiExternalLink,
   FiFolder,
   FiGrid,
   FiHelpCircle,
+  FiSettings,
   FiUsers,
   FiX,
 } from "react-icons/fi";
 import LogoFull from "../../assets/images/appsline_logo_white.webp";
 
+/**
+ * Navegación del panel. Para agregar una sección nueva basta con
+ * añadir un objeto { to, label, icon } en el grupo que corresponda.
+ */
 const navSections = [
   {
     title: "General",
-    items: [{ to: "/admin/dashboard", label: "Dashboard", icon: FiGrid }],
+    items: [
+      { to: "/admin/dashboard", label: "Dashboard", icon: FiGrid },
+      { to: "/admin/tasks", label: "Mi trabajo", icon: FiCheckSquare },
+      { to: "/admin/calendar", label: "Calendario", icon: FiCalendar },
+    ],
   },
   {
     title: "Gestión",
     items: [
       { to: "/admin/projects", label: "Proyectos", icon: FiFolder },
+      { to: "/admin/clients", label: "Clientes", icon: FiBriefcase },
       { to: "/admin/products", label: "Productos", icon: FiBox },
       { to: "/admin/users", label: "Usuarios", icon: FiUsers },
     ],
+  },
+  {
+    title: "Análisis",
+    items: [{ to: "/admin/reports", label: "Reportes", icon: FiBarChart2 }],
+  },
+  {
+    title: "Sistema",
+    items: [{ to: "/admin/settings", label: "Configuración", icon: FiSettings }],
   },
 ];
 
@@ -56,12 +79,8 @@ const Aside = ({ open = false, onClose = () => {} }) => {
       >
         {/* Logo */}
         <div className="flex h-16 items-center justify-between border-b border-white/5 px-5">
-          <NavLink to="/admin/dashboard" className="flex items-center">
-            <img
-              src={LogoFull}
-              alt="Appsline"
-              className="h-8 object-contain"
-            />
+          <NavLink to="/admin/dashboard" className="flex items-center" onClick={onClose}>
+            <img src={LogoFull} alt="Appsline" className="h-8 object-contain" />
           </NavLink>
           <button
             type="button"
@@ -74,13 +93,13 @@ const Aside = ({ open = false, onClose = () => {} }) => {
         </div>
 
         {/* Navegación */}
-        <nav className="flex-1 space-y-7 overflow-y-auto px-3 py-6">
+        <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
           {navSections.map((section) => (
             <div key={section.title}>
               <p className="mb-2 px-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-600">
                 {section.title}
               </p>
-              <ul className="space-y-1">
+              <ul className="space-y-0.5">
                 {section.items.map(({ to, label, icon: Icon }) => (
                   <li key={to}>
                     <NavLink to={to} className={linkClass} onClick={onClose}>
@@ -107,13 +126,20 @@ const Aside = ({ open = false, onClose = () => {} }) => {
           ))}
         </nav>
 
-        {/* Tarjeta de ayuda */}
-        <div className="px-3 pb-4">
+        {/* Acciones inferiores */}
+        <div className="space-y-3 px-3 pb-4">
+          <a
+            href="/"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-white"
+          >
+            <FiExternalLink className="text-lg text-slate-500" />
+            Ver sitio público
+          </a>
           <div className="rounded-xl border border-white/10 bg-brand-700/15 p-4">
             <FiHelpCircle className="text-lg text-brand-400" />
-            <p className="mt-2.5 text-sm font-semibold text-white">
-              ¿Necesitas ayuda?
-            </p>
+            <p className="mt-2.5 text-sm font-semibold text-white">¿Necesitas ayuda?</p>
             <p className="mt-1 text-xs leading-5 text-slate-400">
               Escríbenos y el equipo de soporte te responderá.
             </p>

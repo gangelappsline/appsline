@@ -1,243 +1,148 @@
-import { useEffect, useState } from "react";
-import { Dialog, Transition } from "@headlessui/react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { FiCamera, FiPlus, FiUsers } from "react-icons/fi";
 import LayoutAdmin from "../../layouts/LayoutAdmin";
+import {
+  Avatar, Badge, Button, Card, ConfirmDialog, EmptyState, Field,
+  Modal, SearchInput, TableSkeleton, useToast,
+} from "../../components/admin";
+import { AVATAR_FIELD, deleteUser, fetchUsers, saveUser } from "../../services/admin";
+import { roleLabel, roleTone } from "../../utils/format";
 
-const roles = [
+const ROLES = [
   { key: "administrator", label: "Administrador" },
   { key: "dev", label: "Desarrollador" },
   { key: "client", label: "Cliente" },
 ];
 
-const API_BASE = import.meta.env.VITE_API_URL;
-const USERS_URL = `${API_BASE}/users`; // usar /api/users
-const IMAGE_FIELD = "avatar"; // cambia a "image" si tu API lo espera
-
-// Utilidad: obtiene la imagen del usuario o genera fallback con ui-avatars
-const getUserAvatar = (user) => {
-  const src = user?.avatar || user?.image || user?.photo || "";
-  const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-    user?.name || user?.email || "Usuario"
-  )}`;
-  return src && src !== "null" ? src : fallback;
-};
+const EMPTY_FORM = { name: "", email: "", role: "client", password: "" };
 
 const Users = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { notify } = useToast();
+
   const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [search, setSearch] = useState("");
-  const [showAdd, setShowAdd] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
-  const [adding, setAdding] = useState(false);
 
-  const [newUser, setNewUser] = useState({
-    name: "",
-    email: "",
-    role: "client",
-    password: "", // agregado para evitar undefined
-  });
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  // Nuevo estado para imagen (crear)
-  const [addAvatarFile, setAddAvatarFile] = useState(null);
-  const [addAvatarPreview, setAddAvatarPreview] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
-  // Nuevo estado para imagen (editar)
-  const [editAvatarFile, setEditAvatarFile] = useState(null);
-  const [editAvatarPreview, setEditAvatarPreview] = useState("");
-
-  useEffect(() => {
-    const fetchUsers = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const token = localStorage.getItem("user_token");
-        const res = await fetch(USERS_URL, {
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!res.ok) throw new Error("Fetch users failed");
-        const data = await res.json();
-        setUsers(Array.isArray(data.data) ? data.data : data.data?.users || data.users || []);
-      } catch (err) {
-        setError("Error loading users");
-        setUsers([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUsers();
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    try {
+      setUsers(await fetchUsers());
+    } catch {
+      setLoadError("No se pudieron cargar los usuarios.");
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Manejadores de archivo
-  const handleAddImageChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setAddAvatarFile(file);
-    setAddAvatarPreview(URL.createObjectURL(file));
+  useEffect(() => { load(); }, [load]);
+
+  // Permite abrir el modal con /admin/users?action=new (paleta Ctrl+K).
+  useEffect(() => {
+    if (searchParams.get("action") === "new") {
+      openCreate();
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const filtered = users.filter((u) => {
+    const q = search.trim().toLowerCase();
+    return !q || `${u.name || ""} ${u.email || ""}`.toLowerCase().includes(q);
+  });
+
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const resetAvatar = () => {
+    if (avatarPreview.startsWith("blob:")) URL.revokeObjectURL(avatarPreview);
+    setAvatarFile(null);
+    setAvatarPreview("");
   };
 
-  const handleEditImageChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setEditAvatarFile(file);
-    setEditAvatarPreview(URL.createObjectURL(file));
+  const openCreate = () => {
+    resetAvatar();
+    setEditing(null);
+    setForm(EMPTY_FORM);
+    setShowModal(true);
   };
 
-  // Filtrar usuarios por nombre o email
-  const filteredUsers = users.filter((user) =>
-    user.name?.toLowerCase().includes(search.toLowerCase()) ||
-    user.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const openEdit = (user) => {
+    resetAvatar();
+    setEditing(user);
+    setForm({ name: user.name || "", email: user.email || "", role: user.role || "client", password: "" });
+    setAvatarPreview(user.avatar || user.image || user.photo || "");
+    setShowModal(true);
+  };
 
-  // Agregar nuevo usuario
-  const handleAddUser = async (e) => {
+  const closeModal = () => {
+    setShowModal(false);
+    setEditing(null);
+    setForm(EMPTY_FORM);
+    resetAvatar();
+  };
+
+  const handleAvatar = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (avatarPreview.startsWith("blob:")) URL.revokeObjectURL(avatarPreview);
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!newUser.name.trim() || !newUser.email.trim()) return;
-    setAdding(true);
+    if (!form.name.trim() || !form.email.trim()) return;
+    setSaving(true);
     try {
-      const token = localStorage.getItem("user_token");
+      const payload = new FormData();
+      payload.append("name", form.name.trim());
+      payload.append("email", form.email.trim());
+      payload.append("role", form.role);
+      if (form.password) payload.append("password", form.password);
+      if (avatarFile) payload.append(AVATAR_FIELD, avatarFile);
 
-      const form = new FormData();
-      form.append("name", newUser.name);
-      form.append("email", newUser.email);
-      form.append("role", newUser.role);
-      if (newUser.password) form.append("password", newUser.password);
-      if (addAvatarFile) {
-        form.append(IMAGE_FIELD, addAvatarFile); // campo de imagen
+      const saved = await saveUser(payload, editing?.id || null);
+      if (editing) {
+        setUsers((old) => old.map((u) => (u.id === editing.id ? { ...u, ...saved } : u)));
+        notify("Usuario actualizado");
+      } else {
+        setUsers((old) => [saved, ...old]);
+        notify("Usuario creado");
       }
-
-      if (import.meta.env.DEV) {
-        // Verifica en consola que el archivo viaje
-        for (const [k, v] of form.entries()) {
-          console.log(k, v instanceof File ? `File(${v.name}, ${v.type}, ${v.size}b)` : v);
-        }
-      }
-
-      const res = await fetch(USERS_URL, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: form,
-      });
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || "Error creating user");
-      }
-      const data = await res.json().catch(() => ({}));
-      const created = data.data || data;
-      setUsers((prev) => [created, ...prev]);
-
-      // Reset
-      setNewUser({ name: "", email: "", role: "client", password: "" });
-      if (addAvatarPreview) URL.revokeObjectURL(addAvatarPreview);
-      setAddAvatarFile(null);
-      setAddAvatarPreview("");
-      setShowAdd(false);
-    } catch (err) {
-      console.error(err);
-      setError("Error adding user");
+      closeModal();
+    } catch {
+      notify(editing ? "No se pudo actualizar el usuario" : "No se pudo crear el usuario", "error");
     } finally {
-      setAdding(false);
+      setSaving(false);
     }
   };
 
-  // Editar usuario (cargar datos y preview)
-  const handleEditUser = (user) => {
-    setEditingUser(user);
-    setNewUser({
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      password: "",
-    });
-    // Fallback si no hay imagen
-    setEditAvatarPreview(getUserAvatar(user));
-    setEditAvatarFile(null);
-    setShowEdit(true);
-  };
-
-  // Actualizar usuario (con imagen)
-  const handleUpdateUser = async (e) => {
-    e.preventDefault();
-    if (!newUser.name.trim() || !newUser.email.trim()) return;
-    setAdding(true);
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
     try {
-      const token = localStorage.getItem("user_token");
-
-      const form = new FormData();
-      form.append("name", newUser.name);
-      form.append("email", newUser.email);
-      form.append("role", newUser.role);
-      if (newUser.password) form.append("password", newUser.password);
-      if (editAvatarFile) {
-        form.append(IMAGE_FIELD, editAvatarFile); // campo de imagen
-      }
-
-      // Muchas APIs requieren override para multipart update
-      //form.append("_method", "PUT");
-
-      if (import.meta.env.DEV) {
-        for (const [k, v] of form.entries()) {
-          console.log(k, v instanceof File ? `File(${v.name}, ${v.type}, ${v.size}b)` : v);
-        }
-      }
-
-      const res = await fetch(`${USERS_URL}/${editingUser.id}`, {
-        method: "PUT", // override con _method=PUT
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: form,
-      });
-
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || "Error updating user");
-      }
-
-      const data = await res.json().catch(() => ({}));
-      const updated = data.data || data;
-
-      setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? { ...u, ...updated } : u)));
-
-      setShowEdit(false);
-      setEditingUser(null);
-      if (editAvatarPreview && editAvatarPreview.startsWith("blob:")) {
-        URL.revokeObjectURL(editAvatarPreview);
-      }
-      setEditAvatarFile(null);
-      setEditAvatarPreview("");
-      setNewUser({ name: "", email: "", role: "client", password: "" });
-    } catch (err) {
-      console.error(err);
-      setError("Error updating user");
+      await deleteUser(confirmDelete.id);
+      setUsers((old) => old.filter((u) => u.id !== confirmDelete.id));
+      notify("Usuario eliminado");
+    } catch {
+      notify("No se pudo eliminar el usuario", "error");
     } finally {
-      setAdding(false);
-    }
-  };
-
-  // Eliminar usuario
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm("¿Estás seguro de eliminar este usuario?")) return;
-    try {
-      const token = localStorage.getItem("user_token");
-      await fetch(`${import.meta.env.VITE_API_URL}/users/${userId}`, {
-        method: "DELETE",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      setUsers((prev) => prev.filter((u) => u.id !== userId));
-    } catch (err) {
-      setError("Error deleting user");
+      setDeleting(false);
+      setConfirmDelete(null);
     }
   };
 
@@ -246,359 +151,137 @@ const Users = () => {
       title="Usuarios"
       subtitle="Gestiona las cuentas y roles del equipo"
       actions={
-        <button className="btn-primary" onClick={() => setShowAdd(true)}>
-          + Agregar usuario
-        </button>
+        <Button onClick={openCreate}>
+          <FiPlus /> Agregar usuario
+        </Button>
       }
     >
-      <motion.div
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="admin-card overflow-hidden"
-      >
+      <Card className="overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <input
-            type="search"
-            placeholder="Buscar por nombre o email..."
-            className="admin-input sm:max-w-xs"
+          <SearchInput
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={setSearch}
+            placeholder="Buscar por nombre o correo..."
+            className="w-full sm:max-w-xs"
           />
           <span className="text-sm text-slate-500">
-            {filteredUsers.length} usuario{filteredUsers.length === 1 ? "" : "s"}
+            {filtered.length} usuario{filtered.length === 1 ? "" : "s"}
           </span>
         </div>
 
         {loading ? (
-          <div className="space-y-3 p-6">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4">
-                <div className="h-10 w-10 animate-pulse rounded-full bg-slate-200" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 w-40 animate-pulse rounded bg-slate-200" />
-                  <div className="h-3 w-56 animate-pulse rounded bg-slate-100" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : error ? (
-          <div className="p-10 text-center text-sm text-red-600">{error}</div>
-        ) : filteredUsers.length === 0 ? (
-          <div className="p-16 text-center">
-            <p className="font-medium text-slate-700">
-              {search ? "Sin resultados" : "No hay usuarios registrados"}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              {search
-                ? "Prueba con otro nombre o correo."
-                : "Agrega el primer usuario para comenzar."}
-            </p>
-          </div>
+          <TableSkeleton rows={6} />
+        ) : loadError ? (
+          <EmptyState
+            icon={FiUsers}
+            title="No se pudieron cargar los usuarios"
+            description={loadError}
+            action={<Button variant="secondary" onClick={load}>Reintentar</Button>}
+          />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={FiUsers}
+            title={search ? "Sin resultados" : "No hay usuarios registrados"}
+            description={search ? "Prueba con otro nombre o correo." : "Agrega el primer usuario para comenzar."}
+            action={!search && <Button onClick={openCreate}><FiPlus /> Agregar usuario</Button>}
+          />
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+            <table className="w-full min-w-[680px] text-left text-sm">
               <thead>
                 <tr className="admin-table-head">
-                  <th className="px-6 py-3.5">ID</th>
-                  {/* Nueva columna Foto */}
-                  <th className="px-6 py-3.5">Foto</th>
-                  <th className="px-6 py-3.5">Nombre</th>
-                  <th className="px-6 py-3.5">Email</th>
+                  <th className="px-6 py-3.5">Usuario</th>
+                  <th className="px-6 py-3.5">Correo</th>
                   <th className="px-6 py-3.5">Rol</th>
                   <th className="px-6 py-3.5 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                <AnimatePresence>
-                  {filteredUsers.map((user) => (
-                    <motion.tr
-                      key={user.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.3 }}
-                      className="transition hover:bg-slate-50"
-                    >
-                      <td className="px-6 py-4 text-slate-400 tabular-nums">{user.id}</td>
-                      {/* Celda de foto con fallback */}
-                      <td className="px-6 py-4">
-                        <img
-                          src={getUserAvatar(user)}
-                          alt={`Avatar de ${user.name || user.email || user.id}`}
-                          className="h-10 w-10 rounded-full border border-slate-200 bg-white object-cover"
-                          onError={(e) => {
-                            const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                              user?.name || user?.email || "Usuario"
-                            )}`;
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = fallback;
-                          }}
-                        />
-                      </td>
-                      <td className="px-6 py-4 font-medium text-slate-800">{user.name}</td>
-                      <td className="px-6 py-4 text-slate-500">{user.email}</td>
-                      <td className="px-6 py-4">
-                        <span className="badge-slate">
-                          {roles.find((role) => role.key === user.role)?.label || "-"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleEditUser(user)}
-                            className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-brand-700 transition hover:bg-brand-50"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
-                          >
-                            Eliminar
-                          </button>
+                {filtered.map((user) => (
+                  <tr key={user.id} className="transition hover:bg-slate-50">
+                    <td className="px-6 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <Avatar user={user} size="sm" />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-800">{user.name || "—"}</p>
+                          <p className="text-xs tabular-nums text-slate-400">ID {user.id}</p>
                         </div>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </AnimatePresence>
+                      </div>
+                    </td>
+                    <td className="px-6 py-3.5 text-slate-500">{user.email}</td>
+                    <td className="px-6 py-3.5">
+                      <Badge tone={roleTone(user.role)}>{roleLabel(user.role)}</Badge>
+                    </td>
+                    <td className="px-6 py-3.5">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="subtle" onClick={() => openEdit(user)}>Editar</Button>
+                        <Button variant="subtle" tone="red" onClick={() => setConfirmDelete(user)}>Eliminar</Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
-      </motion.div>
+      </Card>
 
-      {/* Modal para agregar usuario */}
-      <Transition appear show={showAdd} as={motion.div}>
-        <Dialog as="div" className="fixed inset-0 z-50 overflow-y-auto" onClose={() => setShowAdd(false)}>
-          <div className="min-h-screen px-4 text-center">
-            <Transition.Child
-              as={motion.div}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0"
-              enterTo="opacity-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-              className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm"
-            />
-            <span className="inline-block h-screen align-middle" aria-hidden="true">&#8203;</span>
-            <Transition.Child
-              as={motion.div}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-              className="my-8 inline-block w-full max-w-md transform overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-left align-middle shadow-card-lg transition-all"
-            >
-              <Dialog.Title as="h2" className="mb-5 text-lg font-semibold text-slate-900">
-                Agregar Nuevo Usuario
-              </Dialog.Title>
-              <form onSubmit={handleAddUser} className="flex flex-col gap-4">
-                <motion.input
-                  whileFocus={{ scale: 1.02 }}
-                  type="text"
-                  placeholder="Nombre"
-                  className="admin-input"
-                  value={newUser.name}
-                  onChange={(e) => setNewUser((u) => ({ ...u, name: e.target.value }))}
-                  disabled={adding}
-                  autoFocus
-                />
-                <motion.input
-                  whileFocus={{ scale: 1.02 }}
-                  type="email"
-                  placeholder="Email"
-                  className="admin-input"
-                  value={newUser.email}
-                  onChange={(e) => setNewUser((u) => ({ ...u, email: e.target.value }))}
-                  disabled={adding}
-                />
-                <motion.select
-                  whileFocus={{ scale: 1.02 }}
-                  className="admin-input"
-                  value={newUser.role}
-                  onChange={(e) => setNewUser((u) => ({ ...u, role: e.target.value }))}
-                  disabled={adding}
-                >
-                  {roles.map((role) => (
-                    <option key={role.key} value={role.key}>
-                      {role.label}
-                    </option>
-                  ))}
-                </motion.select>
-
-                {/* Imagen (crear) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Imagen (opcional)</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAddImageChange}
-                    disabled={adding}
-                    className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-brand-800"
-                  />
-                  {addAvatarPreview && (
-                    <img src={addAvatarPreview} alt="Preview" className="mt-3 h-20 w-20 rounded-full object-cover border" />
-                  )}
-                </div>
-
-                <motion.input
-                  whileFocus={{ scale: 1.02 }}
-                  type="text"
-                  placeholder="Password"
-                  className="admin-input"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser((u) => ({ ...u, password: e.target.value }))}
-                  disabled={adding}
-                />
-
-                <div className="flex gap-3 mt-4">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="submit"
-                    className="btn-primary"
-                    disabled={adding}
-                  >
-                    {adding ? "Agregando..." : "Agregar"}
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => setShowAdd(false)}
-                    disabled={adding}
-                  >
-                    Cancelar
-                  </motion.button>
-                </div>
-              </form>
-            </Transition.Child>
+      {/* ---------- Modal crear/editar ---------- */}
+      <Modal
+        open={showModal}
+        onClose={closeModal}
+        title={editing ? "Editar usuario" : "Agregar usuario"}
+        subtitle={editing ? "Actualiza los datos de la cuenta." : "Crea una cuenta nueva para el equipo."}
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeModal} disabled={saving}>Cancelar</Button>
+            <Button loading={saving} onClick={handleSubmit}>{editing ? "Guardar cambios" : "Agregar"}</Button>
+          </>
+        }
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Foto */}
+          <div className="flex items-center gap-4 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+            {avatarPreview ? (
+              <img src={avatarPreview} alt="Foto de perfil" className="h-14 w-14 rounded-full border border-slate-200 object-cover" />
+            ) : (
+              <Avatar user={{ name: form.name || "?" }} size="lg" />
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-700">Foto de perfil</p>
+              <p className="text-xs text-slate-400">PNG o JPG. Opcional.</p>
+              <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[13px] font-semibold text-brand-700 ring-1 ring-slate-200 transition hover:ring-brand-300">
+                <FiCamera /> Elegir imagen
+                <input type="file" accept="image/*" hidden onChange={handleAvatar} />
+              </label>
+            </div>
           </div>
-        </Dialog>
-      </Transition>
 
-      {/* Modal para editar usuario */}
-      <Transition appear show={showEdit} as={motion.div}>
-        <Dialog as="div" className="fixed inset-0 z-50 overflow-y-auto" onClose={() => setShowEdit(false)}>
-          <div className="min-h-screen px-4 text-center">
-            <Transition.Child
-              as={motion.div}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0"
-              enterTo="opacity-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-              className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm"
-            />
-            <span className="inline-block h-screen align-middle" aria-hidden="true">&#8203;</span>
-            <Transition.Child
-              as={motion.div}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-              className="my-8 inline-block w-full max-w-md transform overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-left align-middle shadow-card-lg transition-all"
-            >
-              <Dialog.Title as="h2" className="mb-5 text-lg font-semibold text-slate-900">
-                Editar Usuario
-              </Dialog.Title>
-              <form onSubmit={handleUpdateUser} className="flex flex-col gap-4">
-                <motion.input
-                  whileFocus={{ scale: 1.02 }}
-                  type="text"
-                  placeholder="Nombre"
-                  className="admin-input"
-                  value={newUser.name}
-                  onChange={(e) => setNewUser((u) => ({ ...u, name: e.target.value }))}
-                  disabled={adding}
-                />
-                <motion.input
-                  whileFocus={{ scale: 1.02 }}
-                  type="email"
-                  placeholder="Email"
-                  className="admin-input"
-                  value={newUser.email}
-                  onChange={(e) => setNewUser((u) => ({ ...u, email: e.target.value }))}
-                  disabled={adding}
-                />
-                <motion.select
-                  whileFocus={{ scale: 1.02 }}
-                  className="admin-input"
-                  value={newUser.role}
-                  onChange={(e) => setNewUser((u) => ({ ...u, role: e.target.value }))}
-                  disabled={adding}
-                >
-                  {roles.map((role) => (
-                    <option key={role.key} value={role.key}>
-                      {role.label}
-                    </option>
-                  ))}
-                </motion.select>
+          <Field label="Nombre" required>
+            <input className="admin-input" value={form.name} onChange={set("name")} placeholder="Nombre completo" required autoFocus />
+          </Field>
+          <Field label="Correo electrónico" required>
+            <input type="email" className="admin-input" value={form.email} onChange={set("email")} placeholder="usuario@empresa.com" required />
+          </Field>
+          <Field label="Rol">
+            <select className="admin-input" value={form.role} onChange={set("role")}>
+              {ROLES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+            </select>
+          </Field>
+          <Field label={editing ? "Contraseña (opcional)" : "Contraseña"} hint={editing ? "Déjala vacía para conservar la actual." : undefined}>
+            <input type="password" className="admin-input" value={form.password} onChange={set("password")} placeholder="••••••••" autoComplete="new-password" />
+          </Field>
+        </form>
+      </Modal>
 
-                {/* Imagen (editar) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Imagen (opcional)</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleEditImageChange}
-                    disabled={adding}
-                    className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-brand-800"
-                  />
-                  {editAvatarPreview && (
-                    <img
-                      src={editAvatarPreview}
-                      alt="Preview"
-                      className="mt-3 h-20 w-20 rounded-full object-cover border"
-                    />
-                  )}
-                </div>
-
-                {/* Password opcional en edición */}
-                <motion.input
-                  whileFocus={{ scale: 1.02 }}
-                  type="text"
-                  placeholder="Password (opcional)"
-                  className="admin-input"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser((u) => ({ ...u, password: e.target.value }))}
-                  disabled={adding}
-                />
-
-                <div className="flex gap-3 mt-4">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="submit"
-                    className="btn-primary"
-                    disabled={adding}
-                  >
-                    {adding ? "Actualizando..." : "Actualizar"}
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => setShowEdit(false)}
-                    disabled={adding}
-                  >
-                    Cancelar
-                  </motion.button>
-                </div>
-              </form>
-            </Transition.Child>
-          </div>
-        </Dialog>
-      </Transition>
+      <ConfirmDialog
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={handleDelete}
+        loading={deleting}
+        title={`Eliminar a ${confirmDelete?.name || "este usuario"}`}
+        message="Se eliminará la cuenta y perderá el acceso al panel. Esta acción no se puede deshacer."
+      />
     </LayoutAdmin>
   );
 };

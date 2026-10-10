@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import {
   createContext,
   useCallback,
@@ -90,6 +91,15 @@ const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // Actualiza el usuario en memoria y en localStorage (ej. editar perfil).
+  const updateProfile = useCallback((patch) => {
+    setUser((prev) => {
+      const next = { ...(prev || {}), ...(patch || {}) };
+      saveSession(getToken(), next);
+      return next;
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       token,
@@ -99,9 +109,10 @@ const AuthProvider = ({ children }) => {
       isAuthenticated: Boolean(token),
       login,
       logout,
+      updateProfile,
       setError,
     }),
-    [token, user, loading, error, login, logout]
+    [token, user, loading, error, login, logout, updateProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

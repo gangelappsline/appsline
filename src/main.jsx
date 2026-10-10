@@ -19,6 +19,11 @@ import Users from "./pages/admin/Users.jsx";
 import Projects from "./pages/admin/Projects.jsx";
 import Project from "./pages/admin/Project.jsx";
 import Product from "./pages/admin/Product.jsx";
+import Tasks from "./pages/admin/Tasks.jsx";
+import Calendar from "./pages/admin/Calendar.jsx";
+import Clients from "./pages/admin/Clients.jsx";
+import Reports from "./pages/admin/Reports.jsx";
+import Settings from "./pages/admin/Settings.jsx";
 import ProjectLead from "./pages/ProjectLead";
 import ToolsAliasRedirect from "./routes/ToolsAliasRedirect.jsx";
 import ToolsFallback from "./components/tools/ToolsFallback.jsx";
@@ -138,6 +143,46 @@ createRoot(document.getElementById("root")).render(
               element={
                 <ProtectedRoute>
                   <Project />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/tasks"
+              element={
+                <ProtectedRoute>
+                  <Tasks />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/calendar"
+              element={
+                <ProtectedRoute>
+                  <Calendar />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/clients"
+              element={
+                <ProtectedRoute>
+                  <Clients />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/reports"
+              element={
+                <ProtectedRoute>
+                  <Reports />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
                 </ProtectedRoute>
               }
             />
