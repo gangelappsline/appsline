@@ -39,6 +39,7 @@ export const unwrapObject = (payload, nestedKeys = []) => {
 };
 
 const projectKeys = ["project", "projects"];
+const clientKeys = ["client", "clients"];
 const taskKeys = ["task", "tasks"];
 const userKeys = ["user", "users"];
 
@@ -83,6 +84,27 @@ export async function uploadProjectLogo(id, file) {
 
 export async function deleteProject(id) {
   await api.delete(`/projects/${id}`);
+}
+
+/* ------------------------------------------------------------------ */
+/* Clientes                                                            */
+/* ------------------------------------------------------------------ */
+
+export async function fetchClients() {
+  const { data } = await api.get("/clients");
+  return unwrapList(data, clientKeys);
+}
+
+export async function saveClient(payload, id = null) {
+  const isUpdate = id !== null && id !== undefined;
+  const { data } = isUpdate
+    ? await api.put(`/clients/${id}`, payload)
+    : await api.post("/clients", payload);
+  return unwrapObject(data, clientKeys) || data;
+}
+
+export async function deleteClient(id) {
+  await api.delete(`/clients/${id}`);
 }
 
 /* ------------------------------------------------------------------ */
