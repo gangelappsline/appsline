@@ -310,11 +310,18 @@
     "qr": {
       "contentTitle": "Contenido del código",
       "styleTitle": "Personalización",
+      "sections": {
+        "content": "Contenido",
+        "colors": "Colores",
+        "logo": "Logo",
+        "design": "Diseño"
+      },
       "presets": {
         "text": "Texto",
         "url": "Enlace",
         "wifi": "WiFi",
         "email": "Correo",
+        "sms": "SMS",
         "phone": "Teléfono",
         "vcard": "Contacto"
       },
@@ -327,6 +334,7 @@
         "email": "Correo electrónico",
         "subject": "Asunto",
         "body": "Mensaje",
+        "message": "Mensaje",
         "phone": "Teléfono",
         "fullName": "Nombre completo",
         "org": "Empresa"
@@ -336,8 +344,37 @@
       "margin": "Margen",
       "foreground": "Color del código",
       "background": "Color de fondo",
+      "colorMode": {
+        "single": "Color sólido",
+        "gradient": "Degradado"
+      },
+      "gradientStart": "Color inicial",
+      "gradientEnd": "Color final",
+      "gradientType": "Tipo de degradado",
+      "gradientLinear": "Lineal",
+      "gradientRadial": "Radial",
+      "rotation": "Rotación",
+      "brandColors": "Colores Appsline",
+      "transparentBg": "Fondo transparente",
+      "customEyes": "Personalizar el color de los ojos",
+      "eyeFrameColor": "Marco de los ojos",
+      "eyeBallColor": "Centro de los ojos",
+      "logoNone": "Sin logo",
+      "logoUpload": "Subir imagen",
+      "logoRemove": "Quitar logo",
+      "logoSize": "Tamaño del logo",
+      "logoMargin": "Margen del logo",
+      "hideBgDots": "Ocultar puntos detrás del logo",
+      "logoHint": "Con logo se recomienda usar corrección de errores alta (H) para que el código siga siendo legible.",
+      "bodyShape": "Forma del cuerpo",
+      "eyeFrameShape": "Forma del marco de los ojos",
+      "eyeBallShape": "Forma del centro de los ojos",
       "level": "Corrección de errores",
       "levelHint": "Un nivel alto permite leer el QR aunque esté parcialmente dañado.",
+      "quality": "Calidad",
+      "qualityLow": "Baja calidad",
+      "qualityHigh": "Alta calidad",
+      "downloadPng": "Descargar PNG",
       "empty": "Escribe algo para generar tu código QR."
     },
     "pdfToWord": {
