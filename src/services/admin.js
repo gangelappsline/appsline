@@ -7,6 +7,7 @@
  * que ajustar los normalizadores de este archivo.
  */
 import api from "../services/api";
+import { prepareFilesForUpload, prepareFormDataImages, toWebpIfImage } from "../utils/images";
 
 /* ------------------------------------------------------------------ */
 /* Normalizadores: la API responde con formas distintas según el        */
@@ -39,6 +40,7 @@ export const unwrapObject = (payload, nestedKeys = []) => {
 };
 
 const projectKeys = ["project", "projects"];
+const clientKeys = ["client", "clients"];
 const taskKeys = ["task", "tasks"];
 const userKeys = ["user", "users"];
 
@@ -74,7 +76,7 @@ export async function saveProject(payload, id = null) {
 
 export async function uploadProjectLogo(id, file) {
   const form = new FormData();
-  form.append("logo", file);
+  form.append("logo", await toWebpIfImage(file));
   const { data } = await api.post(`/projects/${id}/logo`, form, {
     headers: { "Content-Type": "multipart/form-data" },
   });
@@ -83,6 +85,27 @@ export async function uploadProjectLogo(id, file) {
 
 export async function deleteProject(id) {
   await api.delete(`/projects/${id}`);
+}
+
+/* ------------------------------------------------------------------ */
+/* Clientes                                                            */
+/* ------------------------------------------------------------------ */
+
+export async function fetchClients() {
+  const { data } = await api.get("/clients");
+  return unwrapList(data, clientKeys);
+}
+
+export async function saveClient(payload, id = null) {
+  const isUpdate = id !== null && id !== undefined;
+  const { data } = isUpdate
+    ? await api.put(`/clients/${id}`, payload)
+    : await api.post("/clients", payload);
+  return unwrapObject(data, clientKeys) || data;
+}
+
+export async function deleteClient(id) {
+  await api.delete(`/clients/${id}`);
 }
 
 /* ------------------------------------------------------------------ */
@@ -168,7 +191,8 @@ export async function fetchTaskFiles(projectId, taskId) {
 
 export async function uploadTaskFiles(projectId, taskId, files) {
   const form = new FormData();
-  Array.from(files).forEach((f) => form.append("files[]", f));
+  const preparedFiles = await prepareFilesForUpload(files);
+  preparedFiles.forEach((file) => form.append("files[]", file));
   const { data } = await api.post(
     `/projects/${projectId}/tasks/${taskId}/files`,
     form,
@@ -188,9 +212,10 @@ export async function fetchUsers() {
 
 export async function saveUser(formData, id = null) {
   const config = { headers: { "Content-Type": "multipart/form-data" } };
+  const preparedFormData = await prepareFormDataImages(formData);
   const { data } = id
-    ? await api.put(`/users/${id}`, formData, config)
-    : await api.post("/users", formData, config);
+    ? await api.put(`/users/${id}`, preparedFormData, config)
+    : await api.post("/users", preparedFormData, config);
   return unwrapObject(data, userKeys) || data;
 }
 
