@@ -6,7 +6,7 @@ import {
   Avatar, Badge, Button, Card, ConfirmDialog, EmptyState, Field,
   Modal, SearchInput, TableSkeleton, useToast,
 } from "../../components/admin";
-import { AVATAR_FIELD, deleteUser, fetchUsers, saveUser } from "../../services/admin";
+import { deleteUser, fetchUsers, saveUser, uploadUserAvatar } from "../../services/admin";
 import { roleLabel, roleTone } from "../../utils/format";
 
 const ROLES = [
@@ -108,21 +108,41 @@ const Users = () => {
     if (!form.name.trim() || !form.email.trim()) return;
     setSaving(true);
     try {
-      const payload = new FormData();
-      payload.append("name", form.name.trim());
-      payload.append("email", form.email.trim());
-      payload.append("role", form.role);
-      if (form.password) payload.append("password", form.password);
-      if (avatarFile) payload.append(AVATAR_FIELD, avatarFile);
+      // 1) Primero los datos del usuario (JSON, sin imagen).
+      const payload = {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        role: form.role,
+      };
+      if (form.password) payload.password = form.password;
 
       const saved = await saveUser(payload, editing?.id || null);
-      if (editing) {
-        setUsers((old) => old.map((u) => (u.id === editing.id ? { ...u, ...saved } : u)));
-        notify("Usuario actualizado");
-      } else {
-        setUsers((old) => [saved, ...old]);
-        notify("Usuario creado");
+      const userId = editing?.id || saved?.id || null;
+      const verb = editing ? "actualizado" : "creado";
+      const applyRecord = (next) =>
+        setUsers((old) =>
+          editing
+            ? old.map((u) => (u.id === editing.id ? { ...u, ...next } : u))
+            : [next, ...old]
+        );
+
+      // 2) Después la foto, si se eligió una, al endpoint de avatar.
+      let record = saved;
+      if (avatarFile && userId) {
+        try {
+          const updated = await uploadUserAvatar(userId, avatarFile);
+          const avatar = updated?.avatar || updated?.image || updated?.photo;
+          if (avatar) record = { ...saved, avatar };
+        } catch {
+          applyRecord(record);
+          notify(`Usuario ${verb}, pero no se pudo subir la foto`, "error");
+          closeModal();
+          return;
+        }
       }
+
+      applyRecord(record);
+      notify(`Usuario ${verb}`);
       closeModal();
     } catch {
       notify(editing ? "No se pudo actualizar el usuario" : "No se pudo crear el usuario", "error");

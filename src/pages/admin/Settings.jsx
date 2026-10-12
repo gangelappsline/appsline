@@ -8,7 +8,7 @@ import LayoutAdmin from "../../layouts/LayoutAdmin";
 import {
   Avatar, Button, Card, CardHeader, Field, Tabs, useToast, TOASTS_PREF_KEY, toastsEnabled,
 } from "../../components/admin";
-import { AVATAR_FIELD, saveUser } from "../../services/admin";
+import { saveUser, uploadUserAvatar } from "../../services/admin";
 import api from "../../services/api";
 import { useAuth } from "../../routes/AuthContext";
 import { getPageSize, setPageSize } from "../../utils/prefs";
@@ -64,13 +64,29 @@ const ProfileTab = () => {
     if (!name.trim() || !email.trim()) return;
     setSaving(true);
     try {
-      const payload = new FormData();
-      payload.append("name", name.trim());
-      payload.append("email", email.trim());
-      if (user?.role) payload.append("role", user.role);
-      if (file) payload.append(AVATAR_FIELD, file);
+      // 1) Primero se envía la información del perfil (JSON, sin imagen).
+      const payload = { name: name.trim(), email: email.trim() };
+      if (user?.role) payload.role = user.role;
       const saved = await saveUser(payload, user?.id || null);
-      updateProfile({ name: saved?.name || name.trim(), email: saved?.email || email.trim(), avatar: saved?.avatar || saved?.image || preview || undefined });
+      const userId = user?.id || saved?.id || null;
+      updateProfile({
+        name: saved?.name || name.trim(),
+        email: saved?.email || email.trim(),
+      });
+
+      // 2) Después la foto, si se eligió una nueva, en su endpoint dedicado.
+      if (file && userId) {
+        try {
+          const updated = await uploadUserAvatar(userId, file);
+          updateProfile({
+            avatar: updated?.avatar || updated?.image || updated?.photo || preview || undefined,
+          });
+          setFile(null);
+        } catch {
+          notify("Perfil actualizado, pero no se pudo subir la foto", "error");
+          return;
+        }
+      }
       notify("Perfil actualizado");
     } catch {
       notify("No se pudo actualizar el perfil", "error");

@@ -7,7 +7,7 @@
  * que ajustar los normalizadores de este archivo.
  */
 import api from "../services/api";
-import { prepareFilesForUpload, prepareFormDataImages, toWebpIfImage } from "../utils/images";
+import { prepareFilesForUpload, toWebpIfImage } from "../utils/images";
 
 /* ------------------------------------------------------------------ */
 /* Normalizadores: la API responde con formas distintas según el        */
@@ -210,12 +210,31 @@ export async function fetchUsers() {
   return unwrapList(data, userKeys);
 }
 
-export async function saveUser(formData, id = null) {
-  const config = { headers: { "Content-Type": "multipart/form-data" } };
-  const preparedFormData = await prepareFormDataImages(formData);
+/** Campo multipart que espera el endpoint de avatar. */
+export const AVATAR_FIELD = "avatar";
+
+/**
+ * Guarda únicamente los datos del usuario (JSON, sin imagen).
+ * La foto de perfil se envía después a POST /users/{id}/avatar.
+ */
+export async function saveUser(payload, id = null) {
   const { data } = id
-    ? await api.put(`/users/${id}`, preparedFormData, config)
-    : await api.post("/users", preparedFormData, config);
+    ? await api.put(`/users/${id}`, payload)
+    : await api.post("/users", payload);
+  return unwrapObject(data, userKeys) || data;
+}
+
+/**
+ * Sube o reemplaza la foto de perfil en su endpoint dedicado.
+ * Devuelve el usuario actualizado (o el cuerpo tal cual, si la API responde otra cosa).
+ */
+export async function uploadUserAvatar(id, file) {
+  if (!id || !file) return null;
+  const form = new FormData();
+  form.append(AVATAR_FIELD, await toWebpIfImage(file));
+  const { data } = await api.post(`/users/${id}/avatar`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
   return unwrapObject(data, userKeys) || data;
 }
 
@@ -227,8 +246,6 @@ export async function deleteUser(id) {
  * Foto de perfil de un usuario (o avatar generado como respaldo).
  * Centralizado para no repetir el fallback en cada vista.
  */
-export const AVATAR_FIELD = "avatar";
-
 export function userAvatarUrl(user) {
   const src = user?.avatar || user?.image || user?.photo || "";
   if (src && src !== "null") return src;
