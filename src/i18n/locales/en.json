@@ -280,11 +280,18 @@
     "qr": {
       "contentTitle": "QR content",
       "styleTitle": "Customization",
+      "sections": {
+        "content": "Content",
+        "colors": "Colors",
+        "logo": "Logo",
+        "design": "Design"
+      },
       "presets": {
         "text": "Text",
         "url": "Link",
         "wifi": "WiFi",
         "email": "Email",
+        "sms": "SMS",
         "phone": "Phone",
         "vcard": "Contact"
       },
@@ -297,6 +304,7 @@
         "email": "Email",
         "subject": "Subject",
         "body": "Message",
+        "message": "Message",
         "phone": "Phone",
         "fullName": "Full name",
         "org": "Company"
@@ -306,8 +314,37 @@
       "margin": "Margin",
       "foreground": "Code color",
       "background": "Background color",
+      "colorMode": {
+        "single": "Solid color",
+        "gradient": "Gradient"
+      },
+      "gradientStart": "Start color",
+      "gradientEnd": "End color",
+      "gradientType": "Gradient type",
+      "gradientLinear": "Linear",
+      "gradientRadial": "Radial",
+      "rotation": "Rotation",
+      "brandColors": "Appsline colors",
+      "transparentBg": "Transparent background",
+      "customEyes": "Customize eye colors",
+      "eyeFrameColor": "Eye frame",
+      "eyeBallColor": "Eye ball",
+      "logoNone": "No logo",
+      "logoUpload": "Upload image",
+      "logoRemove": "Remove logo",
+      "logoSize": "Logo size",
+      "logoMargin": "Logo margin",
+      "hideBgDots": "Hide dots behind the logo",
+      "logoHint": "With a logo, high error correction (H) is recommended so the code stays readable.",
+      "bodyShape": "Body shape",
+      "eyeFrameShape": "Eye frame shape",
+      "eyeBallShape": "Eye ball shape",
       "level": "Error correction",
       "levelHint": "A higher level keeps the code readable even if it gets damaged.",
+      "quality": "Quality",
+      "qualityLow": "Low quality",
+      "qualityHigh": "High quality",
+      "downloadPng": "Download PNG",
       "empty": "Type something to generate your QR code."
     },
     "pdfToWord": {
