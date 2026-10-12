@@ -173,6 +173,11 @@ export async function fetchTaskComments(projectId, taskId) {
   }
 }
 
+export async function addSubtaskToTask(projectId, taskId, task) {
+  const { data } = await api.post(`/projects/${projectId}/tasks/${taskId}/subtasks`, task);
+  return unwrapObject(data, ["subtask", "subtasks"]) || data;
+}
+
 export async function addTaskComment(projectId, taskId, comment) {
   const { data } = await api.post(`/projects/${projectId}/tasks/${taskId}/comments`, {
     comment,

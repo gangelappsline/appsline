@@ -15,7 +15,7 @@ import {
 import {
   addTaskComment, createProjectTask, deleteProjectTask, fetchProject,
   fetchProjectTasks, fetchTask, fetchTaskComments, fetchTaskFiles,
-  fetchUsers, updateProjectTask, uploadTaskFiles,
+  fetchUsers, updateProjectTask, uploadTaskFiles, addSubtaskToTask,
 } from "../../services/admin";
 import { cx, formatDate, initials, isOverdue, priorityMeta } from "../../utils/format";
 import { prepareFilesForUpload } from "../../utils/images";
@@ -90,6 +90,7 @@ const Project = () => {
         fetchProjectTasks(id),
         fetchUsers(),
       ]);
+      console.log(p, t, u);
       if (!active) return;
       if (p.status === "fulfilled") setProject(p.value);
       else setLoadError("No se pudo cargar el proyecto.");
@@ -229,8 +230,16 @@ const Project = () => {
     const title = newSubtask.trim();
     if (!title || !selected) return;
     setNewSubtask("");
-    updateTask(selected.id, { subtasks: [...(selected.subtasks || []), { id: `local-${Date.now()}`, title, completed: false }] });
+    addSubtaskToTask(id, selected.id, { id: `local-${Date.now()}`, title, completed: false });
+    selected.subtasks = [...(selected.subtasks || []), { id: `local-${Date.now()}`, title, completed: false }];
+    setTasks((old) => old.map((t) => (t.id === selected.id ? selected : t)));
+    notify("Subtarea agregada");
   };
+
+
+  const addCommentstoTasks = (taskId, data) =>{
+    addTaskComment(id, taskId, data);
+  }
 
   const toggleSubtask = (subtaskId) => {
     if (!selected) return;
