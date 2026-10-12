@@ -18,6 +18,7 @@ import {
   fetchUsers, updateProjectTask, uploadTaskFiles,
 } from "../../services/admin";
 import { cx, formatDate, initials, isOverdue, priorityMeta } from "../../utils/format";
+import { prepareFilesForUpload } from "../../utils/images";
 
 const COLUMNS = [
   { key: "pending", label: "Pendientes", color: "#8b5cf6", bg: "bg-violet-50", text: "text-violet-600", icon: FiArchive },
@@ -210,10 +211,15 @@ const Project = () => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
     if (!files.length || !selected) return;
-    setAttachments((old) => [...old, ...files.map((f) => ({ id: `local-${f.name}`, name: f.name, size: f.size }))]);
     try {
-      await uploadTaskFiles(id, selected.id, files);
-      notify(`${files.length} archivo${files.length > 1 ? "s" : ""} adjuntado${files.length > 1 ? "s" : ""}`);
+      const preparedFiles = await prepareFilesForUpload(files);
+      setAttachments((old) => [...old, ...preparedFiles.map((file) => ({
+        id: `local-${file.name}`,
+        name: file.name,
+        size: file.size,
+      }))]);
+      await uploadTaskFiles(id, selected.id, preparedFiles);
+      notify(`${preparedFiles.length} archivo${preparedFiles.length === 1 ? "" : "s"} adjuntado${preparedFiles.length === 1 ? "" : "s"}`);
     } catch {
       notify("Los archivos no pudieron sincronizarse", "error");
     }

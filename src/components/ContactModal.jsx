@@ -1,6 +1,8 @@
+/* eslint-disable react/prop-types */
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FiX, FiUpload, FiCheck, FiAlertCircle } from "react-icons/fi";
+import { toWebpIfImage } from "../utils/images";
 
 const ContactModal = ({ isOpen, onClose }) => {
   const { t } = useTranslation();
@@ -92,13 +94,24 @@ const ContactModal = ({ isOpen, onClose }) => {
     try {
       const apiUrl =
         import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+      const headers = { Accept: "application/json" };
+      let body;
+      if (form.photo) {
+        const payload = new FormData();
+        payload.append("name", form.name);
+        payload.append("email", form.email);
+        payload.append("message", form.message);
+        payload.append("photo", await toWebpIfImage(form.photo));
+        body = payload;
+      } else {
+        headers["Content-Type"] = "application/json";
+        body = JSON.stringify(form);
+      }
+
       const response = await fetch(`${apiUrl}/contact`, {
         method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json", // 👈 esto faltaba
-        },
-        body: JSON.stringify(form),
+        headers,
+        body,
       });
 
       if (!response.ok) {

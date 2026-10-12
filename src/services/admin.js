@@ -7,6 +7,7 @@
  * que ajustar los normalizadores de este archivo.
  */
 import api from "../services/api";
+import { prepareFilesForUpload, prepareFormDataImages, toWebpIfImage } from "../utils/images";
 
 /* ------------------------------------------------------------------ */
 /* Normalizadores: la API responde con formas distintas según el        */
@@ -75,7 +76,7 @@ export async function saveProject(payload, id = null) {
 
 export async function uploadProjectLogo(id, file) {
   const form = new FormData();
-  form.append("logo", file);
+  form.append("logo", await toWebpIfImage(file));
   const { data } = await api.post(`/projects/${id}/logo`, form, {
     headers: { "Content-Type": "multipart/form-data" },
   });
@@ -190,7 +191,8 @@ export async function fetchTaskFiles(projectId, taskId) {
 
 export async function uploadTaskFiles(projectId, taskId, files) {
   const form = new FormData();
-  Array.from(files).forEach((f) => form.append("files[]", f));
+  const preparedFiles = await prepareFilesForUpload(files);
+  preparedFiles.forEach((file) => form.append("files[]", file));
   const { data } = await api.post(
     `/projects/${projectId}/tasks/${taskId}/files`,
     form,
@@ -210,9 +212,10 @@ export async function fetchUsers() {
 
 export async function saveUser(formData, id = null) {
   const config = { headers: { "Content-Type": "multipart/form-data" } };
+  const preparedFormData = await prepareFormDataImages(formData);
   const { data } = id
-    ? await api.put(`/users/${id}`, formData, config)
-    : await api.post("/users", formData, config);
+    ? await api.put(`/users/${id}`, preparedFormData, config)
+    : await api.post("/users", preparedFormData, config);
   return unwrapObject(data, userKeys) || data;
 }
 
