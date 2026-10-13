@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { FiCamera, FiPlus, FiUsers } from "react-icons/fi";
+import { FiCamera, FiPlus, FiUsers, FiRefreshCw } from "react-icons/fi";
+import { SiLetsencrypt } from "react-icons/si";
 import LayoutAdmin from "../../layouts/LayoutAdmin";
 import {
   Avatar, Badge, Button, Card, ConfirmDialog, EmptyState, Field,
@@ -17,6 +18,46 @@ const ROLES = [
 
 const EMPTY_FORM = { name: "", email: "", role: "client", password: "" };
 
+/**
+ * Genera una contraseña de alta seguridad.
+ * Incluye mayúsculas, minúsculas, números y símbolos, garantizando
+ * al menos un carácter de cada tipo mediante un shuffle final.
+ */
+const generateSecurePassword = (length = 16) => {
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const numbers = "0123456789";
+  const symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+  const all = upper + lower + numbers + symbols;
+
+  const randomChar = (chars) => {
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    return chars[array[0] % chars.length];
+  };
+
+  // Garantiza al menos un carácter de cada categoría.
+  const required = [
+    randomChar(upper),
+    randomChar(lower),
+    randomChar(numbers),
+    randomChar(symbols),
+  ];
+
+  const remaining = Array.from({ length: length - required.length }, () => randomChar(all));
+
+  // Mezcla (Fisher-Yates con crypto) para no dejar predecible la posición.
+  const password = [...required, ...remaining];
+  for (let i = password.length - 1; i > 0; i--) {
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    const j = array[0] % (i + 1);
+    [password[i], password[j]] = [password[j], password[i]];
+  }
+
+  return password.join("");
+};
+
 const Users = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { notify } = useToast();
@@ -32,6 +73,7 @@ const Users = () => {
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -77,6 +119,7 @@ const Users = () => {
     resetAvatar();
     setEditing(null);
     setForm(EMPTY_FORM);
+    setShowPassword(false);
     setShowModal(true);
   };
 
@@ -85,6 +128,7 @@ const Users = () => {
     setEditing(user);
     setForm({ name: user.name || "", email: user.email || "", role: user.role || "client", password: "" });
     setAvatarPreview(user.avatar || user.image || user.photo || "");
+    setShowPassword(false);
     setShowModal(true);
   };
 
@@ -92,6 +136,7 @@ const Users = () => {
     setShowModal(false);
     setEditing(null);
     setForm(EMPTY_FORM);
+    setShowPassword(false);
     resetAvatar();
   };
 
@@ -101,6 +146,13 @@ const Users = () => {
     if (avatarPreview.startsWith("blob:")) URL.revokeObjectURL(avatarPreview);
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const handleGeneratePassword = () => {
+    const newPassword = generateSecurePassword(16);
+    setForm((f) => ({ ...f, password: newPassword }));
+    setShowPassword(true);
+    notify("Contraseña segura generada");
   };
 
   const handleSubmit = async (e) => {
@@ -288,8 +340,40 @@ const Users = () => {
               {ROLES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
             </select>
           </Field>
-          <Field label={editing ? "Contraseña (opcional)" : "Contraseña"} hint={editing ? "Déjala vacía para conservar la actual." : undefined}>
-            <input type="password" className="admin-input" value={form.password} onChange={set("password")} placeholder="••••••••" autoComplete="new-password" />
+          <Field
+            label={editing ? "Contraseña (opcional)" : "Contraseña"}
+            hint={editing ? "Déjala vacía para conservar la actual." : "Usa el botón para generar una contraseña segura."}
+          >
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className="admin-input pr-10"
+                  value={form.password}
+                  onChange={set("password")}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute inset-y-0 right-2 flex items-center px-2 text-xs font-semibold text-slate-400 transition hover:text-slate-600"
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showPassword ? "Ocultar" : "Ver"}
+                </button>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleGeneratePassword}
+                title="Generar contraseña segura"
+                aria-label="Generar contraseña segura"
+              >
+                <SiLetsencrypt />
+              </Button>
+            </div>
           </Field>
         </form>
       </Modal>

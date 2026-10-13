@@ -165,12 +165,12 @@ const LayoutAdmin = ({ title, subtitle, actions, breadcrumbs = [], fluid = false
           </header>
 
           {/* ---------- Contenido ---------- */}
-          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <main className="flex-1 px-4 py-4 sm:px-6 lg:px-8 lg:py-4">
             <div className={`mx-auto w-full ${fluid ? "" : "max-w-9xl"}`}>
               {(title || actions || breadcrumbs.length > 0) && (
                 <div className="mb-6">
                   {breadcrumbs.length > 0 && (
-                    <nav aria-label="Ruta de navegación" className="mb-2 flex flex-wrap items-center gap-1 text-[13px]">
+                    <nav aria-label="Ruta de navegación" className="mb-2 flex flex-wrap items-center gap-1 hidden text-[13px]">
                       {breadcrumbs.map((crumb, i) => {
                         const isLast = i === breadcrumbs.length - 1;
                         return (

@@ -240,7 +240,7 @@ const Projects = () => {
               action={<Button onClick={openCreate}><FiPlus /> Crear proyecto</Button>}
             />
           ) : view === "grid" ? (
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filtered.map((item, i) => (
                 <ProjectCard
                   key={item.id}
@@ -351,7 +351,7 @@ const ProjectCard = ({ project, gradient, onOpen, onEdit, onDelete }) => {
       className="admin-card admin-card-hover group flex cursor-pointer flex-col p-5"
     >
       <div className="flex items-start justify-between gap-3">
-        <span className={cx("flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br text-sm font-extrabold text-white", gradient)}>
+        <span className={cx("flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl text-sm font-extrabold text-white", gradient, project.logo ? "bg-white" : "bg-gradient-to-br")}>
           {project.logo ? (
             <img src={project.logo} alt="" className="h-full w-full object-cover" />
           ) : (
