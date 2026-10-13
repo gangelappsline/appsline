@@ -11,6 +11,7 @@ import {
   FiDroplet,
   FiLink,
   FiType,
+  FiZap,
 } from "react-icons/fi";
 
 /**
@@ -54,6 +55,13 @@ export const TOOLS = [
     slug: "imagen-a-webp",
     key: "imageToWebp",
     icon: FiImage,
+    category: "media",
+    featured: true,
+  },
+  {
+    slug: "mejorar-imagen",
+    key: "imageEnhancer",
+    icon: FiZap,
     category: "media",
     featured: true,
   },

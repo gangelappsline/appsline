@@ -36,6 +36,7 @@ const PdfToWord = lazy(() => import("./pages/tools/PdfToWord.jsx"));
 const PdfSummary = lazy(() => import("./pages/tools/PdfSummary.jsx"));
 const PdfToText = lazy(() => import("./pages/tools/PdfToText.jsx"));
 const ImageToWebp = lazy(() => import("./pages/tools/ImageToWebp.jsx"));
+const ImageEnhancer = lazy(() => import("./pages/tools/ImageEnhancer.jsx"));
 const AudioToText = lazy(() => import("./pages/tools/AudioToText.jsx"));
 const JsonFormatter = lazy(() => import("./pages/tools/JsonFormatter.jsx"));
 const Base64Tool = lazy(() => import("./pages/tools/Base64Tool.jsx"));
@@ -78,6 +79,7 @@ createRoot(document.getElementById("root")).render(
                 <Route path="resumen-de-pdf" element={<PdfSummary />} />
                 <Route path="extraer-texto-de-pdf" element={<PdfToText />} />
                 <Route path="imagen-a-webp" element={<ImageToWebp />} />
+                <Route path="mejorar-imagen" element={<ImageEnhancer />} />
                 <Route path="audio-a-texto" element={<AudioToText />} />
                 <Route path="formateador-json" element={<JsonFormatter />} />
                 <Route path="base64" element={<Base64Tool />} />
