@@ -215,6 +215,11 @@
         "desc": "Convert PNG, JPG, GIF or AVIF to WebP and make your site lighter.",
         "intro": "Convert images from any format to WebP (also PNG or JPG), tune quality and resize in batch without leaving your browser."
       },
+      "imageEnhancer": {
+        "name": "Enhance image",
+        "desc": "Remove the background with AI, improve quality and scale your image on a single page.",
+        "intro": "All in one: remove the background with artificial intelligence, improve brightness, contrast and sharpness, and scale your image up to 4× without leaving this page. Your image is never uploaded to a server."
+      },
       "audioToText": {
         "name": "Audio to text",
         "desc": "Transcribe speech to text in real time, in several languages.",
@@ -404,6 +409,97 @@
       "downloadAll": "Download all",
       "saved": "{{percent}}% smaller · {{before}} → {{after}}",
       "unsupported": "Your browser couldn't generate this format."
+    },
+    "imageEnhancer": {
+      "uploadTitle": "Upload your image",
+      "uploadHint": "Remove the background, improve quality and scale in one place.",
+      "drop": "Drop your image here",
+      "originalSize": "Original size",
+      "features": {
+        "enhanceTitle": "Improve quality",
+        "enhanceText": "Automatic contrast and color correction, sharpening and noise reduction to rescue flat or blurry photos.",
+        "backgroundTitle": "Remove background",
+        "backgroundText": "AI that cuts out people, products and objects, or a fast color mode for solid backgrounds. Transparent or colored background.",
+        "scaleTitle": "Scale image",
+        "scaleText": "Enlarge up to 4× or set an exact pixel size with high-quality, step-by-step resampling."
+      },
+      "presetsTitle": "Quick recipes",
+      "presets": {
+        "auto": "✨ Auto enhance",
+        "product": "🛍️ Product, no background 2×",
+        "web": "🌐 Web ready"
+      },
+      "backgroundTitle": "Background",
+      "backgroundHint": "Remove the background and choose what replaces it.",
+      "bgModes": {
+        "keep": "Keep",
+        "ai": "Remove (AI)",
+        "color": "Remove by color"
+      },
+      "aiModel": "AI model",
+      "aiModels": {
+        "fast": "Fast (recommended)",
+        "quality": "Best quality (larger download)"
+      },
+      "aiNote": "The first time, the AI model downloads (≈40–80 MB) and stays cached in your browser. Your image never leaves your computer: only the model is downloaded.",
+      "replacement": "New background",
+      "replacements": {
+        "transparent": "Transparent",
+        "color": "Solid color"
+      },
+      "bgColor": "Background color",
+      "tolerance": "Background color tolerance",
+      "colorNote": "Color mode detects the background from the image corners. It works best on solid backgrounds (white, a single color). For complex photos use Remove (AI).",
+      "edgeFeather": "Soften edge",
+      "trim": "Trim empty space",
+      "trimHint": "Crop the transparent borders around the subject.",
+      "enhanceTitle": "Quality enhancement",
+      "enhanceHint": "Adjustments applied to the whole image.",
+      "auto": "Auto enhance",
+      "autoHint": "Fixes contrast and color by analyzing the photo's histogram.",
+      "brightness": "Brightness",
+      "contrast": "Contrast",
+      "saturation": "Saturation",
+      "sharpness": "Sharpness",
+      "denoise": "Reduce noise / smooth",
+      "reset": "Reset adjustments",
+      "scaleTitle": "Scale / size",
+      "scaleHint": "Enlarge or shrink the image keeping its aspect ratio.",
+      "scaleFactor": "Scale factor",
+      "width": "Width (px)",
+      "height": "Height (px)",
+      "lockAspect": "Lock aspect ratio",
+      "bigOutput": "Large output ({{mp}} MP): processing may take a few seconds.",
+      "outputTitle": "Output & process",
+      "format": "Format",
+      "quality": "Quality",
+      "jpegNote": "JPG doesn't support transparency: the background will be filled with white (or your chosen color if you pick Solid color).",
+      "action": "Process image",
+      "processing": "Processing…",
+      "steps": {
+        "preparing": "Preparing the image…",
+        "downloading": "Downloading the AI model (first time only)…",
+        "removing": "Removing the background…",
+        "enhancing": "Improving quality…",
+        "scaling": "Scaling the image…",
+        "exporting": "Building the final file…",
+        "done": "Done"
+      },
+      "previewTitle": "Preview",
+      "previewHint": "Compare before and after with the slider.",
+      "original": "Original",
+      "resultLabel": "Enhanced",
+      "compare": "Compare before / after",
+      "emptyPreview": "Adjust the options on the left and press “Process image” to see the result here.",
+      "resultReady": "Done! Your enhanced image is ready to download.",
+      "errors": {
+        "read": "That image couldn't be read. Try a PNG or JPG.",
+        "export": "Your browser couldn't generate that format. Try PNG or WebP.",
+        "ai": "AI background removal failed. Check your connection (the model downloads the first time) or try “Remove by color” mode.",
+        "size": "Enter a valid width and height, greater than zero.",
+        "tooLarge": "The output size is too large (max {{max}} px per side). Lower the scale.",
+        "fileTooLarge": "The image is over 30 MB. Try a lighter file."
+      }
     },
     "audioToText": {
       "liveTitle": "Live transcription",

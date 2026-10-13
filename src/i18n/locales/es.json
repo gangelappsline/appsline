@@ -245,6 +245,11 @@
         "desc": "Convierte PNG, JPG, GIF o AVIF a WebP y reduce el peso de tu sitio.",
         "intro": "Convierte imágenes de cualquier formato a WebP (también a PNG o JPG), ajusta la calidad y redimensiona en lote sin salir del navegador."
       },
+      "imageEnhancer": {
+        "name": "Mejorar imagen",
+        "desc": "Quita el fondo con IA, mejora la calidad y escala tu imagen en una sola página.",
+        "intro": "Todo en uno: quita el fondo con inteligencia artificial, mejora brillo, contraste y nitidez, y escala tu imagen hasta 4× sin salir de esta página. Tu imagen nunca se sube a un servidor."
+      },
       "audioToText": {
         "name": "Audio a texto",
         "desc": "Transcribe voz a texto en tiempo real en varios idiomas.",
@@ -434,6 +439,97 @@
       "downloadAll": "Descargar todas",
       "saved": "Ahorro de {{percent}}% · {{before}} → {{after}}",
       "unsupported": "Tu navegador no pudo generar este formato."
+    },
+    "imageEnhancer": {
+      "uploadTitle": "Sube tu imagen",
+      "uploadHint": "Quita el fondo, mejora la calidad y escala en un solo lugar.",
+      "drop": "Arrastra tu imagen aquí",
+      "originalSize": "Tamaño original",
+      "features": {
+        "enhanceTitle": "Mejorar calidad",
+        "enhanceText": "Mejora automática de contraste y color, nitidez y reducción de ruido para rescatar fotos planas o borrosas.",
+        "backgroundTitle": "Borrar fondo",
+        "backgroundText": "IA que recorta personas, productos y objetos, o modo rápido por color para fondos uniformes. Fondo transparente o de color.",
+        "scaleTitle": "Escalar imagen",
+        "scaleText": "Amplía hasta 4× o ajusta el tamaño exacto en píxeles con remuestreo de alta calidad, paso a paso."
+      },
+      "presetsTitle": "Recetas rápidas",
+      "presets": {
+        "auto": "✨ Mejora automática",
+        "product": "🛍️ Producto sin fondo 2×",
+        "web": "🌐 Lista para web"
+      },
+      "backgroundTitle": "Fondo",
+      "backgroundHint": "Borra el fondo y elige qué poner en su lugar.",
+      "bgModes": {
+        "keep": "Conservar",
+        "ai": "Quitar (IA)",
+        "color": "Quitar por color"
+      },
+      "aiModel": "Modelo de IA",
+      "aiModels": {
+        "fast": "Rápido (recomendado)",
+        "quality": "Máxima calidad (descarga mayor)"
+      },
+      "aiNote": "La primera vez se descarga el modelo de IA (≈40–80 MB) y queda guardado en tu navegador. Tu imagen nunca sale de tu computadora: solo se descarga el modelo.",
+      "replacement": "Fondo nuevo",
+      "replacements": {
+        "transparent": "Transparente",
+        "color": "Color sólido"
+      },
+      "bgColor": "Color de fondo",
+      "tolerance": "Tolerancia al color de fondo",
+      "colorNote": "El modo por color detecta el fondo desde las esquinas de la imagen. Funciona mejor con fondos uniformes (blanco, un solo color). Para fotos complejas usa Quitar (IA).",
+      "edgeFeather": "Suavizar borde",
+      "trim": "Recortar espacio vacío",
+      "trimHint": "Recorta los bordes transparentes alrededor del sujeto.",
+      "enhanceTitle": "Mejora de calidad",
+      "enhanceHint": "Ajustes que se aplican a la imagen completa.",
+      "auto": "Mejora automática",
+      "autoHint": "Corrige contraste y color analizando el histograma de la foto.",
+      "brightness": "Brillo",
+      "contrast": "Contraste",
+      "saturation": "Saturación",
+      "sharpness": "Nitidez",
+      "denoise": "Reducir ruido / suavizar",
+      "reset": "Restablecer ajustes",
+      "scaleTitle": "Escalar / tamaño",
+      "scaleHint": "Amplía o reduce la imagen conservando la proporción.",
+      "scaleFactor": "Factor de escala",
+      "width": "Ancho (px)",
+      "height": "Alto (px)",
+      "lockAspect": "Bloquear proporción",
+      "bigOutput": "Salida grande ({{mp}} MP): el procesamiento puede tardar unos segundos.",
+      "outputTitle": "Salida y procesar",
+      "format": "Formato",
+      "quality": "Calidad",
+      "jpegNote": "JPG no admite transparencia: el fondo se rellenará en blanco (o en el color elegido si seleccionas Color sólido).",
+      "action": "Procesar imagen",
+      "processing": "Procesando…",
+      "steps": {
+        "preparing": "Preparando la imagen…",
+        "downloading": "Descargando el modelo de IA (solo la primera vez)…",
+        "removing": "Quitando el fondo…",
+        "enhancing": "Mejorando la calidad…",
+        "scaling": "Escalando la imagen…",
+        "exporting": "Generando el archivo final…",
+        "done": "Listo"
+      },
+      "previewTitle": "Vista previa",
+      "previewHint": "Compara el antes y el después con el control deslizante.",
+      "original": "Original",
+      "resultLabel": "Mejorada",
+      "compare": "Comparar antes / después",
+      "emptyPreview": "Ajusta las opciones de la izquierda y pulsa «Procesar imagen» para ver el resultado aquí.",
+      "resultReady": "¡Listo! Tu imagen mejorada está preparada para descargar.",
+      "errors": {
+        "read": "No se pudo leer esa imagen. Prueba con un PNG o JPG.",
+        "export": "Tu navegador no pudo generar ese formato. Prueba con PNG o WebP.",
+        "ai": "No se pudo quitar el fondo con IA. Revisa tu conexión (la primera vez se descarga el modelo) o prueba el modo «Quitar por color».",
+        "size": "Indica un ancho y un alto válidos, mayores que cero.",
+        "tooLarge": "El tamaño de salida es demasiado grande (máx. {{max}} px por lado). Reduce la escala.",
+        "fileTooLarge": "La imagen supera los 30 MB. Prueba con un archivo más ligero."
+      }
     },
     "audioToText": {
       "liveTitle": "Transcripción en vivo",
