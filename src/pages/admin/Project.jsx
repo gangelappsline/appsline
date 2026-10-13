@@ -21,7 +21,6 @@ import {
   FiMoreHorizontal,
   FiPaperclip,
   FiPlus,
-  FiSend,
   FiTrash2,
   FiUpload,
   FiUser,
@@ -39,6 +38,8 @@ import {
   Drawer,
   EmptyState,
   Field,
+  MentionComposer,
+  MentionText,
   Modal,
   SearchInput,
   useToast,
@@ -65,6 +66,8 @@ import {
   priorityMeta,
 } from "../../utils/format";
 import { prepareFilesForUpload } from "../../utils/images";
+import { peopleMentionedIn } from "../../utils/mentions";
+import { getStoredUser } from "../../services/session";
 
 const COLUMNS = [
   {
@@ -124,6 +127,26 @@ const assigneeId = (task) => {
   return typeof raw === "object" && raw ? (raw.id ?? "") : (raw ?? "");
 };
 
+/**
+ * Personas mencionadas en un comentario. La API puede devolver objetos de
+ * usuario o solo ids; se completan con el directorio `users` cuando existe.
+ */
+const mentionPeople = (comment, users = []) => {
+  const raw = comment?.mentions ?? comment?.mentioned_users ?? comment?.mentioned ?? [];
+  return (Array.isArray(raw) ? raw : []).map((mention) => {
+    const id = mention && typeof mention === "object" ? mention.id : mention;
+    const known = users.find((u) => String(u.id) === String(id));
+    return {
+      ...known,
+      id,
+      name:
+        (mention && typeof mention === "object" && mention.name) ||
+        known?.name ||
+        `Usuario ${id}`,
+    };
+  });
+};
+
 /* ================================================================== */
 
 const Project = () => {
@@ -154,6 +177,8 @@ const Project = () => {
   const [comments, setComments] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [comment, setComment] = useState("");
+  /* Usuario en sesión: firma sus comentarios y no se sugiere a sí mismo. */
+  const viewer = useMemo(() => getStoredUser() || { name: "Tú" }, []);
   const [detailTab, setDetailTab] = useState("comments");
   const [newSubtask, setNewSubtask] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -299,19 +324,41 @@ const Project = () => {
   const addComment = async () => {
     const value = comment.trim();
     if (!value || !selected) return;
+    // Personas mencionadas con "@": se releen del texto al momento de guardar.
+    const mentioned = peopleMentionedIn(value, users);
     const optimistic = {
       id: `local-${Date.now()}`,
       comment: value,
       user: { name: "Tú" },
       created_at: new Date().toISOString(),
+      mentions: mentioned,
     };
     setComments((old) => [...old, optimistic]);
     setComment("");
     try {
-      const saved = await addTaskComment(id, selected.id, value);
-      setComments((old) =>
-        old.map((c) => (c.id === optimistic.id ? saved : c)),
+      const saved = await addTaskComment(
+        id,
+        selected.id,
+        value,
+        mentioned.map((p) => p.id),
       );
+      setComments((old) =>
+        old.map((c) =>
+          c.id === optimistic.id
+            ? {
+                ...optimistic,
+                ...(saved && typeof saved === "object" ? saved : null),
+                mentions: saved?.mentions?.length ? saved.mentions : mentioned,
+              }
+            : c,
+        ),
+      );
+      if (mentioned.length)
+        notify(
+          `Comentario enviado · ${mentioned.length} ${
+            mentioned.length === 1 ? "persona mencionada" : "personas mencionadas"
+          }`,
+        );
     } catch {
       notify("El comentario no pudo sincronizarse", "error");
     }
@@ -785,6 +832,7 @@ const Project = () => {
           comment={comment}
           setComment={setComment}
           onComment={addComment}
+          viewer={viewer}
           fileRef={fileRef}
           onFiles={uploadFiles}
           onClose={closeTask}
@@ -1140,6 +1188,7 @@ const TaskDrawer = ({
   comment,
   setComment,
   onComment,
+  viewer,
   fileRef,
   onFiles,
   onClose,
@@ -1472,9 +1521,27 @@ const TaskDrawer = ({
                           {c.created_at ? formatDate(c.created_at) : "Ahora"}
                         </time>
                       </p>
-                      <p className="mt-1 text-[13px] leading-5 text-slate-600">
-                        {c.comment || c.content || c.body}
+                      <p className="mt-1 whitespace-pre-line text-[13px] leading-5 text-slate-600">
+                        <MentionText
+                          text={c.comment || c.content || c.body}
+                          people={users}
+                        />
                       </p>
+                      {mentionPeople(c, users).length > 0 && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2">
+                          <span className="text-[11px] font-semibold text-slate-400">
+                            Mencionó a
+                          </span>
+                          {mentionPeople(c, users).map((person) => (
+                            <span
+                              key={person.id}
+                              className="inline-flex max-w-full items-center rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700"
+                            >
+                              <span className="truncate">@{person.name}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1486,35 +1553,15 @@ const TaskDrawer = ({
                 )}
               </div>
               <div className="border-t border-slate-200 bg-white p-3">
-                <div className="flex items-start gap-2">
-                  <Avatar user={{ name: "Tú" }} size="xs" />
-                  <div className="flex-1 overflow-hidden rounded-xl border border-slate-200 focus-within:border-brand-400 focus-within:ring-4 focus-within:ring-brand-500/10">
-                    <textarea
-                      rows={2}
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey))
-                          onComment();
-                      }}
-                      placeholder="Escribe un comentario..."
-                      className="w-full resize-none p-2.5 text-[13px] text-slate-700 placeholder-slate-400 focus:outline-none"
-                    />
-                    <div className="flex items-center justify-between border-t border-slate-100 px-2.5 py-1.5">
-                      <span className="hidden text-[11px] text-slate-400 sm:block">
-                        ⌘ + Enter para enviar
-                      </span>
-                      <button
-                        type="button"
-                        disabled={!comment.trim()}
-                        onClick={onComment}
-                        className="ml-auto flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-700 disabled:opacity-40"
-                      >
-                        <FiSend /> Enviar
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                {/* Escribe "@" para mencionar al personal, estilo WhatsApp. */}
+                <MentionComposer
+                  value={comment}
+                  onValueChange={setComment}
+                  people={users}
+                  viewer={viewer}
+                  onSubmit={onComment}
+                  placeholder="Escribe un comentario... usa @ para mencionar"
+                />
               </div>
             </>
           ) : (

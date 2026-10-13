@@ -261,10 +261,33 @@ export async function addSubtaskToTask(projectId, taskId, task) {
   return unwrapObject(data, ["subtask", "subtasks"]) || data;
 }
 
-export async function addTaskComment(projectId, taskId, comment) {
-  const { data } = await api.post(`/projects/${projectId}/tasks/${taskId}/comments`, {
-    comment,
-  });
+/**
+ * Ids de personas listas para la API: acepta ids sueltos u objetos de usuario,
+ * los convierte a número cuando son numéricos y elimina repetidos/vacíos
+ * (`["3", 3, { id: 7 }]` -> `[3, 7]`).
+ */
+export const normalizeMentionIds = (mentions = []) =>
+  (Array.isArray(mentions) ? mentions : [mentions]).reduce((ids, value) => {
+    const raw = value && typeof value === "object" ? value.id : value;
+    if (raw === "" || raw === null || raw === undefined) return ids;
+    const id = /^\d+$/.test(String(raw)) ? Number(raw) : raw;
+    if (!ids.some((known) => String(known) === String(id))) ids.push(id);
+    return ids;
+  }, []);
+
+/**
+ * Publica un comentario en una tarea.
+ * `mentions` viaja como arreglo de ids de los usuarios mencionados con "@"
+ * (ej. `[2, 5]`); si el comentario no menciona a nadie no se envía la clave
+ * para no cambiar el payload de los comentarios normales.
+ */
+export async function addTaskComment(projectId, taskId, comment, mentions = []) {
+  const ids = normalizeMentionIds(mentions);
+  const payload = ids.length ? { comment, mentions: ids } : { comment };
+  const { data } = await api.post(
+    `/projects/${projectId}/tasks/${taskId}/comments`,
+    payload
+  );
   return unwrapObject(data, ["comment", "comments"]) || data;
 }
 
