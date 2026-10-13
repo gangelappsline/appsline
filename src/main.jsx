@@ -14,6 +14,7 @@ import Portfolio from "./pages/Portfolio.jsx";
 import Dashboard from "./pages/admin/Dashboard.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 import AuthProvider from "./routes/AuthContext.jsx";
+import { ToastProvider } from "./components/admin/Toasts";
 import Products from "./pages/admin/Products.jsx";
 import Users from "./pages/admin/Users.jsx";
 import Projects from "./pages/admin/Projects.jsx";
@@ -50,6 +51,10 @@ createRoot(document.getElementById("root")).render(
     <HelmetProvider>
       <BrowserRouter>
         <AuthProvider>
+          {/* Las notificaciones viven por encima de las páginas para que
+              cualquier `useToast()` (que se monta antes del LayoutAdmin)
+              reciba el contexto real y no el no-op por defecto. */}
+          <ToastProvider>
           <Routes>
             {/* Rutas públicas */}
             <Route path="/">
@@ -187,6 +192,7 @@ createRoot(document.getElementById("root")).render(
               }
             />
           </Routes>
+          </ToastProvider>
         </AuthProvider>
       </BrowserRouter>
     </HelmetProvider>

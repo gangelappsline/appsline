@@ -12,7 +12,6 @@ import {
 } from "react-icons/fi";
 import Aside from "../components/partials/Aside";
 import CommandPalette from "../components/admin/CommandPalette";
-import { ToastProvider } from "../components/admin/Toasts";
 import { Avatar } from "../components/admin";
 import { useAuth } from "../routes/AuthContext";
 
@@ -71,8 +70,7 @@ const LayoutAdmin = ({ title, subtitle, actions, breadcrumbs = [], fluid = false
   const userName = user?.name || "Admin";
 
   return (
-    <ToastProvider>
-      <div className="flex min-h-screen bg-slate-100 text-slate-900">
+    <div className="flex min-h-screen bg-slate-100 text-slate-900">
         <Aside open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -209,8 +207,7 @@ const LayoutAdmin = ({ title, subtitle, actions, breadcrumbs = [], fluid = false
         </div>
 
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
-      </div>
-    </ToastProvider>
+    </div>
   );
 };
 
