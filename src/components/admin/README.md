@@ -26,14 +26,24 @@ import { Card, Modal, Badge, Button, useToast } from "../../components/admin";
 | `TableSkeleton` / `CardsSkeleton` | Esqueletos de carga |
 | `ProgressRing` / `BarChart` / `RankBars` | Gráficos SVG sin dependencias |
 | `Field` | Etiqueta + ayuda + error para formularios |
-| `ToastProvider` / `useToast` | Notificaciones (`notify("Mensaje", "success" \| "error" \| "info")`) |
+| `ToastProvider` / `useToast` | Notificaciones (`notify("Mensaje", "success" \| "error" \| "info")`). El provider se monta en `main.jsx`, por encima de las rutas |
 | `CommandPalette` | Buscador global con `Ctrl+K` (secciones + proyectos) |
 
 ## Capas de apoyo
 
 - `src/services/admin.js` — todas las llamadas a la API del panel
-  (proyectos, tareas, usuarios, productos, dashboard) con normalizadores
-  de respuesta. Si el backend cambia, se ajusta solo aquí.
+  (proyectos, clientes, tareas, usuarios, productos, dashboard) con
+  normalizadores de respuesta. Si el backend cambia, se ajusta solo aquí.
+  Los clientes usan `fetchClientsPage({ search, status, client_type,
+  country, page, per_page, sort_by, sort_dir, with_projects_count })`, que
+  devuelve `{ items, meta }` con la paginación de Laravel ya normalizada.
+- `src/utils/clients.js` — catálogos (estados, tipos, países) y
+  normalizadores de clientes: acepta la forma plana y la anidada
+  (`contact: { name, email, phone }`), lee `country` como string o como
+  objeto y vincula proyectos por id, correo o razón social.
+- `src/utils/apiErrors.js` — lectura de errores de Laravel: `fieldErrors()`
+  para pintar un mensaje por campo (422) y `apiErrorMessage()` para el
+  toast.
 - `src/hooks/useDashboard.js` — datos agregados (KPIs, productividad,
   vencimientos) compartidos por Dashboard y Reportes.
 - `src/utils/format.js` — moneda, fechas, estados, prioridades y CSV.

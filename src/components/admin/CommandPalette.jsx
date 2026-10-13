@@ -25,6 +25,7 @@ export const PALETTE_SECTIONS = [
 const QUICK_ACTIONS = [
   { to: "/admin/projects?action=new", label: "Nuevo proyecto", icon: FiPlus },
   { to: "/admin/users?action=new", label: "Nuevo usuario", icon: FiPlus },
+  { to: "/admin/clients?action=new", label: "Nuevo cliente", icon: FiPlus },
 ];
 
 /**

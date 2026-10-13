@@ -17,8 +17,12 @@ const TONES = {
 };
 
 /**
- * Proveedor de notificaciones flotantes. Se monta una vez en LayoutAdmin;
- * cualquier página hija usa `notify()` con el hook `useToast`.
+ * Proveedor de notificaciones flotantes.
+ *
+ * Se monta UNA vez en `main.jsx`, por encima de las rutas: las páginas
+ * (`Clients`, `Projects`, ...) llaman `useToast()` antes de renderizar
+ * `LayoutAdmin`, así que el provider no puede vivir dentro del layout
+ * (si no, recibirían el contexto por defecto y `notify()` no haría nada).
  */
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);

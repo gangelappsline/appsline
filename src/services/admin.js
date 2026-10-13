@@ -14,13 +14,19 @@ import { prepareFilesForUpload, toWebpIfImage } from "../utils/images";
 /* endpoint ({data: [...]}, {data: {projects: [...]}}, [...] etc.)      */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Claves genéricas donde un backend suele envolver colecciones
+ * (paginadores de Laravel: `{ data: { data: [...], meta: {...} } }`).
+ */
+const LIST_CONTAINER_KEYS = ["data", "items", "results", "records", "rows"];
+
 /** Extrae un arreglo de una respuesta con forma impredecible. */
 export const unwrapList = (payload, nestedKeys = []) => {
   if (Array.isArray(payload)) return payload;
   const data = payload?.data ?? payload;
   if (Array.isArray(data)) return data;
   if (data && typeof data === "object") {
-    for (const key of nestedKeys) {
+    for (const key of [...nestedKeys, ...LIST_CONTAINER_KEYS]) {
       if (Array.isArray(data[key])) return data[key];
     }
   }
@@ -91,9 +97,86 @@ export async function deleteProject(id) {
 /* Clientes                                                            */
 /* ------------------------------------------------------------------ */
 
+/** Quita claves vacías para no enviar `?status=&search=` al backend. */
+export const compactParams = (params = {}) =>
+  Object.fromEntries(
+    Object.entries(params).filter(
+      ([, value]) => value !== "" && value !== null && value !== undefined
+    )
+  );
+
+/**
+ * Paginación de Laravel, venga suelta (`{ total, last_page }`) o envuelta
+ * en `data` / `meta` según cómo la serialice el backend.
+ * @returns {{current_page,last_page,per_page,total,from,to}|null}
+ */
+export const readPagination = (payload) => {
+  const candidates = [
+    payload?.meta,
+    payload?.data?.meta,
+    payload?.data?.data?.meta,
+    payload?.data,
+    payload?.data?.data,
+    payload,
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+    if (typeof candidate.total !== "number" && typeof candidate.last_page !== "number") continue;
+
+    const perPage = Number(candidate.per_page) || 0;
+    const total = Number(candidate.total) || 0;
+    const lastPage =
+      Number(candidate.last_page) ||
+      (perPage > 0 ? Math.max(1, Math.ceil(total / perPage)) : 1);
+
+    return {
+      current_page: Number(candidate.current_page) || 1,
+      last_page: Math.max(1, lastPage),
+      per_page: perPage || total,
+      total,
+      from: candidate.from ?? null,
+      to: candidate.to ?? null,
+    };
+  }
+
+  return null;
+};
+
+/**
+ * Listado de clientes con los filtros del backend.
+ *
+ * @param {object} params
+ *   search, status, client_type, country, page, per_page,
+ *   sort_by, sort_dir ("asc"|"desc"), with_projects_count (1 por defecto).
+ * @returns {Promise<{items: object[], meta: object}>}
+ *   `meta` siempre tiene { current_page, last_page, per_page, total }:
+ *   si el backend no pagina, se sintetiza con lo recibido.
+ */
+export async function fetchClientsPage(params = {}) {
+  const { data } = await api.get("/clients", {
+    params: compactParams({ with_projects_count: 1, ...params }),
+  });
+  const items = unwrapList(data, clientKeys);
+  const meta = readPagination(data) ?? {
+    current_page: 1,
+    last_page: 1,
+    per_page: items.length,
+    total: items.length,
+    from: items.length ? 1 : null,
+    to: items.length || null,
+  };
+  return { items, meta };
+}
+
+/** Listado simple (sin paginación) para consumidores que solo quieren el arreglo. */
 export async function fetchClients() {
-  const { data } = await api.get("/clients");
-  return unwrapList(data, clientKeys);
+  return (await fetchClientsPage({ per_page: 100 })).items;
+}
+
+export async function fetchClient(id) {
+  const { data } = await api.get(`/clients/${id}`);
+  return unwrapObject(data, clientKeys) || data;
 }
 
 export async function saveClient(payload, id = null) {
