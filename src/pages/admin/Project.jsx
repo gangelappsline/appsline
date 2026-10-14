@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   FiActivity,
@@ -58,14 +58,10 @@ import {
   uploadTaskFiles,
   addSubtaskToTask,
 } from "../../services/admin";
-import {
-  cx,
-  formatDate,
-  initials,
-  isOverdue,
-  priorityMeta,
-} from "../../utils/format";
+import { cx, formatDate, isOverdue, priorityMeta } from "../../utils/format";
 import { prepareFilesForUpload } from "../../utils/images";
+import CalendarTab from "./project/CalendarTab";
+import FilesTab from "./project/FilesTab";
 import { peopleMentionedIn } from "../../utils/mentions";
 import { getStoredUser } from "../../services/session";
 
@@ -106,6 +102,9 @@ const COLUMNS = [
 
 const columnOf = (status) =>
   COLUMNS.find((c) => c.key === status) || COLUMNS[0];
+
+/** Vistas de la página; la clave viaja en `?view=` para poder compartirla. */
+const VIEW_KEYS = ["board", "list", "calendar", "files"];
 
 const EMPTY_TASK = {
   title: "",
@@ -167,7 +166,11 @@ const Project = () => {
   const [search, setSearch] = useState("");
   const [priority, setPriority] = useState("");
   const [person, setPerson] = useState("");
-  const [view, setView] = useState("board");
+  const [view, setView] = useState(() => {
+    const requested = searchParams.get("view");
+    return VIEW_KEYS.includes(requested) ? requested : "board";
+  });
+  const [fileCount, setFileCount] = useState(null);
 
   const [taskModal, setTaskModal] = useState(false);
   const [draft, setDraft] = useState(EMPTY_TASK);
@@ -195,7 +198,6 @@ const Project = () => {
         fetchProjectTasks(id),
         fetchUsers(),
       ]);
-      console.log(p, t, u);
       if (!active) return;
       if (p.status === "fulfilled") setProject(p.value);
       else setLoadError("No se pudo cargar el proyecto.");
@@ -225,6 +227,10 @@ const Project = () => {
     });
   }, [tasks, search, priority, person]);
 
+  const tasksWithDate = useMemo(
+    () => tasks.filter((task) => Boolean(task.due_date)).length,
+    [tasks]
+  );
   const done = tasks.filter((t) => t.status === "completed").length;
   const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
   const projectName = project?.name || "Detalle del proyecto";
@@ -240,11 +246,54 @@ const Project = () => {
     try {
       await updateProjectTask(id, taskId, patch);
       if (!quiet) notify("Cambios guardados");
+      return true;
     } catch {
       setTasks(previous);
+      // Revierte solo los campos que se habían adelantado, para no perder los
+      // datos extra del detalle (subtareas, comentarios...) que ya estaban cargados.
+      const before = previous.find((t) => t.id === taskId);
+      if (before) {
+        setSelected((old) => {
+          if (old?.id !== taskId) return old;
+          const restored = { ...old };
+          Object.keys(patch).forEach((key) => {
+            restored[key] = before[key];
+          });
+          return restored;
+        });
+      }
       notify("No se pudieron guardar los cambios", "error");
+      return false;
     }
   };
+
+  /* ---------------- Vistas ---------------- */
+  const changeView = (key) => {
+    setView(key);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (key === "board") next.delete("view");
+        else next.set("view", key);
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  /** Reprogramación desde el calendario (arrastrar o campo de fecha). */
+  const rescheduleTask = async (task, dateISO) => {
+    if (!task) return;
+    const saved = await updateTask(task.id, { due_date: dateISO || null }, true);
+    if (!saved) return;
+    notify(
+      dateISO
+        ? `“${task.title}” reprogramada para el ${formatDate(dateISO)}`
+        : `Se quitó la fecha de “${task.title}”`
+    );
+  };
+
+  const handleFilesCount = useCallback((count) => setFileCount(count), []);
 
   const handleDrop = (status) => {
     setDropColumn(null);
@@ -287,7 +336,14 @@ const Project = () => {
         : [],
     );
     setDetailTab("comments");
-    setSearchParams({ task: task.id }, { replace: true });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("task", task.id);
+        return next;
+      },
+      { replace: true }
+    );
     const [detail, comm, files] = await Promise.allSettled([
       fetchTask(id, task.id),
       fetchTaskComments(id, task.id),
@@ -297,15 +353,34 @@ const Project = () => {
       setSelected((old) =>
         old?.id === task.id ? { ...old, ...detail.value } : old,
       );
-    if (comm.status === "fulfilled" && comm.value.length)
-      setComments(comm.value);
-    if (files.status === "fulfilled" && files.value.length)
-      setAttachments(files.value);
+    // Si el API no devuelve comentarios/adjuntos se usan los del payload de la
+    // tarea (nunca los de la tarea anterior, que ya no se están viendo).
+    setComments(
+      comm.status === "fulfilled" && comm.value.length
+        ? comm.value
+        : Array.isArray(task.comments)
+          ? task.comments
+          : [],
+    );
+    setAttachments(
+      files.status === "fulfilled" && files.value.length
+        ? files.value
+        : Array.isArray(task.attachments || task.files)
+          ? task.attachments || task.files
+          : [],
+    );
   };
 
   const closeTask = () => {
     setSelected(null);
-    setSearchParams({}, { replace: true });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("task");
+        return next;
+      },
+      { replace: true }
+    );
   };
 
   // Deep-link: /admin/projects/:id?task=:taskId abre el detalle automáticamente.
@@ -402,10 +477,6 @@ const Project = () => {
     ];
     setTasks((old) => old.map((t) => (t.id === selected.id ? selected : t)));
     notify("Subtarea agregada");
-  };
-
-  const addCommentstoTasks = (taskId, data) => {
-    addTaskComment(id, taskId, data);
   };
 
   const toggleSubtask = (subtaskId) => {
@@ -562,44 +633,62 @@ const Project = () => {
 
         {/* ---------- Navegación del tablero ---------- */}
         <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div className="flex items-center gap-1" role="tablist">
+          <div className="flex flex-wrap items-center gap-1" role="tablist">
             <ViewTab
               active={view === "board"}
-              onClick={() => setView("board")}
+              onClick={() => changeView("board")}
               icon={FiColumns}
               label="Tablero"
             />
             <ViewTab
               active={view === "list"}
-              onClick={() => setView("list")}
+              onClick={() => changeView("list")}
               icon={FiList}
               label="Lista"
             />
             <ViewTab
-              disabled
+              active={view === "calendar"}
+              onClick={() => changeView("calendar")}
               icon={FiCalendar}
               label="Calendario"
-              title="Próximamente"
+              count={tasksWithDate}
+              title="Vencimientos y entregas del proyecto"
             />
             <ViewTab
-              disabled
+              active={view === "files"}
+              onClick={() => changeView("files")}
               icon={FiPaperclip}
               label="Archivos"
-              title="Próximamente"
+              count={fileCount}
+              title="Archivos del proyecto y de sus tareas"
             />
           </div>
-          <Button
-            onClick={() => {
-              setDraft({ ...EMPTY_TASK, status: "pending" });
-              setTaskModal(true);
-            }}
-          >
-            <FiPlus /> Nueva tarea
-          </Button>
+          <div className="flex items-center gap-2">
+            {view === "files" && (
+              <span className="hidden text-xs text-slate-400 lg:block">
+                {fileCount === null
+                  ? "Cargando archivos…"
+                  : `${fileCount} archivo${fileCount === 1 ? "" : "s"} en el proyecto`}
+              </span>
+            )}
+            <Button
+              onClick={() => {
+                setDraft({ ...EMPTY_TASK, status: "pending" });
+                setTaskModal(true);
+              }}
+            >
+              <FiPlus /> Nueva tarea
+            </Button>
+          </div>
         </div>
 
-        {/* ---------- Filtros ---------- */}
-        <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-3.5 sm:px-6 lg:flex-row lg:items-center">
+        {/* ---------- Filtros (no aplican al explorador de archivos) ---------- */}
+        <div
+          className={cx(
+            "flex flex-col gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-3.5 sm:px-6 lg:flex-row lg:items-center",
+            view === "files" && "hidden"
+          )}
+        >
           <SearchInput
             value={search}
             onChange={setSearch}
@@ -700,8 +789,23 @@ const Project = () => {
                 ))}
               </div>
             </div>
-          ) : (
+          ) : view === "list" ? (
             <TaskTable tasks={filtered} onOpen={openTask} />
+          ) : view === "calendar" ? (
+            <CalendarTab
+              project={project}
+              tasks={filtered}
+              onOpenTask={openTask}
+              onReschedule={rescheduleTask}
+            />
+          ) : (
+            <FilesTab
+              projectId={id}
+              projectName={projectName}
+              tasks={tasks}
+              onOpenTask={openTask}
+              onCountChange={handleFilesCount}
+            />
           )}
         </div>
       </section>
@@ -860,7 +964,7 @@ const Project = () => {
 /* Subcomponentes                                                      */
 /* ================================================================== */
 
-const ViewTab = ({ active, icon: Icon, label, ...rest }) => (
+const ViewTab = ({ active, icon: Icon, label, count, ...rest }) => (
   <button
     type="button"
     role="tab"
@@ -876,6 +980,16 @@ const ViewTab = ({ active, icon: Icon, label, ...rest }) => (
     {...rest}
   >
     <Icon /> {label}
+    {typeof count === "number" && (
+      <span
+        className={cx(
+          "rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums",
+          active ? "bg-white text-brand-700" : "bg-slate-200/70 text-slate-500"
+        )}
+      >
+        {count}
+      </span>
+    )}
   </button>
 );
 
