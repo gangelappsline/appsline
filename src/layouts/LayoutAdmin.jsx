@@ -24,9 +24,11 @@ const APP_NAME = "Appsline";
  * @param {string} subtitle - Descripción bajo el título.
  * @param {node} actions - Botones de acción a la derecha del encabezado.
  * @param {Array<{label: string, to?: string}>} breadcrumbs - Ruta de navegación.
+ * @param {boolean} compact - Reduce márgenes en espacios de trabajo.
+ * @param {boolean} focusMode - Oculta la navegación lateral en escritorio.
  * @param {boolean} fluid - Sin ancho máximo (ideal para tableros kanban).
  */
-const LayoutAdmin = ({ title, subtitle, actions, breadcrumbs = [], fluid = false, children }) => {
+const LayoutAdmin = ({ title, subtitle, actions, breadcrumbs = [], fluid = false, compact = false, focusMode = false, children }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
@@ -71,7 +73,7 @@ const LayoutAdmin = ({ title, subtitle, actions, breadcrumbs = [], fluid = false
 
   return (
     <div className="flex min-h-screen bg-slate-100 text-slate-900">
-        <Aside open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <Aside desktopHidden={focusMode} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         <div className="flex min-w-0 flex-1 flex-col">
           {/* ---------- Top bar ---------- */}
@@ -165,10 +167,10 @@ const LayoutAdmin = ({ title, subtitle, actions, breadcrumbs = [], fluid = false
           </header>
 
           {/* ---------- Contenido ---------- */}
-          <main className="flex-1 px-4 py-4 sm:px-6 lg:px-8 lg:py-4">
+          <main className={`min-w-0 flex-1 ${compact ? "px-3 py-3 sm:px-4" : "px-4 py-4 sm:px-6 lg:px-8 lg:py-4"}`}>
             <div className={`mx-auto w-full ${fluid ? "" : "max-w-9xl"}`}>
-              {(title || actions || breadcrumbs.length > 0) && (
-                <div className="mb-6">
+              {(title || actions || (!compact && breadcrumbs.length > 0)) && (
+                <div className={compact ? "mb-4" : "mb-6"}>
                   {breadcrumbs.length > 0 && (
                     <nav aria-label="Ruta de navegación" className="mb-2 flex flex-wrap items-center gap-1 hidden text-[13px]">
                       {breadcrumbs.map((crumb, i) => {

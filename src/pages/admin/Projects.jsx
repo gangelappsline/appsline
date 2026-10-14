@@ -3,8 +3,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   FiArrowUpRight, FiBriefcase, FiCalendar, FiCheckCircle, FiClock,
-  FiGrid, FiList, FiEdit2, FiPlus, FiTrash2, FiUsers,
+  FiGrid, FiList, FiChevronsUp, FiChevronsDown, FiEdit2, FiPlus, FiTrash2, FiUsers,
 } from "react-icons/fi";
+import CollapsibleSection from "../../components/admin/CollapsibleSection";
+import useDisplayPreference from "../../hooks/useDisplayPreference";
 import LayoutAdmin from "../../layouts/LayoutAdmin";
 import {
   Badge, Button, Card, CardHeader, ConfirmDialog, EmptyState,
@@ -39,6 +41,8 @@ const Projects = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [view, setView] = useState("grid");
+  const [summaryOpen, setSummaryOpen] = useDisplayPreference("projects.summary", false);
+  const [compactCards, setCompactCards] = useDisplayPreference("projects.compactCards", true);
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -181,6 +185,8 @@ const Projects = () => {
 
   return (
     <LayoutAdmin
+      fluid
+      compact
       title="Proyectos"
       subtitle="Organiza el trabajo, supervisa avances y mantén a tu equipo alineado."
       actions={
@@ -190,15 +196,23 @@ const Projects = () => {
       }
     >
       {/* ---------- Resumen ---------- */}
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Proyectos totales" value={stats.total} icon={FiBriefcase} tone="brand" hint={`${stats.active} actualmente activos`} />
-        <StatCard label="En progreso" value={stats.active} icon={FiClock} tone="violet" hint="Proyectos en ejecución" />
-        <StatCard label="Completados" value={stats.completed} icon={FiCheckCircle} tone="green" hint="Entregados exitosamente" />
-        <StatCard label="Presupuesto total" value={formatCurrency(stats.budget)} icon={FiArrowUpRight} tone="amber" hint="Valor del portafolio" />
-      </div>
+      <CollapsibleSection
+        title="Resumen del portafolio"
+        summary={loading ? "Cargando…" : `${stats.total} proyectos · ${stats.active} activos`}
+        open={summaryOpen}
+        onToggle={() => setSummaryOpen((open) => !open)}
+        className="admin-card px-3 py-1.5"
+      >
+        <div className="grid gap-3 pb-2 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Proyectos totales" value={stats.total} icon={FiBriefcase} tone="brand" hint={`${stats.active} actualmente activos`} />
+          <StatCard label="En progreso" value={stats.active} icon={FiClock} tone="violet" hint="Proyectos en ejecución" />
+          <StatCard label="Completados" value={stats.completed} icon={FiCheckCircle} tone="green" hint="Entregados exitosamente" />
+          <StatCard label="Presupuesto total" value={formatCurrency(stats.budget)} icon={FiArrowUpRight} tone="amber" hint="Valor del portafolio" />
+        </div>
+      </CollapsibleSection>
 
       {/* ---------- Panel principal ---------- */}
-      <Card className="mt-6 overflow-hidden">
+      <Card className="mt-3 overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
           <SearchInput
             value={search}
@@ -206,7 +220,13 @@ const Projects = () => {
             placeholder="Buscar proyecto o cliente..."
             className="w-full sm:max-w-xs"
           />
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {view === "grid" && (
+              <Button variant="ghost" aria-pressed={compactCards} onClick={() => setCompactCards((value) => !value)}>
+                {compactCards ? <FiChevronsDown /> : <FiChevronsUp />}
+                {compactCards ? "Ampliar tarjetas" : "Compactar tarjetas"}
+              </Button>
+            )}
             <span className="text-sm text-slate-500">
               {filtered.length} de {projects.length}
             </span>
@@ -229,7 +249,7 @@ const Projects = () => {
           </div>
         </div>
 
-        <div className="p-4 sm:p-5">
+        <div className="p-3 sm:p-4">
           {loading ? (
             <CardsSkeleton />
           ) : filtered.length === 0 ? (
@@ -240,11 +260,12 @@ const Projects = () => {
               action={<Button onClick={openCreate}><FiPlus /> Crear proyecto</Button>}
             />
           ) : view === "grid" ? (
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,260px),1fr))] gap-3">
               {filtered.map((item, i) => (
                 <ProjectCard
                   key={item.id}
                   project={item}
+                  compact={compactCards}
                   gradient={LETTER_GRADIENTS[i % LETTER_GRADIENTS.length]}
                   onOpen={() => navigate(`/admin/projects/${item.id}`)}
                   onEdit={() => openEdit(item)}
@@ -342,13 +363,13 @@ const Projects = () => {
 
 /* ------------------------------------------------------------------ */
 
-const ProjectCard = ({ project, gradient, onOpen, onEdit, onDelete }) => {
+const ProjectCard = ({ project, gradient, onOpen, onEdit, onDelete, compact }) => {
   const pct = projectProgress(project);
   const status = projectStatusMeta(project.status);
   return (
     <article
       onClick={onOpen}
-      className="admin-card admin-card-hover group flex cursor-pointer flex-col p-5"
+      className="admin-card admin-card-hover group flex min-w-0 cursor-pointer flex-col p-4"
     >
       <div className="flex items-start justify-between gap-3">
         <span className={cx("flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl text-sm font-extrabold text-white", gradient, project.logo ? "bg-white" : "bg-gradient-to-br")}>
@@ -358,7 +379,7 @@ const ProjectCard = ({ project, gradient, onOpen, onEdit, onDelete }) => {
             (project.name || "P").slice(0, 2).toUpperCase()
           )}
         </span>
-        <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
+        <div className="flex gap-1">
           <button
             type="button" title="Editar" onClick={(e) => { e.stopPropagation(); onEdit(); }}
             className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
@@ -376,13 +397,13 @@ const ProjectCard = ({ project, gradient, onOpen, onEdit, onDelete }) => {
 
       <div className="mt-4">
         <Badge tone={status.tone} dot>{status.label}</Badge>
-        <h3 className="mt-2.5 truncate text-[15px] font-semibold text-slate-900">{project.name}</h3>
-        <p className="mt-1 line-clamp-2 min-h-10 text-[13px] leading-5 text-slate-500">
+        <h3 className="mt-2 truncate text-[15px] font-semibold text-slate-900"><button type="button" onClick={(e) => { e.stopPropagation(); onOpen(); }} className="max-w-full truncate rounded text-left hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">{project.name}</button></h3>
+        {!compact && <p className="mt-1 line-clamp-2 min-h-10 text-[13px] leading-5 text-slate-500">
           {project.description || "Sin descripción del proyecto."}
-        </p>
+        </p>}
       </div>
 
-      <div className="mt-4 flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+      {!compact && <div className="mt-4 flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[11px] font-extrabold text-brand-700">
           {(project.client_name || "AP").split(/\s+/).slice(0, 2).map((x) => x[0]).join("").toUpperCase()}
         </span>
@@ -395,9 +416,10 @@ const ProjectCard = ({ project, gradient, onOpen, onEdit, onDelete }) => {
             {formatCurrency(project.budget)}
           </p>
         )}
-      </div>
+      </div>}
+      {compact && <p className="mt-1 truncate text-xs text-slate-500">{project.client_name || "Appsline"}</p>}
 
-      <div className="mt-4">
+      <div className="mt-3">
         <div className="flex items-center justify-between text-xs">
           <span className="font-medium text-slate-500">Progreso</span>
           <span className="font-bold tabular-nums text-slate-700">{pct}%</span>
@@ -407,7 +429,7 @@ const ProjectCard = ({ project, gradient, onOpen, onEdit, onDelete }) => {
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-4 border-t border-slate-100 pt-3.5 text-xs text-slate-500">
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
         <span className="flex items-center gap-1.5"><FiCalendar /> {project.end_date ? formatDate(project.end_date) : "Sin fecha"}</span>
         <span className="flex items-center gap-1.5"><FiUsers /> {project.members_count || project.users_count || 0}</span>
         <span className="ml-auto flex items-center gap-1 font-semibold text-brand-600">

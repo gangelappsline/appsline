@@ -53,7 +53,7 @@ const navSections = [
  * En escritorio es fija; en móvil se comporta como drawer controlado
  * por `open` / `onClose` desde LayoutAdmin.
  */
-const Aside = ({ open = false, onClose = () => {} }) => {
+const Aside = ({ open = false, onClose = () => {}, desktopHidden = false }) => {
   const linkClass = ({ isActive }) =>
     `group relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition ${
       isActive
@@ -73,7 +73,7 @@ const Aside = ({ open = false, onClose = () => {} }) => {
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-white/5 bg-ink-950 transition-transform duration-300 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-white/5 bg-ink-950 transition-transform duration-300 ${desktopHidden ? "lg:hidden" : "lg:static lg:translate-x-0"} ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >

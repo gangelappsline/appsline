@@ -18,7 +18,10 @@ import {
   FiLink,
   FiList,
   FiMessageSquare,
-  FiMoreHorizontal,
+  FiMaximize2,
+  FiMinimize2,
+  FiChevronsUp,
+  FiChevronsDown,
   FiPaperclip,
   FiPlus,
   FiTrash2,
@@ -28,6 +31,8 @@ import {
   FiX,
   FiColumns,
 } from "react-icons/fi";
+import CollapsibleSection from "../../components/admin/CollapsibleSection";
+import useDisplayPreference from "../../hooks/useDisplayPreference";
 import LayoutAdmin from "../../layouts/LayoutAdmin";
 import {
   Avatar,
@@ -58,7 +63,7 @@ import {
   uploadTaskFiles,
   addSubtaskToTask,
 } from "../../services/admin";
-import { cx, formatDate, isOverdue, priorityMeta } from "../../utils/format";
+import { cx, formatDate, isOverdue, priorityMeta, projectStatusMeta } from "../../utils/format";
 import { prepareFilesForUpload } from "../../utils/images";
 import CalendarTab from "./project/CalendarTab";
 import FilesTab from "./project/FilesTab";
@@ -171,6 +176,10 @@ const Project = () => {
     return VIEW_KEYS.includes(requested) ? requested : "board";
   });
   const [fileCount, setFileCount] = useState(null);
+  const [summaryOpen, setSummaryOpen] = useDisplayPreference("project.summary", false);
+  const [filtersOpen, setFiltersOpen] = useDisplayPreference("project.filters", false);
+  const [compactCards, setCompactCards] = useDisplayPreference("project.compactCards", true);
+  const [focusMode, setFocusMode] = useDisplayPreference("project.focus", false);
 
   const [taskModal, setTaskModal] = useState(false);
   const [draft, setDraft] = useState(EMPTY_TASK);
@@ -233,6 +242,7 @@ const Project = () => {
   );
   const done = tasks.filter((t) => t.status === "completed").length;
   const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+  const projectStatus = projectStatusMeta(project?.status);
   const projectName = project?.name || "Detalle del proyecto";
   const hasFilters = Boolean(search || priority || person);
 
@@ -514,6 +524,8 @@ const Project = () => {
   return (
     <LayoutAdmin
       fluid
+      compact
+      focusMode={focusMode}
       breadcrumbs={[
         { label: "Proyectos", to: "/admin/projects" },
         { label: projectName },
@@ -521,118 +533,68 @@ const Project = () => {
     >
       {/* ---------- Encabezado del proyecto ---------- */}
       <section className="admin-card overflow-hidden">
-        <div className="border-b border-slate-100 bg-gradient-to-b from-white to-slate-50/60 p-5 sm:p-6">
-          <button
-            type="button"
-            onClick={() => navigate("/admin/projects")}
-            className="flex items-center gap-1.5 text-[13px] font-medium text-slate-500 transition hover:text-brand-600"
-          >
-            <FiArrowLeft /> Volver a proyectos
-          </button>
-
-          <div className="mt-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex min-w-0 items-center gap-4">
-              {project != null && !(project.logo === "") ? (
-                <span
-                  className={cx(
-                    "flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl  p-3.5 text-base font-extrabold text-white shadow-brand-sm",
-                  )}
-                >
-                  <img
-                    src={project.logo}
-                    alt=""
-                    className="object-cover w-10"
-                  />
-                </span>
-              ) : (
-                <span
-                  className={cx(
-                    "flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br bg-gradient-to-br from-brand-600 to-violet-600 p-3.5 text-base font-extrabold text-white shadow-brand-sm",
-                  )}
-                >
-                  {(projectName || "P").slice(0, 2).toUpperCase()}
-                </span>
-              )}
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <h1 className="truncate text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-                    {projectName}
-                  </h1>
-                  <Badge tone="green" dot>
-                    En curso
-                  </Badge>
-                </div>
-                <p className="mt-1 truncate text-sm text-slate-500">
-                  {project?.description ||
-                    "Planificación, diseño y desarrollo del proyecto"}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <AvatarStack users={users} max={4} />
-              <span className="hidden text-sm text-slate-400 sm:block">
-                {users.length} miembro{users.length === 1 ? "" : "s"}
-              </span>
-            </div>
+        <div className="border-b border-slate-100 bg-gradient-to-b from-white to-slate-50/60 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => navigate("/admin/projects")}
+              className="flex items-center gap-1.5 rounded text-xs font-medium text-slate-500 transition hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            >
+              <FiArrowLeft /> Proyectos
+            </button>
+            <Button variant="subtle" aria-pressed={focusMode} onClick={() => setFocusMode((value) => !value)}>
+              {focusMode ? <FiMinimize2 /> : <FiMaximize2 />}
+              {focusMode ? "Salir del enfoque" : "Modo enfoque"}
+            </Button>
           </div>
-
-          {/* Métricas */}
-          <dl className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <div className="rounded-xl border border-slate-100 bg-white p-4">
-              <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                Progreso general
-              </dt>
-              <dd className="mt-1.5 flex items-baseline gap-2">
-                <span className="text-2xl font-bold tabular-nums text-slate-900">
-                  {progress}%
-                </span>
-                <span className="text-xs text-slate-400">
-                  {done}/{tasks.length} tareas
-                </span>
-              </dd>
-              <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-brand-gradient transition-all"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+          <div className="mt-2 flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand-600 to-violet-600 text-sm font-extrabold text-white">
+              {project?.logo ? <img src={project.logo} alt="" className="h-full w-full bg-white object-contain" /> : projectName.slice(0, 2).toUpperCase()}
+            </span>
+            <div className="min-w-0 flex-1">
+              <h1 className="break-words text-lg font-bold tracking-tight text-slate-900 sm:text-xl">{projectName}</h1>
+              <Badge tone={projectStatus.tone} dot>{projectStatus.label}</Badge>
             </div>
-            {[
-              {
-                label: "Fecha de entrega",
-                value: project?.end_date
-                  ? formatDate(project.end_date)
-                  : "Sin fecha",
-                icon: FiCalendar,
-              },
-              {
-                label: "Equipo",
-                value: `${users.length || "—"} miembros`,
-                icon: FiUsers,
-              },
-              {
-                label: "Tareas activas",
-                value: `${tasks.length - done} pendientes`,
-                icon: FiClock,
-              },
-            ].map((m) => (
-              <div
-                key={m.label}
-                className="rounded-xl border border-slate-100 bg-white p-4"
-              >
-                <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                  {m.label}
-                </dt>
-                <dd className="mt-1.5 flex items-center gap-2 text-lg font-semibold text-slate-800">
-                  <m.icon className="text-slate-300" /> {m.value}
-                </dd>
+            <span className="shrink-0 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-brand-700" title={`${done} de ${tasks.length} tareas finalizadas`}>
+              {progress}% <span className="hidden sm:inline">completado</span>
+            </span>
+          </div>
+          {!focusMode && (
+            <CollapsibleSection
+              title="Información del proyecto"
+              summary={`${tasks.length} tareas · ${done} finalizadas`}
+              open={summaryOpen}
+              onToggle={() => setSummaryOpen((open) => !open)}
+              className="mt-2"
+            >
+              <div className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <p className="min-w-0 text-sm text-slate-500">{project?.description || "Sin descripción del proyecto."}</p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <AvatarStack users={users} max={4} />
+                  <span className="text-xs text-slate-500">{users.length} miembros</span>
+                </div>
               </div>
-            ))}
-          </dl>
+              <dl className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                {[
+                  { label: "Progreso general", value: `${progress}% · ${done}/${tasks.length} tareas`, icon: FiCheckCircle },
+                  { label: "Fecha de entrega", value: project?.end_date ? formatDate(project.end_date) : "Sin fecha", icon: FiCalendar },
+                  { label: "Equipo", value: `${users.length} miembros`, icon: FiUsers },
+                  { label: "Tareas activas", value: `${tasks.filter((task) => !["completed", "rejected"].includes(task.status)).length} pendientes`, icon: FiClock },
+                ].map((metric) => (
+                  <div key={metric.label} className="min-w-0 rounded-xl border border-slate-200/70 bg-white p-3">
+                    <dt className="text-[11px] font-medium text-slate-500">{metric.label}</dt>
+                    <dd className="mt-1 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                      <metric.icon className="shrink-0 text-slate-400" /> {metric.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </CollapsibleSection>
+          )}
         </div>
 
         {/* ---------- Navegación del tablero ---------- */}
-        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="flex flex-col gap-3 border-b border-slate-100 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4">
           <div className="flex flex-wrap items-center gap-1" role="tablist">
             <ViewTab
               active={view === "board"}
@@ -685,65 +647,72 @@ const Project = () => {
         {/* ---------- Filtros (no aplican al explorador de archivos) ---------- */}
         <div
           className={cx(
-            "flex flex-col gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-3.5 sm:px-6 lg:flex-row lg:items-center",
+            "border-b border-slate-100 bg-white px-3 py-2 sm:px-4",
             view === "files" && "hidden"
           )}
         >
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Buscar por título o descripción..."
-            className="w-full lg:max-w-sm"
-          />
-          <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
-            <div className="relative">
-              <FiFlag className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-                className="admin-input appearance-none pl-9 pr-8 !py-2 text-[13px]"
-              >
-                <option value="">Prioridad: todas</option>
-                <option value="high">Alta</option>
-                <option value="medium">Media</option>
-                <option value="low">Baja</option>
-              </select>
-              <FiChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
-            </div>
-            <div className="relative">
-              <FiUser className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
-              <select
-                value={person}
-                onChange={(e) => setPerson(e.target.value)}
-                className="admin-input max-w-48 appearance-none pl-9 pr-8 !py-2 text-[13px]"
-              >
-                <option value="">Responsable: todos</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
-              <FiChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
-            </div>
-            {hasFilters && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch("");
-                  setPriority("");
-                  setPerson("");
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-[13px] font-semibold text-brand-700 transition hover:bg-brand-100"
-              >
-                <FiFilter /> Limpiar filtros
-              </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por título o descripción..."
+              className="min-w-[180px] flex-1 sm:max-w-xs"
+              inputClassName="!py-2"
+            />
+            <Button variant="ghost" aria-expanded={filtersOpen} aria-controls="project-filters" onClick={() => setFiltersOpen((open) => !open)}>
+              <FiFilter /> Filtros
+              {(priority || person) && <span className="rounded bg-brand-100 px-1.5 text-xs text-brand-700">{Number(Boolean(priority)) + Number(Boolean(person))}</span>}
+              <FiChevronDown className={cx("transition-transform", filtersOpen && "rotate-180")} />
+            </Button>
+            {view === "board" && (
+              <Button variant="ghost" aria-pressed={compactCards} onClick={() => setCompactCards((value) => !value)}>
+                {compactCards ? <FiChevronsDown /> : <FiChevronsUp />}
+                {compactCards ? "Ampliar tarjetas" : "Compactar tarjetas"}
+              </Button>
             )}
+            <span className="ml-auto text-xs tabular-nums text-slate-500" role="status">{filtered.length} de {tasks.length} tareas</span>
+            {hasFilters && <Button variant="subtle" onClick={() => { setSearch(""); setPriority(""); setPerson(""); }}><FiX /> Limpiar filtros</Button>}
+          </div>
+          <div id="project-filters" hidden={!filtersOpen}>
+            <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
+              <div className="relative">
+                <FiFlag className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
+                <select
+                  aria-label="Filtrar por prioridad"
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                  className="admin-input appearance-none pl-9 pr-8 !py-2 text-[13px]"
+                >
+                  <option value="">Prioridad: todas</option>
+                  <option value="high">Alta</option>
+                  <option value="medium">Media</option>
+                  <option value="low">Baja</option>
+                </select>
+                <FiChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
+              </div>
+              <div className="relative">
+                <FiUser className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
+                <select
+                  aria-label="Filtrar por responsable"
+                  value={person}
+                  onChange={(e) => setPerson(e.target.value)}
+                  className="admin-input max-w-48 appearance-none pl-9 pr-8 !py-2 text-[13px]"
+                >
+                  <option value="">Responsable: todos</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+                <FiChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
+              </div>
+            </div>
           </div>
         </div>
 
         {/* ---------- Contenido ---------- */}
-        <div className="bg-slate-50/50 p-5 sm:p-6">
+        <div className="bg-slate-50/50 p-3 sm:p-4">
           {loading ? (
             <BoardSkeleton />
           ) : loadError && !project ? (
@@ -762,7 +731,7 @@ const Project = () => {
             />
           ) : view === "board" ? (
             <div className="-mx-1 overflow-x-auto px-1 pb-2">
-              <div className="grid min-w-[880px] grid-cols-4 gap-4 xl:min-w-0">
+              <div className="grid min-w-[960px] grid-cols-4 items-start gap-3">
                 {COLUMNS.map((col) => (
                   <KanbanColumn
                     key={col.key}
@@ -771,6 +740,7 @@ const Project = () => {
                       (t) => (t.status || "pending") === col.key,
                     )}
                     projectId={id}
+                    compactCards={compactCards}
                     isDropTarget={dropColumn === col.key}
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -1005,6 +975,7 @@ const KanbanColumn = ({
   onDragStart,
   onAdd,
   hasFilters,
+  compactCards,
 }) => {
   const Icon = column.icon;
   return (
@@ -1013,7 +984,7 @@ const KanbanColumn = ({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       className={cx(
-        "flex min-h-96 flex-col rounded-2xl border bg-slate-100/70 p-3 transition",
+        "flex min-h-[420px] min-w-0 flex-col rounded-xl border bg-slate-100/70 p-2.5 transition",
         isDropTarget
           ? "border-brand-400 bg-brand-50/60 ring-2 ring-brand-200"
           : "border-slate-200/70",
@@ -1050,7 +1021,8 @@ const KanbanColumn = ({
       <div className="flex flex-1 flex-col gap-2.5">
         {tasks.map((task) => (
           <TaskCard
-            key={task.id}
+            key={`${task.id}-${compactCards}`}
+            compact={compactCards}
             task={task}
             projectId={projectId}
             color={column.color}
@@ -1082,7 +1054,9 @@ const KanbanColumn = ({
   );
 };
 
-const TaskCard = ({ task, projectId, color, onOpen, onDrag }) => {
+const TaskCard = ({ task, projectId, color, onOpen, onDrag, compact }) => {
+  const [expanded, setExpanded] = useState(!compact);
+  const detailsId = `task-card-details-${task.id}`;
   const user = assigneeOf(task);
   const subtasks = task.subtasks || [];
   const doneCount = subtasks.filter(
@@ -1104,63 +1078,74 @@ const TaskCard = ({ task, projectId, color, onOpen, onDrag }) => {
       draggable
       onDragStart={onDrag}
       onClick={onOpen}
-      className="group cursor-pointer rounded-xl border border-slate-200 bg-white p-3.5 shadow-card transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-card-lg"
+      className="group min-w-0 cursor-pointer rounded-xl border border-slate-200 bg-white p-3 shadow-card transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-card-lg"
     >
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-bold tracking-wide text-slate-400">
           PR-{projectId}-{task.id}
         </span>
-        <span className="rounded-md p-1 text-slate-300 transition group-hover:text-slate-400">
-          <FiMoreHorizontal />
-        </span>
+        <button
+          type="button"
+          onClick={(event) => { event.stopPropagation(); setExpanded((value) => !value); }}
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          aria-label={`${expanded ? "Ocultar" : "Mostrar"} detalles de ${task.title}`}
+          className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+        >
+          <FiChevronDown className={cx("transition-transform", expanded && "rotate-180")} />
+        </button>
       </div>
-      {tags.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {tags.slice(0, 2).map((tag, i) => (
-            <span
-              key={tag.id || tag.name || tag || i}
-              className="rounded-md px-2 py-0.5 text-[11px] font-semibold"
-              style={{
-                background: `${tag.color || color}1a`,
-                color: tag.color || color,
-              }}
-            >
-              {tag.name || tag}
-            </span>
-          ))}
-        </div>
-      )}
-      <h3 className="mt-2 text-sm font-semibold leading-6 text-slate-800">
-        {task.title}
+      <h3 className="mt-1 break-words text-sm font-semibold leading-5 text-slate-800">
+        <button type="button" onClick={(event) => { event.stopPropagation(); onOpen(); }} className="w-full rounded text-left hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+          {task.title}
+        </button>
       </h3>
-      {task.description && (
-        <p className="mt-1 line-clamp-2 text-[13px] leading-5 text-slate-500">
-          {task.description}
-        </p>
-      )}
-
-      {subtasks.length > 0 && (
-        <div className="mt-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="flex items-center gap-1 font-medium text-slate-500">
-              <FiCheckCircle /> {doneCount}/{subtasks.length} subtareas
-            </span>
-            <span className="font-bold tabular-nums text-slate-600">
-              {Math.round((doneCount / subtasks.length) * 100)}%
-            </span>
+      <div id={detailsId} hidden={!expanded}>
+        {tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {tags.slice(0, 2).map((tag, i) => (
+              <span
+                key={tag.id || tag.name || tag || i}
+                className="rounded-md px-2 py-0.5 text-[11px] font-semibold"
+                style={{
+                  background: `${tag.color || color}1a`,
+                  color: tag.color || color,
+                }}
+              >
+                {tag.name || tag}
+              </span>
+            ))}
           </div>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full transition-all"
-              style={{
-                width: `${(doneCount / subtasks.length) * 100}%`,
-                background: color,
-              }}
-            />
-          </div>
-        </div>
-      )}
+        )}
+        {task.description && (
+          <p className="mt-1 line-clamp-2 text-[13px] leading-5 text-slate-500">
+            {task.description}
+          </p>
+        )}
 
+        {subtasks.length > 0 && (
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1 font-medium text-slate-500">
+                <FiCheckCircle /> {doneCount}/{subtasks.length} subtareas
+              </span>
+              <span className="font-bold tabular-nums text-slate-600">
+                {Math.round((doneCount / subtasks.length) * 100)}%
+              </span>
+            </div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${(doneCount / subtasks.length) * 100}%`,
+                  background: color,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+      </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
         <span
           className={cx(
