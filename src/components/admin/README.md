@@ -18,6 +18,8 @@ import { Card, Modal, Badge, Button, useToast } from "../../components/admin";
 | `Card` / `CardHeader` | Tarjeta y su encabezado con acciones |
 | `EmptyState` | Estado vacío con icono, título, descripción y acción |
 | `Modal` | Diálogo accesible (`size`: sm–2xl, `footer`) |
+| `MonthGrid` | Vista mensual (eventos por día, arrastrar y soltar entre días, leyenda) |
+| `MiniStat` | Métrica compacta para franjas de resumen (`icon`, `label`, `value`, `hint`, `tone`) |
 | `Drawer` | Panel lateral deslizante (`wide` para detalle de tareas) |
 | `ConfirmDialog` | Confirmación de acciones destructivas (en vez de `window.confirm`) |
 | `SearchInput` | Buscador con botón para limpiar |
@@ -47,6 +49,12 @@ import { Card, Modal, Badge, Button, useToast } from "../../components/admin";
 - `src/hooks/useDashboard.js` — datos agregados (KPIs, productividad,
   vencimientos) compartidos por Dashboard y Reportes.
 - `src/utils/format.js` — moneda, fechas, estados, prioridades y CSV.
+- `src/utils/calendar.js` — utilidades de calendario (`dayKey`, `calendarCells`,
+  `monthLabel`, tonos de evento) compartidas por el Calendario global y la
+  pestaña Calendario del proyecto.
+- `src/utils/files.js` — lectura tolerante de los adjuntos que devuelve la API
+  (`normalizeProjectFile`), tipo por extensión/MIME, peso legible
+  (`formatBytes`) y URL de descarga (`resolveFileUrl`).
 - `src/utils/prefs.js` — preferencias en `localStorage`.
 - `src/index.css` (`@layer components`) — clases base `.admin-card`,
   `.admin-input`, `.btn-primary`, etc.

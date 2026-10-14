@@ -31,7 +31,6 @@ const colorFor = (name = "") => {
  * @example <Avatar user={task.assigned_to} size="sm" />
  */
 const Avatar = ({ user, size = "md", ring = false, className = "" }) => {
-  console.log(user);
   const [broken, setBroken] = useState(false);
   const name = user?.name || user?.email || "Sin asignar";
   const photo = user?.photo || user?.avatar || user?.image;

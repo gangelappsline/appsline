@@ -309,7 +309,139 @@ export async function uploadTaskFiles(projectId, taskId, files) {
     form,
     { headers: { "Content-Type": "multipart/form-data" } }
   );
+  invalidateProjectFiles(projectId);
   return data;
+}
+
+/* ------------------------------------------------------------------ */
+/* Archivos del proyecto                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * ¿La API expone archivos a nivel proyecto (`/projects/{id}/files`)?
+ * `null` = todavía no se ha sondeado, `false` = el endpoint no existe.
+ * El panel se adapta: si no existe, los archivos se cargan y suben
+ * siempre dentro de una tarea.
+ */
+let projectFilesEndpoint = null;
+
+export const projectFilesSupported = () => projectFilesEndpoint !== false;
+
+/** Caché corta para no repetir N peticiones al cambiar de pestaña. */
+const PROJECT_FILES_TTL = 30_000;
+const projectFilesCache = new Map();
+
+export const invalidateProjectFiles = (projectId) => {
+  if (projectId === undefined || projectId === null) projectFilesCache.clear();
+  else projectFilesCache.delete(String(projectId));
+};
+
+export const readApiStatus = (error) => Number(error?.response?.status) || 0;
+
+/** Archivos generales del proyecto ([] si el backend no tiene el endpoint). */
+async function fetchOwnProjectFiles(projectId) {
+  if (projectFilesEndpoint === false) return [];
+  try {
+    const { data } = await api.get(`/projects/${projectId}/files`);
+    projectFilesEndpoint = true;
+    return unwrapList(data, ["attachments", "files"]);
+  } catch (error) {
+    const status = readApiStatus(error);
+    // 404/405/501 = el endpoint no existe en este backend.
+    if (status === 404 || status === 405 || status === 501) projectFilesEndpoint = false;
+    return [];
+  }
+}
+
+/** Archivos de todas las tareas del proyecto, etiquetados con su tarea. */
+async function fetchFilesByTask(projectId, tasks = []) {
+  const list = tasks.length ? tasks : await fetchProjectTasks(projectId).catch(() => []);
+  const results = await Promise.allSettled(
+    list.map((task) => fetchTaskFiles(projectId, task.id))
+  );
+  const files = [];
+  results.forEach((result, index) => {
+    if (result.status !== "fulfilled") return;
+    const task = list[index];
+    result.value.forEach((file) =>
+      files.push({
+        ...file,
+        _task: {
+          id: task.id,
+          title: file.task?.title || task.title || `Tarea #${task.id}`,
+        },
+        _scope: "task",
+      })
+    );
+  });
+  return files;
+}
+
+/**
+ * Todos los archivos del proyecto: los generales (si el backend los soporta)
+ * más los adjuntos de cada tarea, marcados con `_task` y `_scope`.
+ *
+ * @param {number|string} projectId
+ * @param {Array} [tasks] Tareas ya cargadas por la página (evita otra petición).
+ * @param {object} [options] `force` ignora la caché (botón Actualizar).
+ */
+export async function fetchProjectFiles(projectId, tasks = [], { force = false } = {}) {
+  const key = String(projectId);
+  const cached = projectFilesCache.get(key);
+  if (!force && cached && Date.now() - cached.at < PROJECT_FILES_TTL) return cached.files;
+
+  const [own, byTask] = await Promise.all([
+    fetchOwnProjectFiles(projectId),
+    fetchFilesByTask(projectId, tasks),
+  ]);
+
+  const files = [
+    ...own.map((file) => ({ ...file, _scope: "project" })),
+    ...byTask,
+  ];
+  projectFilesCache.set(key, { at: Date.now(), files });
+  return files;
+}
+
+/**
+ * Sube archivos al proyecto.
+ *
+ * @param {number|string} projectId
+ * @param {File[]} files
+ * @param {object} [options] `taskId`: si viene, se adjuntan a esa tarea; si
+ *   es `null` se intenta el endpoint del proyecto (POST /projects/{id}/files).
+ * @returns {Promise<object[]>} Adjuntos creados que devolvió el API (si los devuelve).
+ */
+export async function uploadProjectFiles(projectId, files, { taskId = null } = {}) {
+  const list = Array.from(files || []);
+  if (!list.length) return [];
+
+  if (taskId) {
+    await uploadTaskFiles(projectId, taskId, list);
+    return [];
+  }
+
+  const form = new FormData();
+  const prepared = await prepareFilesForUpload(list);
+  prepared.forEach((file) => form.append("files[]", file));
+  const { data } = await api.post(`/projects/${projectId}/files`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  projectFilesEndpoint = true;
+  invalidateProjectFiles(projectId);
+  return unwrapList(data, ["attachments", "files"]);
+}
+
+/** Elimina un archivo general del proyecto. */
+export async function deleteProjectFile(projectId, fileId) {
+  await api.delete(`/projects/${projectId}/files/${fileId}`);
+  invalidateProjectFiles(projectId);
+}
+
+/** Elimina un adjunto de una tarea. */
+export async function deleteTaskFile(projectId, taskId, fileId) {
+  await api.delete(`/projects/${projectId}/tasks/${taskId}/files/${fileId}`);
+  invalidateProjectFiles(projectId);
 }
 
 /* ------------------------------------------------------------------ */

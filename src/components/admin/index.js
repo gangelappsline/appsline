@@ -10,7 +10,9 @@ export { default as ConfirmDialog } from "./ConfirmDialog";
 export { default as Drawer } from "./Drawer";
 export { default as EmptyState } from "./EmptyState";
 export { default as Field } from "./Field";
+export { default as MiniStat } from "./MiniStat";
 export { default as Modal } from "./Modal";
+export { default as MonthGrid } from "./MonthGrid";
 export {
   default as MentionComposer,
   MentionText,

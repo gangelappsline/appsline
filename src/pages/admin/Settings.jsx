@@ -50,7 +50,6 @@ const ProfileTab = () => {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(user?.avatar || user?.image || user?.photo || "");
   const [saving, setSaving] = useState(false);
-  console.log(user);
 
   const pickFile = (e) => {
     const f = e.target.files?.[0];
