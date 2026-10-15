@@ -86,8 +86,14 @@ const broadcast = async (payload) => {
 /* Push                                                               */
 /* ------------------------------------------------------------------ */
 
-self.addEventListener("push", (event) => {
-  const payload = readPayload(event);
+/**
+ * Muestra la notificación de un payload de FCM.
+ *
+ * Se comparte entre el evento `push` (mensaje real de Firebase) y el mensaje
+ * `simulate-push` que envía el panel desde Diagnóstico de notificaciones, para
+ * que la prueba recorra exactamente el mismo camino que un push real.
+ */
+const showPush = async (payload) => {
   const notification = payload.notification || {};
   const data = payload.data || {};
 
@@ -106,15 +112,26 @@ self.addEventListener("push", (event) => {
     data: { ...data, url, received_at: Date.now() },
   };
 
-  event.waitUntil(
-    (async () => {
-      // Siempre se muestra la notificación del sistema (requisito de Chrome
-      // para el push y forma de enterarse con la pestaña cerrada).
-      await self.registration.showNotification(title, options);
-      // Y se refleja dentro de la app cuando hay alguna pestaña abierta.
-      await broadcast({ title, body, url, ...data });
-    })()
-  );
+  // Siempre se muestra la notificación del sistema (requisito de Chrome para el
+  // push y forma de enterarse con la pestaña cerrada).
+  await self.registration.showNotification(title, options);
+  // Y se refleja dentro de la app cuando hay alguna pestaña abierta.
+  await broadcast({ title, body, url, ...data });
+};
+
+self.addEventListener("push", (event) => {
+  event.waitUntil(showPush(readPayload(event)));
+});
+
+/**
+ * Mensaje de las páginas del propio sitio (origen idéntico). Se usa **solo**
+ * para el diagnóstico: probar que el service worker muestra la notificación y
+ * avisa al panel, sin depender de Firebase.
+ */
+self.addEventListener("message", (event) => {
+  const message = event.data || {};
+  if (message.source !== MESSAGE_SOURCE || message.type !== "simulate-push") return;
+  event.waitUntil(showPush(message.payload || {}));
 });
 
 self.addEventListener("notificationclick", (event) => {

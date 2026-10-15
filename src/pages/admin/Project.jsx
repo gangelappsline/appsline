@@ -24,6 +24,7 @@ import {
   FiChevronsDown,
   FiPaperclip,
   FiPlus,
+  FiRepeat,
   FiTrash2,
   FiUpload,
   FiUser,
@@ -44,9 +45,11 @@ import {
   EmptyState,
   Field,
   MentionComposer,
-  MentionText,
   Modal,
+  RichText,
+  RichTextEditor,
   SearchInput,
+  SubtaskProgress,
   useToast,
 } from "../../components/admin";
 import {
@@ -66,7 +69,6 @@ import {
 import {
   cx,
   formatDate,
-  isOverdue,
   priorityMeta,
   projectStatusMeta,
 } from "../../utils/format";
@@ -74,6 +76,27 @@ import { prepareFilesForUpload } from "../../utils/images";
 import CalendarTab from "./project/CalendarTab";
 import FilesTab from "./project/FilesTab";
 import { peopleMentionedIn } from "../../utils/mentions";
+import {
+  isEmptyRichText,
+  richTextPreview,
+  richTextToPlain,
+  toRichHtml,
+} from "../../utils/richText";
+import {
+  ONGOING_LABEL,
+  RECURRENCE_OPTIONS,
+  TASK_TYPE_ONCE,
+  TASK_TYPE_ONGOING,
+  TASK_TYPE_OPTIONS,
+  isOngoingTask,
+  nextOccurrenceFrom,
+  nextRoundPayload,
+  ongoingLabel,
+  recurrenceMeta,
+  recurrenceOf,
+  taskDescriptionText,
+  taskSchedule,
+} from "../../utils/tasks";
 import { getStoredUser } from "../../services/session";
 
 const COLUMNS = [
@@ -125,6 +148,9 @@ const EMPTY_TASK = {
   assigned_to: "",
   due_date: "",
   estimated_hours: "",
+  /* "once" = puntual (con fecha) · "ongoing" = continua (sin fecha) */
+  task_type: TASK_TYPE_ONCE,
+  recurrence: "none",
 };
 
 /* Helpers tolerantes a las distintas formas de "responsable" de la API. */
@@ -178,6 +204,8 @@ const Project = () => {
   const [search, setSearch] = useState("");
   const [priority, setPriority] = useState("");
   const [person, setPerson] = useState("");
+  /* Filtro por tipo: "" (todas) · "ongoing" (continuas) · "once" (puntuales). */
+  const [taskType, setTaskType] = useState("");
   const [view, setView] = useState(() => {
     const requested = searchParams.get("view");
     return VIEW_KEYS.includes(requested) ? requested : "board";
@@ -242,28 +270,36 @@ const Project = () => {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return tasks.filter((task) => {
+      // El buscador ignora las etiquetas del texto enriquecido.
       const matches =
         !term ||
-        `${task.title || ""} ${task.description || ""}`
+        `${task.title || ""} ${taskDescriptionText(task)}`
           .toLowerCase()
           .includes(term);
       return (
         matches &&
         (!priority || task.priority === priority) &&
-        (!person || String(assigneeId(task)) === String(person))
+        (!person || String(assigneeId(task)) === String(person)) &&
+        (!taskType ||
+          (taskType === TASK_TYPE_ONGOING
+            ? isOngoingTask(task)
+            : !isOngoingTask(task)))
       );
     });
-  }, [tasks, search, priority, person]);
+  }, [tasks, search, priority, person, taskType]);
 
+  // El calendario solo puede pintar tareas con vencimiento: las continuas no
+  // tienen fecha de entrega por definición.
   const tasksWithDate = useMemo(
     () => tasks.filter((task) => Boolean(task.due_date)).length,
     [tasks],
   );
+  const ongoingCount = useMemo(() => tasks.filter(isOngoingTask).length, [tasks]);
   const done = tasks.filter((t) => t.status === "completed").length;
   const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
   const projectStatus = projectStatusMeta(project?.status);
   const projectName = project?.name || "Detalle del proyecto";
-  const hasFilters = Boolean(search || priority || person);
+  const hasFilters = Boolean(search || priority || person || taskType);
 
   /* ---------------- Mutaciones (optimistas) ---------------- */
   const updateTask = async (taskId, patch, quiet = false) => {
@@ -340,22 +376,67 @@ const Project = () => {
     e?.preventDefault();
     if (!draft.title.trim()) return;
     setSaving(true);
+    // Las tareas continuas (ongoing) nunca llevan fecha de entrega.
+    const ongoing = draft.task_type === TASK_TYPE_ONGOING;
     try {
       const created = await createProjectTask(id, {
         ...draft,
+        description: isEmptyRichText(draft.description)
+          ? ""
+          : toRichHtml(draft.description),
         assigned_to: draft.assigned_to || null,
         estimated_hours:
           draft.estimated_hours === "" ? null : Number(draft.estimated_hours),
-        due_date: draft.due_date || null,
+        due_date: ongoing ? null : draft.due_date || null,
+        task_type: ongoing ? TASK_TYPE_ONGOING : TASK_TYPE_ONCE,
+        recurrence: ongoing ? recurrenceOf(draft) : "none",
       });
       setTasks((old) => [created, ...old]);
       setTaskModal(false);
       setDraft(EMPTY_TASK);
-      notify("Tarea creada correctamente");
+      notify(
+        ongoing
+          ? "Tarea continua creada (sin fecha de entrega)"
+          : "Tarea creada correctamente",
+      );
     } catch {
       notify("No se pudo crear la tarea", "error");
     } finally {
       setSaving(false);
+    }
+  };
+
+  /**
+   * Cambia el tipo de una tarea existente. Al pasar a continua se quita la
+   * fecha de entrega en el mismo guardado (una tarea continua no vence).
+   */
+  const changeTaskType = (task, nextType) => {
+    if (!task) return;
+    if (nextType === TASK_TYPE_ONGOING) {
+      updateTask(task.id, { task_type: TASK_TYPE_ONGOING, due_date: null });
+      notify("Tarea marcada como continua (sin fecha de entrega)");
+      return;
+    }
+    updateTask(task.id, { task_type: TASK_TYPE_ONCE });
+  };
+
+  /**
+   * Programa la siguiente ronda de una tarea continua: crea una tarea puntual
+   * con la fecha que toca según la cadencia (semanal, quincenal, mensual…).
+   */
+  const scheduleNextRound = async (task) => {
+    if (!task) return;
+    const dateISO = nextOccurrenceFrom(task);
+    if (!dateISO) {
+      notify("Elige una cadencia para poder programar la siguiente ronda", "info");
+      return;
+    }
+    try {
+      const created = await createProjectTask(id, nextRoundPayload(task, dateISO));
+      setTasks((old) => [created, ...old]);
+      notify(`Siguiente ronda programada para el ${formatDate(dateISO)}`);
+    } catch {
+      notify("No se pudo programar la siguiente ronda", "error");
     }
   };
 
@@ -431,12 +512,15 @@ const Project = () => {
 
   const addComment = async () => {
     const value = comment.trim();
-    if (!value || !selected) return;
-    // Personas mencionadas con "@": se releen del texto al momento de guardar.
-    const mentioned = peopleMentionedIn(value, users);
+    if (!value || isEmptyRichText(value) || !selected) return;
+    // Personas mencionadas con "@": se releen del texto visible al guardar
+    // (el comentario viaja como HTML, con su formato).
+    const mentioned = peopleMentionedIn(richTextToPlain(value), users);
+    // Se guarda HTML sencillo y normalizado (`<b>` -> `<strong>`, `<div>` -> `<p>`).
+    const payload = toRichHtml(value);
     const optimistic = {
       id: `local-${Date.now()}`,
-      comment: value,
+      comment: payload,
       user: { name: "Tú" },
       created_at: new Date().toISOString(),
       mentions: mentioned,
@@ -447,7 +531,7 @@ const Project = () => {
       const saved = await addTaskComment(
         id,
         selected.id,
-        value,
+        payload,
         mentioned.map((p) => p.id),
       );
       setComments((old) =>
@@ -775,6 +859,7 @@ const Project = () => {
                   setSearch("");
                   setPriority("");
                   setPerson("");
+                  setTaskType("");
                 }}
               >
                 <FiX /> Limpiar filtros
@@ -815,6 +900,27 @@ const Project = () => {
                 </select>
                 <FiChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
               </div>
+              <div className="relative">
+                <FiRepeat className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
+                <select
+                  aria-label="Filtrar por tipo de tarea"
+                  value={taskType}
+                  onChange={(e) => setTaskType(e.target.value)}
+                  className="admin-input appearance-none pl-9 pr-8 !py-2 text-[13px]"
+                >
+                  <option value="">Tipo: todos</option>
+                  <option value={TASK_TYPE_ONGOING}>Solo continuas</option>
+                  <option value={TASK_TYPE_ONCE}>Solo puntuales</option>
+                </select>
+                <FiChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
+              </div>
+              {ongoingCount > 0 && (
+                <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <FiRepeat className="text-brand-500" />
+                  {ongoingCount} tarea{ongoingCount === 1 ? "" : "s"} continua
+                  {ongoingCount === 1 ? "" : "s"}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -928,15 +1034,44 @@ const Project = () => {
             />
           </Field>
           <Field label="Descripción" className="sm:col-span-2">
-            <textarea
-              rows={3}
+            <RichTextEditor
               value={draft.description}
-              onChange={(e) =>
-                setDraft({ ...draft, description: e.target.value })
-              }
+              onChange={(html) => setDraft({ ...draft, description: html })}
               placeholder="Contexto, criterios de aceptación, enlaces..."
-              className="admin-input min-h-20 resize-y"
+              minHeightClass="min-h-20"
+              maxHeightClass="max-h-64"
+              ariaLabel="Descripción de la tarea"
             />
+          </Field>
+          <Field
+            label="Tipo de tarea"
+            hint={
+              draft.task_type === TASK_TYPE_ONGOING
+                ? "Continua: sin fecha de entrega, se mantiene activa hasta finalizarla."
+                : "Puntual: se entrega en una fecha concreta."
+            }
+          >
+            <select
+              value={draft.task_type}
+              onChange={(e) => {
+                const value = e.target.value;
+                setDraft({
+                  ...draft,
+                  task_type: value,
+                  // Una tarea continua no guarda fecha de entrega.
+                  due_date: value === TASK_TYPE_ONGOING ? "" : draft.due_date,
+                  recurrence:
+                    value === TASK_TYPE_ONGOING ? draft.recurrence : "none",
+                });
+              }}
+              className="admin-input"
+            >
+              {TASK_TYPE_OPTIONS.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Estado">
             <select
@@ -978,14 +1113,39 @@ const Project = () => {
               ))}
             </select>
           </Field>
-          <Field label="Fecha de entrega">
-            <input
-              type="date"
-              value={draft.due_date}
-              onChange={(e) => setDraft({ ...draft, due_date: e.target.value })}
-              className="admin-input"
-            />
-          </Field>
+          {draft.task_type === TASK_TYPE_ONGOING ? (
+            <Field
+              label="Cadencia"
+              hint={
+                recurrenceOf(draft) === "none"
+                  ? "Sin cadencia: la tarea se queda abierta hasta finalizarla."
+                  : recurrenceMeta(recurrenceOf(draft)).hint
+              }
+            >
+              <select
+                value={draft.recurrence}
+                onChange={(e) =>
+                  setDraft({ ...draft, recurrence: e.target.value })
+                }
+                className="admin-input"
+              >
+                {RECURRENCE_OPTIONS.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : (
+            <Field label="Fecha de entrega">
+              <input
+                type="date"
+                value={draft.due_date}
+                onChange={(e) => setDraft({ ...draft, due_date: e.target.value })}
+                className="admin-input"
+              />
+            </Field>
+          )}
           <Field label="Estimación (horas)" className="sm:col-span-2">
             <input
               type="number"
@@ -1019,6 +1179,8 @@ const Project = () => {
           onFiles={uploadFiles}
           onClose={closeTask}
           onUpdate={(patch) => updateTask(selected.id, patch)}
+          onChangeType={(type) => changeTaskType(selected, type)}
+          onScheduleNext={() => scheduleNextRound(selected)}
           onDelete={() => setConfirmDelete(true)}
           newSubtask={newSubtask}
           setNewSubtask={setNewSubtask}
@@ -1167,9 +1329,6 @@ const TaskCard = ({ task, projectId, color, onOpen, onDrag, compact }) => {
   const detailsId = `task-card-details-${task.id}`;
   const user = assigneeOf(task);
   const subtasks = task.subtasks || [];
-  const doneCount = subtasks.filter(
-    (s) => s.completed || s.status === "completed",
-  ).length;
   const tags = task.tags || task.labels || [];
   const commentCount = task.comments_count ?? task.comments?.length ?? 0;
   const fileCount =
@@ -1178,7 +1337,9 @@ const TaskCard = ({ task, projectId, color, onOpen, onDrag, compact }) => {
     task.attachments?.length ??
     task.files?.length ??
     0;
-  const late = isOverdue(task.due_date) && task.status !== "completed";
+  const schedule = taskSchedule(task);
+  const ongoing = schedule.kind === "ongoing";
+  const late = schedule.kind === "overdue";
   const prio = priorityMeta(task.priority);
 
   return (
@@ -1220,6 +1381,18 @@ const TaskCard = ({ task, projectId, color, onOpen, onDrag, compact }) => {
           {task.title}
         </button>
       </h3>
+
+      {/* Las tareas continuas se identifican siempre, aunque la tarjeta esté plegada. */}
+      {ongoing && (
+        <span
+          className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-md bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-700"
+          title={schedule.detail}
+        >
+          <FiRepeat className="shrink-0" />
+          <span className="truncate">{ongoingLabel(task)}</span>
+        </span>
+      )}
+
       <div id={detailsId} hidden={!expanded}>
         {tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1239,41 +1412,29 @@ const TaskCard = ({ task, projectId, color, onOpen, onDrag, compact }) => {
         )}
         {task.description && (
           <p className="mt-1 line-clamp-2 text-[13px] leading-5 text-slate-500">
-            {task.description}
+            {richTextPreview(task.description, 180)}
           </p>
         )}
 
         {subtasks.length > 0 && (
-          <div className="mt-3">
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-1 font-medium text-slate-500">
-                <FiCheckCircle /> {doneCount}/{subtasks.length} subtareas
-              </span>
-              <span className="font-bold tabular-nums text-slate-600">
-                {Math.round((doneCount / subtasks.length) * 100)}%
-              </span>
-            </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full transition-all"
-                style={{
-                  width: `${(doneCount / subtasks.length) * 100}%`,
-                  background: color,
-                }}
-              />
-            </div>
-          </div>
+          <SubtaskProgress
+            className="mt-3"
+            subtasks={subtasks}
+            showLabel
+            barClassName="bg-brand-500"
+          />
         )}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
         <span
           className={cx(
             "flex items-center gap-1 font-medium",
-            late ? "text-red-600" : "text-slate-500",
+            late ? "text-red-600" : ongoing ? "text-brand-600" : "text-slate-500",
           )}
+          title={ongoing ? schedule.detail : undefined}
         >
-          <FiCalendar />{" "}
-          {task.due_date ? formatDate(task.due_date) : "Sin fecha"}
+          {ongoing ? <FiRepeat /> : <FiCalendar />}{" "}
+          {ongoing ? ONGOING_LABEL : task.due_date ? formatDate(task.due_date) : "Sin fecha"}
           {late && (
             <span className="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-bold uppercase">
               Vencida
@@ -1327,6 +1488,7 @@ const TaskTable = ({ tasks, onOpen }) => (
             const col = columnOf(task.status);
             const prio = priorityMeta(task.priority);
             const user = assigneeOf(task);
+            const schedule = taskSchedule(task);
             return (
               <tr
                 key={task.id}
@@ -1338,7 +1500,7 @@ const TaskTable = ({ tasks, onOpen }) => (
                     {task.title}
                   </p>
                   <p className="truncate text-xs text-slate-400">
-                    {task.description || "—"}
+                    {richTextPreview(task.description, 120) || "—"}
                   </p>
                 </td>
                 <td className="px-5 py-3.5">
@@ -1371,12 +1533,25 @@ const TaskTable = ({ tasks, onOpen }) => (
                 <td
                   className={cx(
                     "whitespace-nowrap px-5 py-3.5",
-                    isOverdue(task.due_date) && task.status !== "completed"
+                    schedule.kind === "overdue"
                       ? "font-semibold text-red-600"
-                      : "text-slate-600",
+                      : schedule.kind === "ongoing"
+                        ? "font-semibold text-brand-600"
+                        : "text-slate-600",
                   )}
                 >
-                  {task.due_date ? formatDate(task.due_date) : "—"}
+                  {schedule.kind === "ongoing" ? (
+                    <span
+                      className="inline-flex items-center gap-1.5"
+                      title={schedule.detail}
+                    >
+                      <FiRepeat /> {ongoingLabel(task)}
+                    </span>
+                  ) : task.due_date ? (
+                    formatDate(task.due_date)
+                  ) : (
+                    "—"
+                  )}
                 </td>
               </tr>
             );
@@ -1411,6 +1586,8 @@ const TaskDrawer = ({
   onFiles,
   onClose,
   onUpdate,
+  onChangeType,
+  onScheduleNext,
   onDelete,
   newSubtask,
   setNewSubtask,
@@ -1421,6 +1598,9 @@ const TaskDrawer = ({
   const doneCount = subtasks.filter(
     (s) => s.completed || s.status === "completed",
   ).length;
+  const schedule = taskSchedule(task);
+  const ongoing = schedule.kind === "ongoing";
+  const cadence = recurrenceOf(task);
 
   return (
     <Drawer open wide onClose={onClose}>
@@ -1475,23 +1655,27 @@ const TaskDrawer = ({
             aria-label="Título de la tarea"
             className="w-full rounded-lg border border-transparent bg-transparent px-1 text-xl font-bold tracking-tight text-slate-900 transition focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-500/10"
           />
-          <textarea
-            key={`desc-${task.id}`}
-            rows={3}
-            defaultValue={task.description || ""}
-            onBlur={(e) => {
-              if (e.target.value !== (task.description || ""))
-                onUpdate({ description: e.target.value });
-            }}
-            placeholder="Agregar una descripción..."
-            aria-label="Descripción de la tarea"
-            className="mt-2 w-full resize-none rounded-lg border border-transparent bg-transparent px-1 text-sm leading-6 text-slate-500 transition placeholder:text-slate-300 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-500/10"
-          />
+          <div className="mt-2">
+            <RichTextEditor
+              value={task.description || ""}
+              onBlur={(html) => {
+                const next = isEmptyRichText(html) ? "" : toRichHtml(html);
+                if (next !== (task.description || ""))
+                  onUpdate({ description: next });
+              }}
+              placeholder="Agregar una descripción..."
+              ariaLabel="Descripción de la tarea"
+              minHeightClass="min-h-20"
+              maxHeightClass="max-h-80"
+              editorClassName="text-sm leading-6 text-slate-600"
+            />
+          </div>
 
           {/* Propiedades */}
           <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 border-y border-slate-100 py-5 sm:grid-cols-2">
             <Property icon={FiActivity} label="Estado">
               <select
+                aria-label="Estado"
                 value={task.status || "pending"}
                 onChange={(e) => onUpdate({ status: e.target.value })}
                 className="admin-input !w-auto !border-transparent !bg-slate-50 !py-1.5 text-[13px] font-semibold"
@@ -1505,6 +1689,7 @@ const TaskDrawer = ({
             </Property>
             <Property icon={FiFlag} label="Prioridad">
               <select
+                aria-label="Prioridad"
                 value={task.priority || "medium"}
                 onChange={(e) => onUpdate({ priority: e.target.value })}
                 className="admin-input !w-auto !border-transparent !bg-slate-50 !py-1.5 text-[13px] font-semibold"
@@ -1516,6 +1701,7 @@ const TaskDrawer = ({
             </Property>
             <Property icon={FiUser} label="Responsable">
               <select
+                aria-label="Responsable"
                 value={assigneeId(task) || ""}
                 onChange={(e) =>
                   onUpdate({ assigned_to: e.target.value || null })
@@ -1530,14 +1716,46 @@ const TaskDrawer = ({
                 ))}
               </select>
             </Property>
-            <Property icon={FiCalendar} label="Fecha límite">
-              <input
-                type="date"
-                value={task.due_date?.slice?.(0, 10) || ""}
-                onChange={(e) => onUpdate({ due_date: e.target.value || null })}
+            <Property icon={FiRepeat} label="Tipo de tarea">
+              <select
+                aria-label="Tipo de tarea"
+                value={ongoing ? TASK_TYPE_ONGOING : TASK_TYPE_ONCE}
+                onChange={(e) => onChangeType(e.target.value)}
                 className="admin-input !w-auto !border-transparent !bg-slate-50 !py-1.5 text-[13px] font-semibold"
-              />
+              >
+                {TASK_TYPE_OPTIONS.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </Property>
+            {ongoing ? (
+              <Property icon={FiRepeat} label="Cadencia">
+                <select
+                  aria-label="Cadencia"
+                  value={recurrenceOf(task)}
+                  onChange={(e) => onUpdate({ recurrence: e.target.value })}
+                  className="admin-input !w-auto !border-transparent !bg-slate-50 !py-1.5 text-[13px] font-semibold"
+                >
+                  {RECURRENCE_OPTIONS.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </Property>
+            ) : (
+              <Property icon={FiCalendar} label="Fecha límite">
+                <input
+                  type="date"
+                  aria-label="Fecha límite"
+                  value={task.due_date?.slice?.(0, 10) || ""}
+                  onChange={(e) => onUpdate({ due_date: e.target.value || null })}
+                  className="admin-input !w-auto !border-transparent !bg-slate-50 !py-1.5 text-[13px] font-semibold"
+                />
+              </Property>
+            )}
             <Property icon={FiClock} label="Estimación (h)">
               <input
                 type="number"
@@ -1556,6 +1774,20 @@ const TaskDrawer = ({
             </Property>
           </div>
 
+          {ongoing && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-brand-100 bg-brand-50/60 px-3 py-2.5 text-[13px] text-brand-800">
+              <FiRepeat className="shrink-0" />
+              <span className="min-w-0 flex-1">
+                <b>Tarea continua</b> · {schedule.detail}
+              </span>
+              {cadence !== "none" && onScheduleNext && (
+                <Button variant="subtle" onClick={onScheduleNext}>
+                  <FiCalendar /> Programar siguiente
+                </Button>
+              )}
+            </div>
+          )}
+
           {/* Subtareas */}
           <section className="border-b border-slate-100 py-5">
             <div className="flex items-center justify-between">
@@ -1566,14 +1798,12 @@ const TaskDrawer = ({
                 {doneCount}/{subtasks.length}
               </span>
             </div>
-            {subtasks.length > 0 && (
-              <div className="mt-3 h-1 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-emerald-500 transition-all"
-                  style={{ width: `${(doneCount / subtasks.length) * 100}%` }}
-                />
-              </div>
-            )}
+            <SubtaskProgress
+              className="mt-3"
+              subtasks={subtasks}
+              showLabel
+              barClassName="bg-emerald-500"
+            />
             <div className="mt-2 space-y-0.5">
               {subtasks.map((s) => {
                 const checked = Boolean(
@@ -1739,12 +1969,12 @@ const TaskDrawer = ({
                           {c.created_at ? formatDate(c.created_at) : "Ahora"}
                         </time>
                       </p>
-                      <p className="mt-1 whitespace-pre-line text-[13px] leading-5 text-slate-600">
-                        <MentionText
-                          text={c.comment || c.content || c.body}
+                      <div className="mt-1 text-[13px] leading-5 text-slate-600">
+                        <RichText
+                          value={c.comment || c.content || c.body}
                           people={users}
                         />
-                      </p>
+                      </div>
                       {mentionPeople(c, users).length > 0 && (
                         <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2">
                           <span className="text-[11px] font-semibold text-slate-400">
@@ -1779,6 +2009,7 @@ const TaskDrawer = ({
                   viewer={viewer}
                   onSubmit={onComment}
                   placeholder="Escribe un comentario... usa @ para mencionar"
+                  hint="Formato, listas y @menciones · ⌘ + Enter para enviar"
                 />
               </div>
             </>

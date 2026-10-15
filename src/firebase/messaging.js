@@ -20,7 +20,7 @@ import {
   isFirebaseConfigured,
   missingFirebaseKeys,
   vapidKey,
-} from "./config";
+} from "./config.js";
 
 /** Evento de `window` con el detalle de cada push recibido en primer plano. */
 export const PUSH_MESSAGE_EVENT = "appsline:push-message";
@@ -321,6 +321,141 @@ export const subscribeToPushMessages = (handler) => {
   const listener = (event) => handler(event.detail || {});
   window.addEventListener(PUSH_MESSAGE_EVENT, listener);
   return () => window.removeEventListener(PUSH_MESSAGE_EVENT, listener);
+};
+
+/* ------------------------------------------------------------------ */
+/* Diagnóstico (Configuración > Preferencias > Diagnóstico de push)    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Estado del service worker de este sitio: si está registrado, en qué scope,
+ * con qué archivo y si hay alguno activo. Es la primera pieza que falla cuando
+ * las notificaciones "no llegan", así que el panel la muestra tal cual.
+ */
+export const messagingServiceWorkerStatus = async () => {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+    return { supported: false, registrations: [], ours: null };
+  }
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  const list = registrations.map((registration) => ({
+    scope: registration.scope,
+    scriptURL:
+      registration.active?.scriptURL ||
+      registration.waiting?.scriptURL ||
+      registration.installing?.scriptURL ||
+      "",
+    active: Boolean(registration.active),
+    installing: Boolean(registration.installing),
+    waiting: Boolean(registration.waiting),
+  }));
+  const ours = list.find((item) => item.scriptURL.includes(SW_SCRIPT_NAME)) || null;
+  return { supported: true, registrations: list, ours };
+};
+
+/**
+ * Comprueba que `/firebase-messaging-sw.js` se sirva de verdad como archivo
+ * JavaScript. Es el fallo típico en producción: el hosting devuelve el
+ * `index.html` de la SPA (con `text/html`) y el navegador nunca registra el
+ * service worker de FCM.
+ */
+export const inspectMessagingServiceWorkerFile = async () => {
+  try {
+    const response = await fetch(`${MESSAGING_SW_PATH}?diag=${Date.now()}`, {
+      cache: "no-store",
+      headers: { Accept: "text/javascript,*/*" },
+    });
+    const body = await response.text();
+    const contentType = response.headers.get("content-type") || "";
+    return {
+      ok: response.ok,
+      status: response.status,
+      contentType,
+      isJavaScript: /javascript|ecmascript/i.test(contentType),
+      includesServiceWorker: body.includes("showNotification"),
+      bytes: body.length,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      contentType: "",
+      isJavaScript: false,
+      includesServiceWorker: false,
+      bytes: 0,
+      error: err?.message || "No se pudo descargar el service worker.",
+    };
+  }
+};
+
+/**
+ * Simula un push **sin** Firebase: le manda el payload al service worker, que
+ * lo trata igual que uno real (notificación del sistema + aviso dentro del
+ * panel). Sirve para separar "el navegador no muestra notificaciones" de
+ * "la API no está enviando nada".
+ */
+export const simulatePushThroughServiceWorker = async (payload = {}) => {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+    throw new PushError("unsupported");
+  }
+  const registration =
+    (await navigator.serviceWorker.getRegistration(MESSAGING_SW_PATH)) ||
+    (await navigator.serviceWorker.getRegistration("/"));
+  const worker =
+    registration?.active || registration?.waiting || registration?.installing;
+  if (!worker) throw new PushError("sw-failed");
+  worker.postMessage({
+    source: SW_MESSAGE_SOURCE,
+    type: "simulate-push",
+    payload: {
+      notification: {
+        title: payload.title || "Prueba de Appsline",
+        body:
+          payload.body ||
+          "Si ves esta notificación, el navegador y el service worker funcionan.",
+      },
+      data: { url: payload.url || "/admin/settings", ...(payload.data || {}) },
+    },
+  });
+  return true;
+};
+
+/**
+ * Intenta leer la información que el navegador incrusta en el token de FCM
+ * (base64url con un JSON dentro: `projectId`, `appId`, `fid`…).
+ *
+ * No siempre es posible (el formato depende del navegador), así que devuelve
+ * `null` cuando no se puede decodificar: el panel lo muestra como "no
+ * disponible" y compara lo que sí alcanza a leer.
+ */
+export const decodeFcmToken = (token = "") => {
+  const raw = String(token || "").trim();
+  if (!raw) return null;
+  const normalized = raw.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4)) % 4),
+    "="
+  );
+  if (typeof atob !== "function") return null;
+  try {
+    const json = JSON.parse(atob(padded));
+    if (!json || typeof json !== "object") return null;
+    return {
+      projectId: json.projectId || json.project_id || null,
+      appId: json.appId || json.applicationId || null,
+      senderId: json.senderId || json.sender_id || null,
+      fid: json.fid || json.installationId || null,
+      raw: json,
+    };
+  } catch {
+    return null;
+  }
+};
+
+/** Token recortado para pintarlo sin exponerlo completo (`fZx…9Kd`). */
+export const maskToken = (token = "", visible = 6) => {
+  const raw = String(token || "");
+  if (raw.length <= visible * 2 + 1) return raw;
+  return `${raw.slice(0, visible)}…${raw.slice(-visible)}`;
 };
 
 /**

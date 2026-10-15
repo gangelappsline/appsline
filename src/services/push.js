@@ -184,6 +184,100 @@ export async function releasePushDevice() {
   return token;
 }
 
+/* ------------------------------------------------------------------ */
+/* Diagnóstico                                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Envía una prueba a un token concreto **sin lanzar errores**: devuelve el
+ * estado HTTP y el cuerpo de la respuesta. Es lo que necesita el diagnóstico
+ * para enseñar *por qué* no llega la notificación (403 del token de otro
+ * usuario, 422, 500 al hablar con FCM, `SENDER_ID_MISMATCH`, etc.).
+ *
+ * @param {string} token Token de FCM (por ejemplo, el que está en `push_devices`).
+ * @returns {Promise<{ok:boolean,status:number,message:string,data:object|null}>}
+ */
+export async function sendTestPushToToken(token) {
+  const body = token ? { token } : {};
+  try {
+    const { data, status } = await api.post(`${PUSH_DEVICES_PATH}/test`, body);
+    devicesEndpointSupported = true;
+    return {
+      ok: true,
+      status,
+      message: data?.message || "La API aceptó el envío de la notificación.",
+      data: data ?? null,
+    };
+  } catch (err) {
+    const status = Number(err?.response?.status) || 0;
+    if (isMissingEndpoint(err)) devicesEndpointSupported = false;
+    return {
+      ok: false,
+      status,
+      message:
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "La petición falló antes de llegar a la API.",
+      data: err?.response?.data ?? null,
+    };
+  }
+}
+
+/**
+ * Lista los dispositivos del usuario autenticado sin lanzar errores.
+ * @returns {Promise<{ok:boolean,status:number,devices:object[]|null,message:string}>}
+ */
+export async function probePushDevices() {
+  try {
+    const { data, status } = await api.get(PUSH_DEVICES_PATH);
+    devicesEndpointSupported = true;
+    const list = Array.isArray(data) ? data : data?.data;
+    return {
+      ok: true,
+      status,
+      devices: Array.isArray(list) ? list : [],
+      message: "",
+    };
+  } catch (err) {
+    const status = Number(err?.response?.status) || 0;
+    if (isMissingEndpoint(err)) devicesEndpointSupported = false;
+    return {
+      ok: false,
+      status,
+      devices: null,
+      message: isMissingEndpoint(err)
+        ? "La API no expone GET /push/devices (404)."
+        : err?.response?.data?.message || err?.message || "No se pudo consultar la API.",
+    };
+  }
+}
+
+/**
+ * Da de baja un token concreto (por ejemplo, uno "fantasma" que quedó en la
+ * base de datos) sin lanzar errores.
+ * @returns {Promise<{ok:boolean,status:number,message:string}>}
+ */
+export async function removePushDeviceFromServer(token) {
+  if (!token) return { ok: false, status: 0, message: "Falta el token." };
+  try {
+    const { status } = await api.delete(PUSH_DEVICES_PATH, { data: { token } });
+    devicesEndpointSupported = true;
+    return { ok: true, status, message: "Token dado de baja del usuario." };
+  } catch (err) {
+    const status = Number(err?.response?.status) || 0;
+    if (isMissingEndpoint(err)) devicesEndpointSupported = false;
+    return {
+      ok: false,
+      status,
+      message:
+        err?.response?.data?.message ||
+        err?.message ||
+        "No se pudo dar de baja el token.",
+    };
+  }
+}
+
 /**
  * Pide al backend que envíe una notificación de prueba al usuario actual
  * (a todos sus dispositivos o solo al token indicado).

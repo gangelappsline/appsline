@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FiAlertTriangle, FiCalendar, FiCheckCircle, FiCheckSquare,
-  FiChevronLeft, FiChevronRight, FiClock, FiUser,
+  FiChevronLeft, FiChevronRight, FiClock, FiRepeat, FiUser,
 } from "react-icons/fi";
 import LayoutAdmin from "../../layouts/LayoutAdmin";
 import {
@@ -15,12 +15,20 @@ import { getPageSize } from "../../utils/prefs";
 import {
   cx, formatDate, isDueWithin, isOverdue, priorityMeta, taskStatusMeta,
 } from "../../utils/format";
+import {
+  isOngoingTask,
+  ongoingLabel,
+  taskDescriptionText,
+  taskSchedule,
+} from "../../utils/tasks";
 
 const TABS = [
   { key: "all", label: "Todas" },
   { key: "pending", label: "Pendientes" },
   { key: "in_progress", label: "En progreso" },
   { key: "completed", label: "Finalizadas" },
+  // Las tareas continuas (sin fecha de entrega) no son un estado: son un tipo.
+  { key: "ongoing", label: "Continuas" },
 ];
 
 const assigneeIdOf = (t) => {
@@ -80,8 +88,11 @@ const Tasks = () => {
     return {
       mine: mine.length,
       overdue: tasks.filter((t) => t.status !== "completed" && isOverdue(t.due_date)).length,
-      week: tasks.filter((t) => t.status !== "completed" && isDueWithin(t.due_date, 7)).length,
+      week: tasks.filter(
+        (t) => !isOngoingTask(t) && t.status !== "completed" && isDueWithin(t.due_date, 7),
+      ).length,
       done: tasks.filter((t) => t.status === "completed").length,
+      ongoing: tasks.filter(isOngoingTask).length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, user]);
@@ -98,11 +109,21 @@ const Tasks = () => {
     () =>
       tasks.filter((t) => {
         const q = search.trim().toLowerCase();
-        if (tab !== "all" && (t.status || "pending") !== tab) return false;
+        if (tab === "ongoing") {
+          if (!isOngoingTask(t)) return false;
+        } else if (tab !== "all" && (t.status || "pending") !== tab) {
+          return false;
+        }
         if (priority && t.priority !== priority) return false;
         if (project && String(t._project?.id) !== String(project)) return false;
         if (onlyMine && !isMine(t)) return false;
-        if (q && !`${t.title || ""} ${t.description || ""} ${t._project?.name || ""}`.toLowerCase().includes(q)) return false;
+        if (
+          q &&
+          !`${t.title || ""} ${taskDescriptionText(t)} ${t._project?.name || ""}`
+            .toLowerCase()
+            .includes(q)
+        )
+          return false;
         return true;
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -111,7 +132,12 @@ const Tasks = () => {
 
   const tabsWithCounts = TABS.map((t) => ({
     ...t,
-    count: t.key === "all" ? tasks.length : tasks.filter((x) => (x.status || "pending") === t.key).length,
+    count:
+      t.key === "all"
+        ? tasks.length
+        : t.key === "ongoing"
+          ? tasks.filter(isOngoingTask).length
+          : tasks.filter((x) => (x.status || "pending") === t.key).length,
   }));
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -132,10 +158,17 @@ const Tasks = () => {
       }
     >
       {/* ---------- Resumen ---------- */}
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard label="Mis tareas" value={stats.mine} icon={FiCheckSquare} tone="brand" hint="Asignadas a ti" />
         <StatCard label="Vencidas" value={stats.overdue} icon={FiAlertTriangle} tone="red" hint="Requieren atención" />
         <StatCard label="Vencen esta semana" value={stats.week} icon={FiCalendar} tone="amber" hint="Próximos 7 días" />
+        <StatCard
+          label="Continuas"
+          value={stats.ongoing}
+          icon={FiRepeat}
+          tone="violet"
+          hint="Sin fecha de entrega"
+        />
         <StatCard label="Finalizadas" value={stats.done} icon={FiCheckCircle} tone="green" hint="Trabajo completado" />
       </div>
 
@@ -206,7 +239,9 @@ const Tasks = () => {
                   {pageItems.map((t) => {
                     const status = taskStatusMeta(t.status);
                     const prio = priorityMeta(t.priority);
-                    const late = t.status !== "completed" && isOverdue(t.due_date);
+                    const schedule = taskSchedule(t);
+                    const ongoing = schedule.kind === "ongoing";
+                    const late = schedule.kind === "overdue";
                     const who = assigneeOf(t) || users.find((u) => String(u.id) === String(assigneeIdOf(t)));
                     return (
                       <tr key={`${t._project?.id}-${t.id}`} onClick={() => openTask(t)} className="cursor-pointer transition hover:bg-slate-50">
@@ -236,11 +271,21 @@ const Tasks = () => {
                           </span>
                         </td>
                         <td className="px-6 py-3.5">
-                          <span className={cx("flex items-center gap-1.5 whitespace-nowrap", late ? "font-semibold text-red-600" : "text-slate-600")}>
-                            <FiClock className="text-slate-300" />
-                            {t.due_date ? formatDate(t.due_date) : "—"}
-                            {late && <Badge tone="red">Vencida</Badge>}
-                          </span>
+                          {ongoing ? (
+                            <span
+                              className="flex items-center gap-1.5 whitespace-nowrap font-semibold text-brand-600"
+                              title={schedule.detail}
+                            >
+                              <FiRepeat />
+                              {ongoingLabel(t)}
+                            </span>
+                          ) : (
+                            <span className={cx("flex items-center gap-1.5 whitespace-nowrap", late ? "font-semibold text-red-600" : "text-slate-600")}>
+                              <FiClock className="text-slate-300" />
+                              {t.due_date ? formatDate(t.due_date) : "—"}
+                              {late && <Badge tone="red">Vencida</Badge>}
+                            </span>
+                          )}
                         </td>
                       </tr>
                     );
