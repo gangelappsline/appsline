@@ -10,6 +10,7 @@ import {
 } from "../../components/admin";
 import { saveUser, uploadUserAvatar } from "../../services/admin";
 import PushSettings from "../../components/admin/PushSettings";
+import PushDiagnostics from "../../components/admin/PushDiagnostics";
 import api from "../../services/api";
 import { useAuth } from "../../routes/AuthContext";
 import { getPageSize, setPageSize } from "../../utils/prefs";
@@ -331,6 +332,10 @@ const PreferencesTab = () => {
 
     {/* Notificaciones push del navegador (Firebase Cloud Messaging) */}
     <PushSettings className="mt-6" />
+
+    {/* Diagnóstico: comprueba cada paso y permite probar un token de la base
+        de datos sin salir del panel (ver `docs/API-PUSH.md`). */}
+    <PushDiagnostics className="mt-6" />
     </>
   );
 };

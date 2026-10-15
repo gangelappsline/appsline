@@ -233,3 +233,80 @@
     height: 2.5rem;
   }
 }
+/* ------------------------------------------------------------------ */
+/* Texto enriquecido (descripciones de tareas y comentarios)           */
+/* ------------------------------------------------------------------ */
+
+/* Marcador de posición del editor (un contenteditable no tiene `placeholder`). */
+[contenteditable="true"][data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.rich-text {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.rich-text > :first-child { margin-top: 0; }
+.rich-text > :last-child { margin-bottom: 0; }
+.rich-text p { margin: 0 0 0.5em; }
+.rich-text em { font-style: italic; }
+.rich-text u { text-decoration: underline; text-underline-offset: 2px; }
+.rich-text s { text-decoration: line-through; }
+.rich-text ul { margin: 0.25em 0 0.5em; padding-left: 1.35em; list-style: disc; }
+.rich-text ol { margin: 0.25em 0 0.5em; padding-left: 1.5em; list-style: decimal; }
+.rich-text li { margin: 0.15em 0; }
+.rich-text li::marker { color: #94a3b8; }
+.rich-text h1,
+.rich-text h2,
+.rich-text h3,
+.rich-text h4 {
+  margin: 0.6em 0 0.25em;
+  font-size: 1em;
+  font-weight: 700;
+  color: #0f172a;
+}
+.rich-text blockquote {
+  margin: 0.35em 0;
+  padding-left: 0.75em;
+  border-left: 3px solid #cbd5e1;
+  color: #475569;
+  font-style: italic;
+}
+.rich-text pre {
+  margin: 0.35em 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.5rem;
+  background: #f1f5f9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+}
+.rich-text code {
+  padding: 0.05em 0.3em;
+  border-radius: 0.25rem;
+  background: #f1f5f9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+.rich-text a {
+  color: #0060fc;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rich-text a:hover { color: #0043b0; }
+.rich-text hr { margin: 0.75em 0; border-color: #e2e8f0; }
+
+/* @menciones resaltadas (comentarios y descripciones). */
+.rich-mention {
+  border-radius: 0.25rem;
+  background: #eef4ff;
+  padding: 0 0.15em;
+  font-weight: 600;
+  color: #0043b0;
+}
+
+/* La barra del editor no debe heredar el subrayado del enlace activo. */
+.rich-text-editor { min-height: 3.5rem; }
+.rich-text-editor:focus { outline: none; }

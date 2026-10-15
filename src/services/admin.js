@@ -327,11 +327,24 @@ export async function fetchTask(projectId, taskId) {
   return unwrapObject(data, taskKeys);
 }
 
+/**
+ * Crea una tarea en el proyecto.
+ *
+ * El payload incluye los campos del formulario tal cual, entre ellos los de las
+ * tareas continuas y el texto enriquecido (contrato en `docs/API-TASKS.md`):
+ * `task_type` (`once` | `ongoing`), `recurrence` (`none` | `daily` | `weekly` |
+ * `biweekly` | `monthly` | `quarterly`), `due_date: null` en las continuas y
+ * `description` como HTML sencillo.
+ */
 export async function createProjectTask(projectId, payload) {
   const { data } = await api.post(`/projects/${projectId}/tasks`, payload);
   return unwrapObject(data, taskKeys) || data;
 }
 
+/**
+ * Actualiza una tarea (guardado optimista desde el panel).
+ * Al pasar una tarea a continua se envía `due_date: null` en la misma petición.
+ */
 export async function updateProjectTask(projectId, taskId, payload) {
   const { data } = await api.put(`/projects/${projectId}/tasks/${taskId}`, payload);
   return unwrapObject(data, taskKeys) || data;
@@ -399,6 +412,7 @@ export const normalizeMentionIds = (mentions = []) =>
 
 /**
  * Publica un comentario en una tarea.
+ * `comment` viaja como HTML sencillo ya saneado (`toRichHtml`).
  * `mentions` viaja como arreglo de ids de los usuarios mencionados con "@"
  * (ej. `[2, 5]`); si el comentario no menciona a nadie no se envía la clave
  * para no cambiar el payload de los comentarios normales.

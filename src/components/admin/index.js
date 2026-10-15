@@ -17,6 +17,9 @@ export {
   default as MentionComposer,
   MentionText,
 } from "./MentionComposer";
+export { default as RichTextEditor, RICH_TEXT_TOOLBAR } from "./RichTextEditor";
+export { default as RichText, MentionText as RichMentionText } from "./RichText";
+export { default as SubtaskProgress, subtaskRollup, isSubtaskDone } from "./SubtaskProgress";
 export { default as SearchInput } from "./SearchInput";
 export { default as StatCard } from "./StatCard";
 export { default as Tabs } from "./Tabs";

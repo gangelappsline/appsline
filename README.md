@@ -45,6 +45,35 @@ formatos, ejemplos de Laravel y checklist) está en
   `appsline.display.`. Expandir una tarjeta individual es temporal; el control global
   aplica la misma densidad a todas las tarjetas. No se modifican datos del proyecto.
 
+## Tareas continuas (ongoing) y texto enriquecido
+
+Dos mejoras del tablero de tareas, ambas con el contrato de la API en
+[`docs/API-TASKS.md`](docs/API-TASKS.md):
+
+- **Tareas continuas / recurrentes**: al crear (o editar) una tarea se elige
+  **Puntual** o **Continua (recurrente)**. Las continuas **no tienen fecha de
+  entrega**: se quedan en el tablero con una insignia (`Continua · semanal`,
+  `Continua · mensual`…) hasta que alguien las finalice, tienen una **cadencia**
+  opcional y, con cadencia, el detalle ofrece **“Programar siguiente”** para
+  crear la siguiente ronda con la fecha que toca (diaria, semanal, quincenal,
+  mensual o trimestral). Quedan fuera de los avisos de “vence esta semana” y
+  “vencida”, y el calendario las lista aparte porque no se agendan.
+  - Filtros nuevos: en el proyecto (**Tipo: continuas / puntuales**) y en
+    `/admin/tasks` (pestaña **Continuas** + tarjeta de resumen).
+- **Descripciones y comentarios con formato**: `RichTextEditor`
+  (`src/components/admin/`) es un editor con negritas, cursivas, subrayado,
+  tachado, encabezado, listas con viñetas/numeradas, cita, código y enlaces, más
+  atajos (⌘B, ⌘U, ⌘I) y pegado como texto plano. El valor guardado es **HTML
+  sencillo**; al pintarlo, `<RichText />` lo sanea (lista blanca de etiquetas,
+  sin `script`/`iframe`/`on*`, enlaces solo `http(s)`/`mailto`/`tel`/relativos) y
+  resalta las **@menciones**, que se siguen detectando desde el texto visible
+  para avisar a las personas mencionadas.
+  - Los textos antiguos (comentarios en texto plano) se siguen viendo igual.
+  - Los buscadores comparan contra el **texto plano** (`taskDescriptionText`), así
+    que buscar "tickets" encuentra una tarea aunque esté en negritas.
+  - `src/utils/richText.js` y `src/utils/tasks.js` no tocan el DOM y están
+    cubiertos por pruebas unitarias (`npm run test:unit`).
+
 ## Notificaciones push web (Firebase Cloud Messaging)
 
 Los usuarios con sesión iniciada pueden recibir notificaciones del panel en el
@@ -59,6 +88,15 @@ registrado en la API con su token de FCM.
   demanda: no pesa en la parte pública del sitio.
 - `src/services/push.js`: `POST/DELETE/GET /push/devices` y `POST /push/devices/test`.
 - `src/routes/PushContext.jsx` + `src/components/admin/Push*.jsx`: estado y UI.
+- **Diagnóstico de notificaciones** (Configuración → Preferencias): comprueba
+  HTTPS, permiso, variables de Firebase, que el service worker se sirva como
+  JavaScript (no como el `index.html` de la SPA), el registro del service worker
+  y si el token del navegador está guardado en la API. Permite lanzar tres
+  pruebas —**notificación local**, **push simulado por el service worker** y
+  **`POST /push/devices/test`**— y aquí es donde se puede **pegar un token de
+  `push_devices`** para ver la respuesta cruda del servidor (útil para errores
+  como `SENDER_ID_MISMATCH`), copiar un `curl` equivalente y abrir la consola de
+  Firebase con el mismo token.
 
 Requisitos: HTTPS (o `localhost`), las variables `VITE_FIREBASE_*` y cuatro
 endpoints en la API. **La guía completa —qué agregar en Firebase Console, en el
@@ -77,6 +115,17 @@ npm run test:unit    # service worker de push y variables de Firebase
 Las pruebas usan datos ficticios e interceptan las peticiones de la API, sin requerir
 una cuenta real. Cubren preferencias, teclado, filtros ocultos, enfoque, tarjetas,
 arrastre de tareas, apertura del detalle y del formulario, estados vacíos/error y
-anchos de 375, 768, 1280 y 1920 px. Playwright inicia Vite si no está ya ejecutándose.
+anchos de 375, 768, 1280 y 1920 px.
+
+Archivos añadidos con las tareas continuas y el push:
+
+- `tests/tasks-ongoing-rich-text.spec.mjs` — crear/convertir tareas continuas
+  (sin fecha de entrega), insignias, búsqueda que ignora las etiquetas HTML y
+  comentarios con formato y @menciones.
+- `tests/push-diagnostics.spec.mjs` — el panel de diagnóstico y la prueba de un
+  token de la base de datos contra `POST /push/devices/test`.
+- `tests/unit/rich-text.test.mjs`, `tests/unit/tasks.test.mjs` y
+  `tests/unit/push-diagnostics.test.mjs` — saneado de HTML, aritmética de la
+  recurrencia y utilidades del token de FCM. Playwright inicia Vite si no está ya ejecutándose.
 Puede usarse `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` para indicar un Chromium instalado
 localmente y `CAPTURE_WORKSPACE=1` para guardar capturas en `test-results/` (ignorado).

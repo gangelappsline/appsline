@@ -38,13 +38,14 @@ Piezas implicadas:
 
 | Pieza | Dónde vive | Qué hace |
 |---|---|---|
-| `public/firebase-messaging-sw.js` | sitio (raíz `/`) | Recibe los push, muestra la notificación y abre la ruta al hacer clic |
+| `public/firebase-messaging-sw.js` | sitio (raíz `/`) | Recibe los push, muestra la notificación, abre la ruta al hacer clic y atiende el push **simulado** del diagnóstico (`postMessage` → `simulate-push`) |
 | `src/firebase/config.js` | bundle | Lee las variables `VITE_FIREBASE_*` |
 | `src/firebase/messaging.js` | bundle (import dinámico del SDK) | Permiso, service worker, token FCM, revocación y puente de mensajes |
 | `src/services/push.js` | bundle | Llama a `POST/DELETE/GET /push/devices` y `/push/devices/test` |
 | `src/routes/PushContext.jsx` | bundle | Estado global (activar/desactivar/probar/sincronizar) |
 | `src/components/admin/PushBell.jsx` | bundle | Campana del encabezado del panel |
 | `src/components/admin/PushSettings.jsx` | bundle | Tarjeta en Configuración → Preferencias |
+| `src/components/admin/PushDiagnostics.jsx` | bundle | Diagnóstico paso a paso + prueba de un token de `push_devices` |
 
 ---
 
@@ -272,6 +273,12 @@ Comportamiento esperado:
 - **`POST /push/devices/test`**: envía la notificación de prueba al dispositivo
   indicado (o a todos los del usuario). Es opcional: si no existe, el botón
   “Enviar prueba” del panel muestra una notificación **local** en su lugar.
+  - Con `{ token }` el panel puede probar **cualquier token de `push_devices`**
+    (así se comprueba si ese dispositivo sigue vivo desde Configuración →
+    Preferencias → Diagnóstico). Devuélvelo solo si el token pertenece al usuario
+    autenticado (`403`/`404` en caso contrario).
+  - En caso de fallo, responde con el **error real** de FCM (mensaje + código) y
+    un `4xx`/`5xx`: el panel lo enseña tal cual en el historial del diagnóstico.
 - Si un endpoint no existe, la API debe responder `404`/`405`: el panel lo
   detecta, no se rompe y deja de insistir.
 
@@ -723,7 +730,50 @@ Comprobaciones en DevTools:
 - **Console**: sin errores `messaging/token-subscribe-failed`
   (si aparece, revisa `VITE_FIREBASE_VAPID_KEY` y reinicia el dev server).
 
-### 4.2 Con la API
+### 4.2 Diagnóstico desde el panel (sin abrir DevTools)
+
+**Configuración → Preferencias → Diagnóstico de notificaciones** está pensado
+justo para “activé el push y no me llega nada”. Comprueba cada eslabón y, sobre
+todo, deja ver la **respuesta cruda de la API**.
+
+Qué revisa:
+
+| Comprobación | Qué detecta |
+|---|---|
+| El navegador soporta push web | HTTPS/localhost, `Notification`, `ServiceWorker`, `PushManager` |
+| Permiso del navegador | `granted` / `default` / `denied` (y cómo desbloquearlo) |
+| Variables `VITE_FIREBASE_*` | Cuáles faltan y con qué proyecto está configurada la app |
+| El service worker se sirve como JavaScript | El fallo típico de producción: la SPA devuelve `index.html` (con `text/html`) en `/firebase-messaging-sw.js` |
+| Service worker registrado | Scope y estado (`active`, `installing`, `waiting`) |
+| Token FCM de este dispositivo | Si existe, su longitud y —si el token lo permite— **el `projectId` que lleva dentro** |
+| Dispositivos en la API (`GET /push/devices`) | Si el token de este navegador llegó a guardarse (o si hay tokens “fantasma”) |
+
+Pruebas, de la más local a la más lejana:
+
+1. **Notificación local**: el navegador muestra una notificación usando el
+   service worker. Sin Firebase ni API. Si esto falla, el problema es del
+   navegador o del archivo del service worker.
+2. **Simular push (service worker)**: el panel le manda un payload al service
+   worker (`postMessage` → `simulate-push`), que hace exactamente lo mismo que
+   con un push real: notificación del sistema + aviso dentro del panel. Si esto
+   funciona, el problema está en el **envío**.
+3. **Probar un token de la base de datos**: pega el valor de `push_devices.token`
+   (o pulsa el token de la tabla de dispositivos) y **Enviar prueba** →
+   `POST /push/devices/test` con `{ token }`. El panel muestra el código HTTP y
+   el cuerpo JSON:
+
+   - `200` + sin notificación → el problema está en FCM (ver
+     [SENDER_ID_MISMATCH](#44-códigos-de-error-de-fcm) y la API legacy).
+   - `403/404` → ese token no pertenece al usuario autenticado (o el endpoint
+     exige que sí).
+   - `422/500` → mira el mensaje: suele traer el error de Google.
+4. **Consola de Firebase**: pega el mismo token en *Cloud Messaging → Enviar
+   mensaje de prueba*. Si **Firebase sí entrega y la API no**, el fallo es del
+   backend (credenciales), no del frontend.
+5. **Copiar curl**: comando listo para reproducir la petición desde una terminal,
+   con el token de la base de datos y el de la sesión.
+
+### 4.3 Con la API (terminal)
 
 ```bash
 # 1) Registrar el dispositivo (token obtenido en el paso anterior)
@@ -732,9 +782,15 @@ curl -X POST https://api.appsline.com.mx/api/push/devices \
   -H "Content-Type: application/json" \
   -d '{"token":"fZx...","platform":"web"}'
 
-# 2) Notificación de prueba (o usa el botón "Enviar prueba" del panel)
+# 2) Notificación de prueba al usuario (o usa el botón "Enviar prueba" del panel)
 curl -X POST https://api.appsline.com.mx/api/push/devices/test \
   -H "Authorization: Bearer $TOKEN" -H "Accept: application/json"
+
+# 2b) Notificación de prueba a un token concreto de la base de datos
+curl -X POST https://api.appsline.com.mx/api/push/devices/test \
+  -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{"token":"fZxTokenDeLaBaseDeDatos..."}'
 
 # 3) Desvincular
 curl -X DELETE https://api.appsline.com.mx/api/push/devices \
@@ -742,12 +798,42 @@ curl -X DELETE https://api.appsline.com.mx/api/push/devices \
   -H "Content-Type: application/json" -d '{"token":"fZx..."}'
 ```
 
+`POST /push/devices/test` debe responder **el error real de FCM**, no un `200`
+optimista: es lo que convierte el diagnóstico del panel en algo útil.
+
+```php
+// app/Services/FcmService.php (extracto)
+try {
+    $this->messaging->send($message);
+    return response()->json(['ok' => true, 'token' => $device->token]);
+} catch (\Kreait\Firebase\Exception\MessagingException $e) {
+    // 404 UNREGISTERED -> borra el dispositivo
+    // 403 SENDER_ID_MISMATCH -> cuenta de servicio de otro proyecto
+    return response()->json([
+        'ok' => false,
+        'error' => $e->getMessage(),
+        'code' => $e->errors()[0]['status'] ?? null,
+    ], 502);
+}
+```
+
 Pruebas automatizadas del repositorio (no necesitan Firebase):
 
 ```bash
-npm run test:unit   # service worker: interpretación del payload de FCM
-npm run test:e2e    # panel completo con API interceptada
+npm run test:unit   # service worker + utilidades de diagnóstico
+npm run test:e2e    # panel completo con la API interceptada
 ```
+
+### 4.4 Códigos de error de FCM
+
+| Código / mensaje | Significado | Qué hacer |
+|---|---|---|
+| `SENDER_ID_MISMATCH` | El token es de otro proyecto de Firebase | La cuenta de servicio del backend debe ser del **mismo** proyecto que el token (`projectId` que muestra el diagnóstico) |
+| `UNREGISTERED` (404) | El token ya no existe (navegador borrado, permiso revocado, app desinstalada) | Borra la fila de `push_devices` y vuelve a activar en ese dispositivo |
+| `INVALID_ARGUMENT` (400) | Token mal formado o payload inválido (por ejemplo, `data` con números/boleanos) | Revisa que todos los valores de `data` sean **strings** |
+| `THIRD_PARTY_AUTH_ERROR` / `MISMATCHED_CREDENTIAL` | Credenciales sin permiso sobre el proyecto | Revisa el rol de la cuenta de servicio (Firebase Admin SDK Administrator Service Agent) |
+| `QUOTA_EXCEEDED` / `MESSAGE_RATE_EXCEEDED` | Demasiados mensajes por dispositivo | Agrupa las notificaciones |
+| `404 Not Found` en `fcm.googleapis.com/fcm/send` | La API **legacy** está apagada desde 2024 | Migra el envío a **HTTP v1** con `google/auth` (o `kreait/laravel-firebase`) |
 
 ---
 
@@ -762,6 +848,8 @@ npm run test:e2e    # panel completo con API interceptada
 | Nada llega al celular (iPhone) | En iOS/iPadOS el push web requiere **instalar el panel como app** (Compartir → Añadir a pantalla de inicio) y iOS 16.4 o superior. |
 | Llega la notificación pero el clic no abre la ruta | Revisa `data.url` (debe existir en el router, p. ej. `/admin/projects/12`) o `webpush.fcm_options.link` si envías URL absoluta. |
 | `UNREGISTERED` / 404 al enviar | El usuario desactivó las notificaciones o el token caducó: el servicio borra la fila automáticamente. |
+| La API responde `200` al enviar una prueba y no llega nada | Usa Configuración → Preferencias → **Diagnóstico**: compara el `projectId` del token con el de la app (`SENDER_ID_MISMATCH`) y prueba el mismo token desde la consola de Firebase para saber si el fallo es del backend o de FCM. |
+| El backend usa la API legacy (`fcm.googleapis.com/fcm/send`) | Google la apagó en 2024: responde error y no se entrega nada. Migra a **HTTP v1** (ver §4.4). |
 | Se registran muchos dispositivos “fantasma” | Es normal: cada navegador/perfil es un token. Limpia los `last_seen_at` antiguos con un comando programado (`php artisan push:prune`) si te molesta. |
 | El push dejó de funcionar tras un deploy | Revisa que `firebase-messaging-sw.js` se sirva desde la raíz y sin caché agresiva, y que el build de producción tenga las variables `VITE_FIREBASE_*`. |
 | Quiero que varios usuarios del mismo equipo se notifiquen | El token es del navegador; al iniciar sesión con otra cuenta el `POST /push/devices` lo reasigna y al cerrar sesión se desvincula. |
@@ -796,6 +884,8 @@ Seguridad:
 - [ ] Variables `VITE_FIREBASE_*` (7) definidas en desarrollo **y** en el build de producción.
 - [ ] `https://tu-dominio/firebase-messaging-sw.js` responde `200` con `text/javascript`.
 - [ ] Al activar desde la campana, el navegador muestra la notificación de confirmación.
+- [ ] **Diagnóstico de notificaciones** (Configuración → Preferencias): todo en verde y
+      las pruebas “Notificación local” y “Simular push” muestran la notificación.
 - [ ] `npm run test:unit` y `npm run build` en verde.
 
 **API (Laravel)**
@@ -803,5 +893,7 @@ Seguridad:
 - [ ] Migración `push_devices` ejecutada y modelo creado.
 - [ ] `POST`, `DELETE`, `GET` y `POST /push/devices/test` implementados y protegidos con `auth:api`.
 - [ ] `FIREBASE_PROJECT_ID` y `FIREBASE_CREDENTIALS` configurados; `google/auth` instalado.
-- [ ] `POST /push/devices/test` entrega la notificación al dispositivo.
+- [ ] `POST /push/devices/test` entrega la notificación al dispositivo y acepta
+      `{ token }` para probar un token concreto de `push_devices`.
+- [ ] Un token de otro proyecto responde con el error de FCM (no un `200` optimista).
 - [ ] Envíos reales enganchados a los eventos (tareas, comentarios, proyectos) y encolados.

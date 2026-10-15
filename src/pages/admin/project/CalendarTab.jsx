@@ -7,6 +7,7 @@ import {
   FiEye,
   FiFlag,
   FiInfo,
+  FiRepeat,
   FiX,
 } from "react-icons/fi";
 import { Badge, MonthGrid } from "../../../components/admin";
@@ -17,6 +18,7 @@ import {
   priorityMeta,
   taskStatusMeta,
 } from "../../../utils/format";
+import { isOngoingTask, ongoingLabel } from "../../../utils/tasks";
 import {
   addMonths,
   dateFromKey,
@@ -129,8 +131,14 @@ const CalendarTab = ({ project, tasks = [], onOpenTask, onReschedule }) => {
     [events, selected]
   );
 
+  const ongoingTasks = useMemo(
+    () => visibleTasks.filter(isOngoingTask),
+    [visibleTasks]
+  );
+
+  // Las tareas continuas (ongoing) no se agendan: no aparecen en "Sin fecha".
   const unscheduled = useMemo(
-    () => visibleTasks.filter((task) => !task.due_date),
+    () => visibleTasks.filter((task) => !task.due_date && !isOngoingTask(task)),
     [visibleTasks]
   );
 
@@ -263,7 +271,9 @@ const CalendarTab = ({ project, tasks = [], onOpenTask, onReschedule }) => {
             <div className="border-t border-slate-100">
               {unscheduled.length === 0 ? (
                 <p className="px-5 py-6 text-center text-[13px] text-slate-400">
-                  Todas las tareas del filtro actual tienen fecha de entrega.
+                  {ongoingTasks.length > 0
+                    ? "Todas las tareas puntuales ya tienen fecha de entrega."
+                    : "Todas las tareas del filtro actual tienen fecha de entrega."}
                 </p>
               ) : (
                 <ul className="divide-y divide-slate-100">
@@ -300,6 +310,30 @@ const CalendarTab = ({ project, tasks = [], onOpenTask, onReschedule }) => {
                     </li>
                   ))}
                 </ul>
+              )}
+
+              {ongoingTasks.length > 0 && (
+                <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-slate-100 px-5 py-3 text-xs text-slate-400">
+                  <FiRepeat className="text-brand-500" />
+                  <span>
+                    {ongoingTasks.length} tarea
+                    {ongoingTasks.length === 1 ? "" : "s"} continua
+                    {ongoingTasks.length === 1 ? "" : "s"} sin fecha de entrega
+                    (no se agenda{ongoingTasks.length === 1 ? "" : "n"}):
+                  </span>
+                  {ongoingTasks.slice(0, 4).map((task) => (
+                    <button
+                      key={task.id}
+                      type="button"
+                      onClick={() => onOpenTask?.(task)}
+                      title={ongoingLabel(task)}
+                      className="max-w-40 truncate font-semibold text-slate-500 transition hover:text-brand-600"
+                    >
+                      {task.title}
+                    </button>
+                  ))}
+                  {ongoingTasks.length > 4 && <span>y {ongoingTasks.length - 4} más</span>}
+                </p>
               )}
             </div>
           )}
