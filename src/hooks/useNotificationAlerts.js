@@ -8,6 +8,12 @@ import {
 /**
  * Hook para gestionar el indicador de la pestaña y el sonido de aviso
  * cuando llegan notificaciones con la pestaña abierta.
+ *
+ * Nota: hoy no lo usa ninguna pantalla. El panel gestiona el aviso desde
+ * `src/routes/PushContext.jsx` contra la bandeja de `notificationInbox.js`, que
+ * es la única fuente de verdad de lo "sin leer" y **solo** se limpia cuando el
+ * usuario abre la campana (este hook, en cambio, lo reinicia al enfocar la
+ * pestaña, así que un aviso pendiente se perdería).
  */
 export const useNotificationAlerts = () => {
   const [unread, setUnread] = useState(0);

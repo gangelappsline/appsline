@@ -10,8 +10,11 @@
  * Web Push estándar (el payload JSON de la API HTTP v1). Este archivo:
  *   1. muestra la notificación del sistema,
  *   2. avisa a las pestañas abiertas (`postMessage`) para que el panel muestre
- *      el aviso dentro de la app,
- *   3. abre la ruta indicada (por ejemplo `/admin/projects/12`) al hacer clic.
+ *      el aviso y lo guarde en la bandeja de notificaciones (ver
+ *      `src/utils/notificationInbox.js`): así no se pierde cuando el *toast*
+ *      desaparece,
+ *   3. abre la ruta indicada (por ejemplo `/admin/projects/12`) al hacer clic y
+ *      avisa de qué aviso se abrió, para marcarlo como leído.
  * Así el proyecto no depende de ningún CDN y funciona igual en desarrollo.
  *
  * El token FCM del dispositivo se obtiene en la app con `firebase/messaging`
@@ -159,6 +162,22 @@ self.addEventListener("notificationclick", (event) => {
 
   event.waitUntil(
     (async () => {
+      // El usuario ya vio el aviso: se avisa a las pestañas abiertas para que
+      // lo marquen como leído en la bandeja del panel. Se reenvían los mismos
+      // datos (título, cuerpo, tag, received_at) para que el aviso se
+      // identifique igual que cuando llegó.
+      try {
+        await broadcast({
+          ...(event.notification.data || {}),
+          type: "notification-click",
+          title: event.notification.title || DEFAULT_TITLE,
+          body: event.notification.body || "",
+          url: target,
+        });
+      } catch {
+        // Sin pestañas abiertas no hay nada que marcar.
+      }
+
       const windows = await self.clients.matchAll({
         type: "window",
         includeUncontrolled: true,

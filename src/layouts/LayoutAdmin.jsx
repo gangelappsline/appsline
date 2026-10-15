@@ -12,9 +12,10 @@ import {
 } from "react-icons/fi";
 import Aside from "../components/partials/Aside";
 import CommandPalette from "../components/admin/CommandPalette";
-import PushBell from "../components/admin/PushBell";
+import NotificationBell from "../components/admin/NotificationBell";
 import { Avatar } from "../components/admin";
 import { useAuth } from "../routes/AuthContext";
+import { setBaseTitle } from "../utils/notificationAlert";
 
 const APP_NAME = "Appsline";
 
@@ -38,8 +39,10 @@ const LayoutAdmin = ({ title, subtitle, actions, breadcrumbs = [], fluid = false
   const [paletteOpen, setPaletteOpen] = useState(false);
   const menuRef = useRef(null);
 
+  // El título de la página se fija con `setBaseTitle`, que conserva el contador
+  // de notificaciones sin leer ("(3) Appsline · Tareas") al navegar.
   useEffect(() => {
-    document.title = `${APP_NAME}${title ? ` · ${title}` : ""}`;
+    setBaseTitle(`${APP_NAME}${title ? ` · ${title}` : ""}`);
   }, [title]);
 
   // Cierra menús al hacer clic fuera o con Escape; Ctrl+K abre la paleta.
@@ -104,8 +107,8 @@ const LayoutAdmin = ({ title, subtitle, actions, breadcrumbs = [], fluid = false
             </button>
 
             <div className="ml-auto flex items-center gap-2">
-              {/* Notificaciones push del navegador (activar / estado) */}
-              <PushBell />
+              {/* Centro de notificaciones: lista guardada + estado del push 🔔 */}
+              <NotificationBell />
 
               {/* Menú de usuario */}
               <div className="relative" ref={menuRef}>

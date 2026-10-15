@@ -87,7 +87,18 @@ registrado en la API con su token de FCM.
   token, revocación, mensajes con la pestaña abierta). El SDK se carga bajo
   demanda: no pesa en la parte pública del sitio.
 - `src/services/push.js`: `POST/DELETE/GET /push/devices` y `POST /push/devices/test`.
-- `src/routes/PushContext.jsx` + `src/components/admin/Push*.jsx`: estado y UI.
+- `src/routes/PushContext.jsx` + `src/components/admin/NotificationBell.jsx` y
+  `Push*.jsx`: estado y UI.
+- **Centro de notificaciones** (campana 🔔 del encabezado): cada aviso recibido
+  se guarda en `localStorage` (`src/utils/notificationInbox.js`, una bandeja por
+  usuario), así que sigue disponible después de que el *toast* desaparece. La
+  campana muestra cuántos hay sin leer, al pulsarla se abre la lista completa
+  (título, cuerpo, categoría, hora y destino) y **al abrirla todo queda marcado
+  como leído**, con lo que el contador de la pestaña (`(3) Appsline · Tareas` +
+  punto en el favicon) desaparece. Los avisos nuevos se resaltan como *Nueva*
+  mientras la lista está abierta, cada uno se puede quitar y la lista se puede
+  vaciar (pide confirmación). Si el backend quiere que el historial viaje entre
+  dispositivos, el contrato opcional está en `docs/API-PUSH.md` (§2.4).
 - **Diagnóstico de notificaciones** (Configuración → Preferencias): comprueba
   HTTPS, permiso, variables de Firebase, que el service worker se sirva como
   JavaScript (no como el `index.html` de la SPA), el registro del service worker
@@ -124,8 +135,10 @@ Archivos añadidos con las tareas continuas y el push:
   comentarios con formato y @menciones.
 - `tests/push-diagnostics.spec.mjs` — el panel de diagnóstico y la prueba de un
   token de la base de datos contra `POST /push/devices/test`.
-- `tests/unit/rich-text.test.mjs`, `tests/unit/tasks.test.mjs` y
-  `tests/unit/push-diagnostics.test.mjs` — saneado de HTML, aritmética de la
-  recurrencia y utilidades del token de FCM. Playwright inicia Vite si no está ya ejecutándose.
+- `tests/unit/rich-text.test.mjs`, `tests/unit/tasks.test.mjs`,
+  `tests/unit/push-diagnostics.test.mjs` y
+  `tests/unit/notification-inbox.test.mjs` — saneado de HTML, aritmética de la
+  recurrencia, utilidades del token de FCM y la bandeja de notificaciones
+  (guardado, sin duplicados, "sin leer" y una bandeja por usuario). Playwright inicia Vite si no está ya ejecutándose.
 Puede usarse `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` para indicar un Chromium instalado
 localmente y `CAPTURE_WORKSPACE=1` para guardar capturas en `test-results/` (ignorado).
