@@ -3,7 +3,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, Transition } from "@headlessui/react";
 import {
-  FiBarChart2, FiBox, FiBriefcase, FiCalendar, FiCheckSquare, FiCornerDownLeft,
+  FiActivity, FiBarChart2, FiBox, FiBriefcase, FiCalendar, FiCheckSquare, FiCornerDownLeft,
   FiFolder, FiGrid, FiPlus, FiSearch, FiSettings, FiUsers,
 } from "react-icons/fi";
 import { fetchProjects } from "../../services/admin";
@@ -18,6 +18,7 @@ export const PALETTE_SECTIONS = [
   { to: "/admin/clients", label: "Clientes", hint: "Cartera de clientes", icon: FiBriefcase, keywords: "clientes cartera contactos" },
   { to: "/admin/products", label: "Productos", hint: "Catálogo", icon: FiBox, keywords: "productos catálogo inventario" },
   { to: "/admin/users", label: "Usuarios", hint: "Equipo y roles", icon: FiUsers, keywords: "usuarios equipo roles permisos" },
+  { to: "/admin/analytics", label: "Analítica", hint: "Análisis profundo del portafolio", icon: FiActivity, keywords: "analítica gráficos portafolio kpi salud radar clientes" },
   { to: "/admin/reports", label: "Reportes", hint: "Análisis y exportaciones", icon: FiBarChart2, keywords: "reportes analítica estadísticas exportar" },
   { to: "/admin/settings", label: "Configuración", hint: "Perfil y preferencias", icon: FiSettings, keywords: "configuración ajustes perfil cuenta" },
 ];

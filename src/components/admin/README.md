@@ -27,6 +27,17 @@ import { Card, Modal, Badge, Button, useToast } from "../../components/admin";
 | `Tabs` | Pestañas `pill` o `underline`, con contadores |
 | `TableSkeleton` / `CardsSkeleton` | Esqueletos de carga |
 | `ProgressRing` / `BarChart` / `RankBars` | Gráficos SVG sin dependencias |
+| `AreaChart` / `LineChart` | Series temporales multi-línea/área con degradado, tooltips y leyenda |
+| `DonutChart` | Dona con leyenda, porcentaje y valor central |
+| `BarsChart` | Barras verticales con línea de objetivo (meta) |
+| `StackedBars` | Barras horizontales apiladas por categoría (carga del equipo) |
+| `RadarChart` | Radar multidimensional (salud del portafolio) |
+| `GaugeChart` | Medidor semicircular con zonas de color |
+| `Heatmap` | Mapa de calor tipo calendario (actividad diaria) |
+| `BubbleChart` | Burbujas: presupuesto vs. avance, tamaño = volumen |
+| `Sparkline` | Miniatura de tendencia para tarjetas de KPI |
+| `FunnelChart` | Embudo de conversión |
+| `TrendBadge` | Variación de KPI (▲/▼) con color semántico |
 | `Field` | Etiqueta + ayuda + error para formularios |
 | `ToastProvider` / `useToast` | Notificaciones (`notify("Mensaje", "success" \| "error" \| "info")`). El provider se monta en `main.jsx`, por encima de las rutas |
 | `CommandPalette` | Buscador global con `Ctrl+K` (secciones + proyectos) |
@@ -48,6 +59,16 @@ import { Card, Modal, Badge, Button, useToast } from "../../components/admin";
   toast.
 - `src/hooks/useDashboard.js` — datos agregados (KPIs, productividad,
   vencimientos) compartidos por Dashboard y Reportes.
+- `src/hooks/useAnalytics.js` — motor analítico del panel. Calcula en el
+  cliente todos los KPIs, series y distribuciones (para que el panel nunca
+  quede vacío) y usa `GET /analytics/*` como fuente de verdad cuando el
+  backend lo expone. Devuelve además el indicador `source`
+  (`"server"` | `"local"`).
+- `src/hooks/useUrlTab.js` — pestañas sincronizadas con la URL (`?tab=...`)
+  para poder compartir enlaces a una sección concreta.
+- `src/utils/analytics.js` — cálculos analíticos puros: fechas (mes/semana
+  ISO), series mensuales y semanales, mapa de calor, antigüedad de tareas,
+  carga por persona, concentración de cartera (HHI), salud de proyecto y KPIs.
 - `src/utils/format.js` — moneda, fechas, estados, prioridades y CSV.
 - `src/utils/calendar.js` — utilidades de calendario (`dayKey`, `calendarCells`,
   `monthLabel`, tonos de evento) compartidas por el Calendario global y la
@@ -65,3 +86,28 @@ import { Card, Modal, Badge, Button, useToast } from "../../components/admin";
 2. Añade la ruta en `src/main.jsx` dentro de `<ProtectedRoute>`.
 3. Añade el enlace en `src/components/partials/Aside.jsx` y en
    `PALETTE_SECTIONS` de `CommandPalette.jsx`.
+
+## Gráficas
+
+Todas las gráficas viven en `src/components/admin/DataViz.jsx` (SVG puro, sin
+dependencias). Son responsivas vía `viewBox`, admiten estados vacíos y usan la
+paleta de marca.
+
+```jsx
+import { AreaChart, DonutChart, SERIES_COLORS } from "../../components/admin";
+
+<AreaChart
+  data={[{ label: "Ene", creadas: 12, completadas: 8 }]}
+  series={[
+    { key: "creadas", label: "Creadas", color: SERIES_COLORS[0] },
+    { key: "completadas", label: "Completadas", color: SERIES_COLORS[1] },
+  ]}
+  height={280}
+/>
+```
+
+### Contrato de datos de la API
+
+Las gráficas se alimentan de `useAnalytics()`. Si el backend expone
+`GET /analytics/*`, sus valores mandan; si no, se calculan en el cliente.
+El contrato completo está en [`docs/API-ANALYTICS.md`](../../../docs/API-ANALYTICS.md).
