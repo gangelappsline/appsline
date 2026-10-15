@@ -15,6 +15,7 @@ import {
   FiUpload,
   FiX,
 } from "react-icons/fi";
+import { FaRegBuilding } from "react-icons/fa";
 import {
   Button,
   CardsSkeleton,
@@ -380,7 +381,7 @@ const FilesTab = ({ projectId, projectName, tasks = [], onOpenTask, onCountChang
 
       <div className="space-y-5">
         {/* ---------- Métricas ---------- */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <MiniStat icon={FiFolder} label="Archivos" value={files.length} tone="brand" />
           <MiniStat icon={FiInfo} label="Peso total" value={formatBytes(totalSize)} tone="sky" />
           <MiniStat
@@ -391,7 +392,7 @@ const FilesTab = ({ projectId, projectName, tasks = [], onOpenTask, onCountChang
             tone="violet"
           />
           <MiniStat
-            icon={FiBuilding}
+            icon={FaRegBuilding}
             label="Proyecto"
             value={files.length - inTasks}
             hint={files.length > 0 ? `${files.length - inTasks} archivo${files.length - inTasks === 1 ? "" : "s"} generales` : "ninguno"}
@@ -592,7 +593,7 @@ const FilesTab = ({ projectId, projectName, tasks = [], onOpenTask, onCountChang
             />
           </div>
         ) : layout === "grid" ? (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-8 2xl:grid-cols-8">
             {filtered.map((file) => (
               <FileCard
                 key={file.key}

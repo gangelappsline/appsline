@@ -63,7 +63,13 @@ import {
   uploadTaskFiles,
   addSubtaskToTask,
 } from "../../services/admin";
-import { cx, formatDate, isOverdue, priorityMeta, projectStatusMeta } from "../../utils/format";
+import {
+  cx,
+  formatDate,
+  isOverdue,
+  priorityMeta,
+  projectStatusMeta,
+} from "../../utils/format";
 import { prepareFilesForUpload } from "../../utils/images";
 import CalendarTab from "./project/CalendarTab";
 import FilesTab from "./project/FilesTab";
@@ -136,7 +142,8 @@ const assigneeId = (task) => {
  * usuario o solo ids; se completan con el directorio `users` cuando existe.
  */
 const mentionPeople = (comment, users = []) => {
-  const raw = comment?.mentions ?? comment?.mentioned_users ?? comment?.mentioned ?? [];
+  const raw =
+    comment?.mentions ?? comment?.mentioned_users ?? comment?.mentioned ?? [];
   return (Array.isArray(raw) ? raw : []).map((mention) => {
     const id = mention && typeof mention === "object" ? mention.id : mention;
     const known = users.find((u) => String(u.id) === String(id));
@@ -176,10 +183,22 @@ const Project = () => {
     return VIEW_KEYS.includes(requested) ? requested : "board";
   });
   const [fileCount, setFileCount] = useState(null);
-  const [summaryOpen, setSummaryOpen] = useDisplayPreference("project.summary", false);
-  const [filtersOpen, setFiltersOpen] = useDisplayPreference("project.filters", false);
-  const [compactCards, setCompactCards] = useDisplayPreference("project.compactCards", true);
-  const [focusMode, setFocusMode] = useDisplayPreference("project.focus", false);
+  const [summaryOpen, setSummaryOpen] = useDisplayPreference(
+    "project.summary",
+    false,
+  );
+  const [filtersOpen, setFiltersOpen] = useDisplayPreference(
+    "project.filters",
+    false,
+  );
+  const [compactCards, setCompactCards] = useDisplayPreference(
+    "project.compactCards",
+    true,
+  );
+  const [focusMode, setFocusMode] = useDisplayPreference(
+    "project.focus",
+    false,
+  );
 
   const [taskModal, setTaskModal] = useState(false);
   const [draft, setDraft] = useState(EMPTY_TASK);
@@ -238,7 +257,7 @@ const Project = () => {
 
   const tasksWithDate = useMemo(
     () => tasks.filter((task) => Boolean(task.due_date)).length,
-    [tasks]
+    [tasks],
   );
   const done = tasks.filter((t) => t.status === "completed").length;
   const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
@@ -287,19 +306,23 @@ const Project = () => {
         else next.set("view", key);
         return next;
       },
-      { replace: true }
+      { replace: true },
     );
   };
 
   /** Reprogramación desde el calendario (arrastrar o campo de fecha). */
   const rescheduleTask = async (task, dateISO) => {
     if (!task) return;
-    const saved = await updateTask(task.id, { due_date: dateISO || null }, true);
+    const saved = await updateTask(
+      task.id,
+      { due_date: dateISO || null },
+      true,
+    );
     if (!saved) return;
     notify(
       dateISO
         ? `“${task.title}” reprogramada para el ${formatDate(dateISO)}`
-        : `Se quitó la fecha de “${task.title}”`
+        : `Se quitó la fecha de “${task.title}”`,
     );
   };
 
@@ -352,7 +375,7 @@ const Project = () => {
         next.set("task", task.id);
         return next;
       },
-      { replace: true }
+      { replace: true },
     );
     const [detail, comm, files] = await Promise.allSettled([
       fetchTask(id, task.id),
@@ -389,7 +412,7 @@ const Project = () => {
         next.delete("task");
         return next;
       },
-      { replace: true }
+      { replace: true },
     );
   };
 
@@ -441,7 +464,9 @@ const Project = () => {
       if (mentioned.length)
         notify(
           `Comentario enviado · ${mentioned.length} ${
-            mentioned.length === 1 ? "persona mencionada" : "personas mencionadas"
+            mentioned.length === 1
+              ? "persona mencionada"
+              : "personas mencionadas"
           }`,
         );
     } catch {
@@ -540,24 +565,45 @@ const Project = () => {
               onClick={() => navigate("/admin/projects")}
               className="flex items-center gap-1.5 rounded text-xs font-medium text-slate-500 transition hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             >
-              <FiArrowLeft /> Proyectos
+              <FiArrowLeft />
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand-600 to-violet-600 text-sm font-extrabold text-white">
+                  {project?.logo ? (
+                    <img
+                      src={project.logo}
+                      alt=""
+                      className="h-full w-full bg-white object-contain"
+                    />
+                  ) : (
+                    projectName.slice(0, 2).toUpperCase()
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h1 className="break-words text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+                    {projectName}
+                  </h1>
+                  <Badge tone={projectStatus.tone} dot>
+                    {projectStatus.label}
+                  </Badge>
+                </div>
+              </div>
             </button>
-            <Button variant="subtle" aria-pressed={focusMode} onClick={() => setFocusMode((value) => !value)}>
-              {focusMode ? <FiMinimize2 /> : <FiMaximize2 />}
-              {focusMode ? "Salir del enfoque" : "Modo enfoque"}
-            </Button>
-          </div>
-          <div className="mt-2 flex min-w-0 items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand-600 to-violet-600 text-sm font-extrabold text-white">
-              {project?.logo ? <img src={project.logo} alt="" className="h-full w-full bg-white object-contain" /> : projectName.slice(0, 2).toUpperCase()}
-            </span>
-            <div className="min-w-0 flex-1">
-              <h1 className="break-words text-lg font-bold tracking-tight text-slate-900 sm:text-xl">{projectName}</h1>
-              <Badge tone={projectStatus.tone} dot>{projectStatus.label}</Badge>
-            </div>
-            <span className="shrink-0 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-brand-700" title={`${done} de ${tasks.length} tareas finalizadas`}>
+            <div className="flex items-center gap-3">
+              <span
+              className="shrink-0 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-brand-700"
+              title={`${done} de ${tasks.length} tareas finalizadas`}
+            >
               {progress}% <span className="hidden sm:inline">completado</span>
             </span>
+              <Button
+                variant="subtle"
+                aria-pressed={focusMode}
+                onClick={() => setFocusMode((value) => !value)}
+              >
+                {focusMode ? <FiMinimize2 /> : <FiMaximize2 />}
+                {focusMode ? "Salir del enfoque" : "Modo enfoque"}
+              </Button>
+            </div>
           </div>
           {!focusMode && (
             <CollapsibleSection
@@ -568,23 +614,51 @@ const Project = () => {
               className="mt-2"
             >
               <div className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                <p className="min-w-0 text-sm text-slate-500">{project?.description || "Sin descripción del proyecto."}</p>
+                <p className="min-w-0 text-sm text-slate-500">
+                  {project?.description || "Sin descripción del proyecto."}
+                </p>
                 <div className="flex shrink-0 items-center gap-2">
                   <AvatarStack users={users} max={4} />
-                  <span className="text-xs text-slate-500">{users.length} miembros</span>
+                  <span className="text-xs text-slate-500">
+                    {users.length} miembros
+                  </span>
                 </div>
               </div>
               <dl className="grid grid-cols-2 gap-2 lg:grid-cols-4">
                 {[
-                  { label: "Progreso general", value: `${progress}% · ${done}/${tasks.length} tareas`, icon: FiCheckCircle },
-                  { label: "Fecha de entrega", value: project?.end_date ? formatDate(project.end_date) : "Sin fecha", icon: FiCalendar },
-                  { label: "Equipo", value: `${users.length} miembros`, icon: FiUsers },
-                  { label: "Tareas activas", value: `${tasks.filter((task) => !["completed", "rejected"].includes(task.status)).length} pendientes`, icon: FiClock },
+                  {
+                    label: "Progreso general",
+                    value: `${progress}% · ${done}/${tasks.length} tareas`,
+                    icon: FiCheckCircle,
+                  },
+                  {
+                    label: "Fecha de entrega",
+                    value: project?.end_date
+                      ? formatDate(project.end_date)
+                      : "Sin fecha",
+                    icon: FiCalendar,
+                  },
+                  {
+                    label: "Equipo",
+                    value: `${users.length} miembros`,
+                    icon: FiUsers,
+                  },
+                  {
+                    label: "Tareas activas",
+                    value: `${tasks.filter((task) => !["completed", "rejected"].includes(task.status)).length} pendientes`,
+                    icon: FiClock,
+                  },
                 ].map((metric) => (
-                  <div key={metric.label} className="min-w-0 rounded-xl border border-slate-200/70 bg-white p-3">
-                    <dt className="text-[11px] font-medium text-slate-500">{metric.label}</dt>
+                  <div
+                    key={metric.label}
+                    className="min-w-0 rounded-xl border border-slate-200/70 bg-white p-3"
+                  >
+                    <dt className="text-[11px] font-medium text-slate-500">
+                      {metric.label}
+                    </dt>
                     <dd className="mt-1 flex items-center gap-2 text-sm font-semibold text-slate-800">
-                      <metric.icon className="shrink-0 text-slate-400" /> {metric.value}
+                      <metric.icon className="shrink-0 text-slate-400" />{" "}
+                      {metric.value}
                     </dd>
                   </div>
                 ))}
@@ -648,7 +722,7 @@ const Project = () => {
         <div
           className={cx(
             "border-b border-slate-100 bg-white px-3 py-2 sm:px-4",
-            view === "files" && "hidden"
+            view === "files" && "hidden",
           )}
         >
           <div className="flex flex-wrap items-center gap-2">
@@ -659,19 +733,53 @@ const Project = () => {
               className="min-w-[180px] flex-1 sm:max-w-xs"
               inputClassName="!py-2"
             />
-            <Button variant="ghost" aria-expanded={filtersOpen} aria-controls="project-filters" onClick={() => setFiltersOpen((open) => !open)}>
+            <Button
+              variant="ghost"
+              aria-expanded={filtersOpen}
+              aria-controls="project-filters"
+              onClick={() => setFiltersOpen((open) => !open)}
+            >
               <FiFilter /> Filtros
-              {(priority || person) && <span className="rounded bg-brand-100 px-1.5 text-xs text-brand-700">{Number(Boolean(priority)) + Number(Boolean(person))}</span>}
-              <FiChevronDown className={cx("transition-transform", filtersOpen && "rotate-180")} />
+              {(priority || person) && (
+                <span className="rounded bg-brand-100 px-1.5 text-xs text-brand-700">
+                  {Number(Boolean(priority)) + Number(Boolean(person))}
+                </span>
+              )}
+              <FiChevronDown
+                className={cx(
+                  "transition-transform",
+                  filtersOpen && "rotate-180",
+                )}
+              />
             </Button>
             {view === "board" && (
-              <Button variant="ghost" aria-pressed={compactCards} onClick={() => setCompactCards((value) => !value)}>
+              <Button
+                variant="ghost"
+                aria-pressed={compactCards}
+                onClick={() => setCompactCards((value) => !value)}
+              >
                 {compactCards ? <FiChevronsDown /> : <FiChevronsUp />}
                 {compactCards ? "Ampliar tarjetas" : "Compactar tarjetas"}
               </Button>
             )}
-            <span className="ml-auto text-xs tabular-nums text-slate-500" role="status">{filtered.length} de {tasks.length} tareas</span>
-            {hasFilters && <Button variant="subtle" onClick={() => { setSearch(""); setPriority(""); setPerson(""); }}><FiX /> Limpiar filtros</Button>}
+            <span
+              className="ml-auto text-xs tabular-nums text-slate-500"
+              role="status"
+            >
+              {filtered.length} de {tasks.length} tareas
+            </span>
+            {hasFilters && (
+              <Button
+                variant="subtle"
+                onClick={() => {
+                  setSearch("");
+                  setPriority("");
+                  setPerson("");
+                }}
+              >
+                <FiX /> Limpiar filtros
+              </Button>
+            )}
           </div>
           <div id="project-filters" hidden={!filtersOpen}>
             <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
@@ -954,7 +1062,7 @@ const ViewTab = ({ active, icon: Icon, label, count, ...rest }) => (
       <span
         className={cx(
           "rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums",
-          active ? "bg-white text-brand-700" : "bg-slate-200/70 text-slate-500"
+          active ? "bg-white text-brand-700" : "bg-slate-200/70 text-slate-500",
         )}
       >
         {count}
@@ -1086,17 +1194,29 @@ const TaskCard = ({ task, projectId, color, onOpen, onDrag, compact }) => {
         </span>
         <button
           type="button"
-          onClick={(event) => { event.stopPropagation(); setExpanded((value) => !value); }}
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpanded((value) => !value);
+          }}
           aria-expanded={expanded}
           aria-controls={detailsId}
           aria-label={`${expanded ? "Ocultar" : "Mostrar"} detalles de ${task.title}`}
           className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
         >
-          <FiChevronDown className={cx("transition-transform", expanded && "rotate-180")} />
+          <FiChevronDown
+            className={cx("transition-transform", expanded && "rotate-180")}
+          />
         </button>
       </div>
       <h3 className="mt-1 break-words text-sm font-semibold leading-5 text-slate-800">
-        <button type="button" onClick={(event) => { event.stopPropagation(); onOpen(); }} className="w-full rounded text-left hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen();
+          }}
+          className="w-full rounded text-left hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+        >
           {task.title}
         </button>
       </h3>
@@ -1144,7 +1264,6 @@ const TaskCard = ({ task, projectId, color, onOpen, onDrag, compact }) => {
             </div>
           </div>
         )}
-
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
         <span
