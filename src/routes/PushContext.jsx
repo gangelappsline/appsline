@@ -27,6 +27,11 @@ import {
 import { useAuth } from "./AuthContext";
 import { useToast } from "../components/admin/Toasts";
 import {
+  clearTabIndicator,
+  playNotificationSound,
+  setTabIndicator,
+} from "../utils/notificationAlert";
+import {
   PushError,
   deletePushToken,
   fetchPushToken,
@@ -73,6 +78,7 @@ export const PushProvider = ({ children }) => {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [syncNonce, setSyncNonce] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [endpointSupported, setEndpointSupported] = useState(() =>
     pushEndpointSupported()
   );
@@ -178,8 +184,51 @@ export const PushProvider = ({ children }) => {
       const title = payload.title || "Nueva notificación";
       const body = payload.body || "";
       notify(body ? `${title}: ${body}` : title, "info");
+      // Aviso visible aunque la pestaña esté abierta: sonido + indicador en la pestaña.
+      try {
+        playNotificationSound();
+      } catch {
+        /* ignore */
+      }
+      setUnreadCount((prev) => {
+        const next = prev + 1;
+        try {
+          setTabIndicator(next);
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
     });
   }, [notify]);
+
+  /* ---------------------------------------------------------------- */
+  /* Indicador de la pestaña y sonido: se limpia al volver a la pestaña  */
+  /* ---------------------------------------------------------------- */
+
+  useEffect(() => {
+    const reset = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        setUnreadCount(0);
+        clearTabIndicator();
+      }
+    };
+    const onFocus = () => reset();
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", reset);
+    }
+    if (typeof window !== "undefined") {
+      window.addEventListener("focus", onFocus);
+    }
+    return () => {
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", reset);
+      }
+      if (typeof window !== "undefined") {
+        window.removeEventListener("focus", onFocus);
+      }
+    };
+  }, []);
 
   /* ---------------------------------------------------------------- */
   /* Acciones                                                          */
@@ -307,6 +356,11 @@ export const PushProvider = ({ children }) => {
     }
   }, [notify, refresh, token]);
 
+  const markNotificationsRead = useCallback(() => {
+    setUnreadCount(0);
+    clearTabIndicator();
+  }, []);
+
   const value = useMemo(
     () => ({
       status,
@@ -318,12 +372,15 @@ export const PushProvider = ({ children }) => {
       error,
       busy,
       endpointSupported,
+      unreadCount,
       missingEnv: missingFirebaseEnv(),
       enable,
       disable,
       sendTest,
       retry,
       refresh,
+      markNotificationsRead,
+      clearUnread: markNotificationsRead,
     }),
     [
       status,
@@ -334,11 +391,13 @@ export const PushProvider = ({ children }) => {
       error,
       busy,
       endpointSupported,
+      unreadCount,
       enable,
       disable,
       sendTest,
       retry,
       refresh,
+      markNotificationsRead,
     ]
   );
 

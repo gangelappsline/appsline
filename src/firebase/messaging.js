@@ -474,3 +474,25 @@ export const showLocalNotification = async ({ title, body = "", url = "/admin/da
   });
   return true;
 };
+
+/* ------------------------------------------------------------------ */
+/* Re-export de ayudas de aviso (sonido + indicador de pestaña)        */
+/* ------------------------------------------------------------------ */
+export {
+  playNotificationSound,
+  playNotificationBeep,
+  playSound,
+  playBeep,
+  beepWithWebAudio,
+  setTabIndicator,
+  setTabBadge,
+  setAppBadge,
+  setNotificationBadge,
+  updateTabIndicator,
+  clearTabIndicator,
+  clearTabBadge,
+  clearAppBadge,
+  clearNotificationBadge,
+  formatTabTitle,
+  drawFaviconBadge,
+} from "../utils/notificationAlert.js";
