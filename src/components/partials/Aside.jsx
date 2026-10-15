@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 import { NavLink } from "react-router-dom";
 import {
+  FiActivity,
   FiBarChart2,
   FiBox,
   FiBriefcase,
@@ -40,7 +41,10 @@ const navSections = [
   },
   {
     title: "Análisis",
-    items: [{ to: "/admin/reports", label: "Reportes", icon: FiBarChart2 }],
+    items: [
+      { to: "/admin/analytics", label: "Analítica", icon: FiActivity },
+      { to: "/admin/reports", label: "Reportes", icon: FiBarChart2 },
+    ],
   },
   {
     title: "Sistema",

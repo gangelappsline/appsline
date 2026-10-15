@@ -60,6 +60,128 @@ export async function fetchDashboard() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Analítica (endpoints opcionales)                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Estado de los endpoints analíticos.
+ *  - `null`  → todavía no se ha sondeado
+ *  - `false` → el backend no los expone (el panel calcula en el cliente)
+ *  - `true`  → disponibles
+ */
+let analyticsSupported = null;
+
+/** ¿El backend expone los endpoints de analítica? */
+export const analyticsEndpointSupported = () => analyticsSupported !== false;
+
+/** Marca los endpoints de analítica como no soportados. */
+export const markAnalyticsUnsupported = () => {
+  analyticsSupported = false;
+};
+
+const ANALYTICS_MISSING = [404, 405, 501];
+
+/**
+ * Petición a un endpoint de analítica que puede no existir.
+ * Si el backend responde 404/405/501 se marca como no soportado y se
+ * devuelve `null` para que la vista use el cálculo local.
+ */
+const fetchAnalytics = async (url, params = {}, config = {}) => {
+  try {
+    const { data } = await api.get(url, {
+      params: compactParams(params),
+      ...config,
+    });
+    analyticsSupported = true;
+    return data;
+  } catch (error) {
+    if (ANALYTICS_MISSING.includes(readApiStatus(error))) {
+      analyticsSupported = false;
+      return null;
+    }
+    throw error;
+  }
+};
+
+/**
+ * Resumen ejecutivo de analítica.
+ * @param {object} params `from`, `to`, `client_id`, `status`, `project_id`
+ */
+export async function fetchAnalyticsOverview(params = {}) {
+  const data = await fetchAnalytics("/analytics/overview", params);
+  if (!data) return null;
+  return unwrapObject(data, ["overview", "analytics", "summary"]) || {};
+}
+
+/**
+ * Series temporales para los gráficos de línea/área.
+ * @param {object} params `metric`, `granularity` (day|week|month), `from`, `to`
+ */
+export async function fetchAnalyticsTimeseries(params = {}) {
+  const data = await fetchAnalytics("/analytics/timeseries", params);
+  if (!data) return null;
+  const obj = unwrapObject(data, ["timeseries", "series"]) || {};
+  return {
+    metric: obj.metric || params.metric || "",
+    granularity: obj.granularity || params.granularity || "week",
+    series: unwrapList(obj.series || obj.data || [], ["series", "points"]),
+  };
+}
+
+/** Métricas detalladas por proyecto. */
+export async function fetchAnalyticsProjects(params = {}) {
+  const data = await fetchAnalytics("/analytics/projects", params);
+  if (!data) return null;
+  return unwrapList(data, ["projects", "projects_metrics", "items"]);
+}
+
+/** Métricas detalladas por persona del equipo. */
+export async function fetchAnalyticsTeam(params = {}) {
+  const data = await fetchAnalytics("/analytics/team", params);
+  if (!data) return null;
+  return unwrapList(data, ["team", "users", "items"]);
+}
+
+/** Resumen financiero (presupuesto, facturado, cobrado, margen). */
+export async function fetchAnalyticsFinancial(params = {}) {
+  const data = await fetchAnalytics("/analytics/financial", params);
+  if (!data) return null;
+  return unwrapObject(data, ["financial", "finance"]) || {};
+}
+
+/**
+ * Exportación de reportes.
+ * @param {object} params `type` (projects|team|clients|financial), `format`
+ *   (csv|xlsx|json|pdf), `from`, `to`.
+ * @returns {Promise<{url?:string, filename?:string, blob?:Blob, data?:object}|null>}
+ */
+export async function fetchReportExport(params = {}) {
+  const format = params.format || "csv";
+  try {
+    const response = await api.get("/analytics/export", {
+      params: compactParams(params),
+      responseType: format === "json" ? "json" : "blob",
+    });
+    if (format === "json") {
+      const payload = response.data?.data ?? response.data;
+      return { data: payload, filename: params.filename || `reporte.${format}` };
+    }
+    return {
+      blob: response.data,
+      filename:
+        response.headers?.["content-disposition"]?.match(/filename="?([^"]+)"?/)?.[1] ||
+        `reporte.${format}`,
+    };
+  } catch (error) {
+    if (ANALYTICS_MISSING.includes(readApiStatus(error))) {
+      analyticsSupported = false;
+      return null;
+    }
+    throw error;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Proyectos                                                           */
 /* ------------------------------------------------------------------ */
 

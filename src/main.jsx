@@ -12,6 +12,7 @@ import WhatWeDo from "./pages/WhatWeDo.jsx";
 import Login from "./pages/Login.jsx";
 import Portfolio from "./pages/Portfolio.jsx";
 import Dashboard from "./pages/admin/Dashboard.jsx";
+import Analytics from "./pages/admin/Analytics.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 import AuthProvider from "./routes/AuthContext.jsx";
 import { ToastProvider } from "./components/admin/Toasts";
@@ -182,6 +183,14 @@ createRoot(document.getElementById("root")).render(
               element={
                 <ProtectedRoute>
                   <Reports />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/analytics"
+              element={
+                <ProtectedRoute>
+                  <Analytics />
                 </ProtectedRoute>
               }
             />
