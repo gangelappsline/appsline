@@ -12,6 +12,7 @@ import {
 } from "react-icons/fi";
 import Aside from "../components/partials/Aside";
 import CommandPalette from "../components/admin/CommandPalette";
+import PushBell from "../components/admin/PushBell";
 import { Avatar } from "../components/admin";
 import { useAuth } from "../routes/AuthContext";
 
@@ -103,6 +104,9 @@ const LayoutAdmin = ({ title, subtitle, actions, breadcrumbs = [], fluid = false
             </button>
 
             <div className="ml-auto flex items-center gap-2">
+              {/* Notificaciones push del navegador (activar / estado) */}
+              <PushBell />
+
               {/* Menú de usuario */}
               <div className="relative" ref={menuRef}>
                 <button

@@ -2,6 +2,8 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
+  // Las pruebas unitarias de `tests/unit` corren con `npm run test:unit` (node --test).
+  testIgnore: ["unit/**"],
   fullyParallel: true,
   use: {
     baseURL: "http://127.0.0.1:5173",

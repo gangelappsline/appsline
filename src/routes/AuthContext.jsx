@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import api from "../services/api";
+import { releasePushDevice } from "../services/push";
 import {
   getToken,
   getStoredUser,
@@ -79,6 +80,14 @@ const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = useCallback(async () => {
+    try {
+      // Desvincular este navegador del usuario para que la API deje de
+      // enviarle notificaciones push (se hace antes de revocar el token,
+      // porque la petición necesita seguir autenticada).
+      await releasePushDevice();
+    } catch {
+      // Cerrar sesión nunca debe fallar por las notificaciones.
+    }
     try {
       // Revocar el token de Passport en el servidor (si sigue siendo válido).
       await api.post("/logout");

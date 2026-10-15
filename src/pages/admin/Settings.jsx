@@ -9,6 +9,7 @@ import {
   Avatar, Button, Card, CardHeader, Field, Tabs, useToast, TOASTS_PREF_KEY, toastsEnabled,
 } from "../../components/admin";
 import { saveUser, uploadUserAvatar } from "../../services/admin";
+import PushSettings from "../../components/admin/PushSettings";
 import api from "../../services/api";
 import { useAuth } from "../../routes/AuthContext";
 import { getPageSize, setPageSize } from "../../utils/prefs";
@@ -262,6 +263,7 @@ const PreferencesTab = () => {
   };
 
   return (
+    <>
     <Card className="divide-y divide-slate-100 p-6">
       <div className="flex flex-col gap-3 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
@@ -326,6 +328,10 @@ const PreferencesTab = () => {
         </div>
       </div>
     </Card>
+
+    {/* Notificaciones push del navegador (Firebase Cloud Messaging) */}
+    <PushSettings className="mt-6" />
+    </>
   );
 };
 

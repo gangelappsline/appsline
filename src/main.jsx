@@ -15,6 +15,7 @@ import Dashboard from "./pages/admin/Dashboard.jsx";
 import Analytics from "./pages/admin/Analytics.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 import AuthProvider from "./routes/AuthContext.jsx";
+import PushProvider from "./routes/PushContext.jsx";
 import { ToastProvider } from "./components/admin/Toasts";
 import Products from "./pages/admin/Products.jsx";
 import Users from "./pages/admin/Users.jsx";
@@ -57,6 +58,9 @@ createRoot(document.getElementById("root")).render(
               cualquier `useToast()` (que se monta antes del LayoutAdmin)
               reciba el contexto real y no el no-op por defecto. */}
           <ToastProvider>
+          {/* Notificaciones push (FCM): requiere sesión + toasts, así que va
+              dentro de AuthProvider y ToastProvider y encima de las rutas. */}
+          <PushProvider>
           <Routes>
             {/* Rutas públicas */}
             <Route path="/">
@@ -203,6 +207,7 @@ createRoot(document.getElementById("root")).render(
               }
             />
           </Routes>
+          </PushProvider>
           </ToastProvider>
         </AuthProvider>
       </BrowserRouter>

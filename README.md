@@ -45,12 +45,33 @@ formatos, ejemplos de Laravel y checklist) está en
   `appsline.display.`. Expandir una tarjeta individual es temporal; el control global
   aplica la misma densidad a todas las tarjetas. No se modifican datos del proyecto.
 
+## Notificaciones push web (Firebase Cloud Messaging)
+
+Los usuarios con sesión iniciada pueden recibir notificaciones del panel en el
+navegador. Se activan con un clic (campana 🔔 del encabezado o
+**Configuración → Preferencias → Notificaciones push**) y el navegador queda
+registrado en la API con su token de FCM.
+
+- `public/firebase-messaging-sw.js`: service worker que muestra la notificación
+  y abre la ruta indicada al hacer clic.
+- `src/firebase/`: configuración (`VITE_FIREBASE_*`) y manejo del SDK (permiso,
+  token, revocación, mensajes con la pestaña abierta). El SDK se carga bajo
+  demanda: no pesa en la parte pública del sitio.
+- `src/services/push.js`: `POST/DELETE/GET /push/devices` y `POST /push/devices/test`.
+- `src/routes/PushContext.jsx` + `src/components/admin/Push*.jsx`: estado y UI.
+
+Requisitos: HTTPS (o `localhost`), las variables `VITE_FIREBASE_*` y cuatro
+endpoints en la API. **La guía completa —qué agregar en Firebase Console, en el
+`.env` y en el backend Laravel— está en
+[`docs/API-PUSH.md`](docs/API-PUSH.md).**
+
 ### Pruebas del panel
 
 ```bash
 npm ci
 npx playwright install --with-deps chromium
-npm run test:e2e
+npm run test:e2e     # panel completo (API interceptada)
+npm run test:unit    # service worker de push y variables de Firebase
 ```
 
 Las pruebas usan datos ficticios e interceptan las peticiones de la API, sin requerir
