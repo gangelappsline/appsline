@@ -391,6 +391,13 @@ const FilesTab = ({ projectId, projectName, tasks = [], onOpenTask, onCountChang
             tone="violet"
           />
           <MiniStat
+            icon={FiBuilding}
+            label="Proyecto"
+            value={files.length - inTasks}
+            hint={files.length > 0 ? `${files.length - inTasks} archivo${files.length - inTasks === 1 ? "" : "s"} generales` : "ninguno"}
+            tone="sky"
+          />
+          <MiniStat
             icon={FiEye}
             label="En pantalla"
             value={filtered.length}
@@ -501,6 +508,22 @@ const FilesTab = ({ projectId, projectName, tasks = [], onOpenTask, onCountChang
                 <span className="ml-1.5 tabular-nums text-slate-400">{groupCounts[key]}</span>
               </button>
             ))}
+            {files.length > 0 && (
+              <button
+                key="project-filter"
+                type="button"
+                onClick={() => setTaskFilter("project")}
+                className={cx(
+                  "rounded-full px-3 py-1.5 text-[12px] font-semibold ring-1 ring-inset transition",
+                  taskFilter === "project"
+                    ? "bg-brand-50 text-brand-700 ring-brand-200"
+                    : "bg-white text-slate-500 ring-slate-200 hover:bg-slate-50"
+                )}
+              >
+                Proyecto
+                <span className="ml-1.5 tabular-nums text-slate-400">{files.length - inTasks}</span>
+              </button>
+            )}
             {filtersActive && (
               <button
                 type="button"
