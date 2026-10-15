@@ -31,6 +31,34 @@ export const pushEndpointSupported = () => devicesEndpointSupported !== false;
 const isMissingEndpoint = (err) =>
   [404, 405, 501].includes(err?.response?.status);
 
+/**
+ * Extrae un mensaje legible de la respuesta de error de la API.
+ *
+ * La API puede devolver la forma habitual de Laravel (`{ message }`) o reenviar
+ * tal cual el error de Google/FCM (`{ error: { message, status, details } }`),
+ * por eso se prueban ambas. También se extrae el `reason` de `details`
+ * (p. ej. `RESOURCE_PROJECT_INVALID`, `SENDER_ID_MISMATCH`) para poder dar una
+ * pista accionable en el diagnóstico.
+ */
+export const extractPushApiError = (err) => {
+  const data = err?.response?.data ?? null;
+  const googleError =
+    data?.error && typeof data.error === "object" ? data.error : null;
+  const message =
+    (typeof data?.error === "string" ? data.error : null) ||
+    googleError?.message ||
+    data?.message ||
+    err?.message ||
+    "La petición falló antes de llegar a la API.";
+  const reason =
+    googleError?.details?.find?.((d) => d?.reason)?.reason ||
+    googleError?.details?.[0]?.reason ||
+    data?.reason ||
+    null;
+  const code = googleError?.status || googleError?.code || data?.code || null;
+  return { message: String(message), reason, code };
+};
+
 /** Identificador estable de este navegador (ayuda al backend a hacer upsert). */
 export const getDeviceId = () => {
   try {
@@ -211,14 +239,13 @@ export async function sendTestPushToToken(token) {
   } catch (err) {
     const status = Number(err?.response?.status) || 0;
     if (isMissingEndpoint(err)) devicesEndpointSupported = false;
+    const extracted = extractPushApiError(err);
     return {
       ok: false,
       status,
-      message:
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        err?.message ||
-        "La petición falló antes de llegar a la API.",
+      message: extracted.message,
+      reason: extracted.reason,
+      code: extracted.code,
       data: err?.response?.data ?? null,
     };
   }
@@ -248,7 +275,7 @@ export async function probePushDevices() {
       devices: null,
       message: isMissingEndpoint(err)
         ? "La API no expone GET /push/devices (404)."
-        : err?.response?.data?.message || err?.message || "No se pudo consultar la API.",
+        : extractPushApiError(err).message || "No se pudo consultar la API.",
     };
   }
 }
@@ -271,7 +298,7 @@ export async function removePushDeviceFromServer(token) {
       ok: false,
       status,
       message:
-        err?.response?.data?.message ||
+        extractPushApiError(err).message ||
         err?.message ||
         "No se pudo dar de baja el token.",
     };

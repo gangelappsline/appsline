@@ -105,18 +105,36 @@ const showPush = async (payload) => {
     body,
     icon: notification.icon || data.icon || DEFAULT_ICON,
     badge: notification.badge || DEFAULT_BADGE,
-    // Un mismo `tag` reemplaza la notificación anterior en lugar de acumular.
+    // Un mismo `tag` reemplaza la notificación anterior en lugar de acumular,
+    // pero `renotify: true` hace que el navegador vuelva a avisar (sonido/popup)
+    // aunque se reemplace: así la notificación se ve aunque la pestaña esté
+    // en segundo plano o el usuario no esté mirando la pantalla.
     tag: data.tag || notification.tag || "appsline",
-    renotify: Boolean(data.renotify),
+    renotify: data.renotify !== false,
     requireInteraction: Boolean(data.require_interaction),
+    silent: false,
     data: { ...data, url, received_at: Date.now() },
   };
 
   // Siempre se muestra la notificación del sistema (requisito de Chrome para el
-  // push y forma de enterarse con la pestaña cerrada).
-  await self.registration.showNotification(title, options);
+  // push y forma de enterarse con la pestaña cerrada o en segundo plano).
+  try {
+    await self.registration.showNotification(title, options);
+  } catch (err) {
+    // Si las opciones ricas fallan (algunos navegadores son estrictos), se
+    // reintenta con el mínimo indispensable para no perder la notificación.
+    try {
+      await self.registration.showNotification(title, { body, icon: DEFAULT_ICON });
+    } catch {
+      // Último recurso: nada más que hacer, pero no se rompe el push.
+    }
+  }
   // Y se refleja dentro de la app cuando hay alguna pestaña abierta.
-  await broadcast({ title, body, url, ...data });
+  try {
+    await broadcast({ title, body, url, ...data });
+  } catch {
+    // Las pestañas pueden no estar disponibles; la notificación del sistema ya se mostró.
+  }
 };
 
 self.addEventListener("push", (event) => {

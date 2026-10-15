@@ -253,7 +253,10 @@ const PushDiagnostics = ({ className = "" }) => {
           "La API aceptó el envío. Si no aparece en segundos, el problema está en FCM o en la cuenta de servicio.",
         );
       } else {
-        notify(result.message, "error");
+        notify(
+          result.reason ? `${result.message} (${result.reason})` : result.message,
+          "error",
+        );
       }
       runDiagnostics();
     } finally {
@@ -673,6 +676,16 @@ const PushDiagnostics = ({ className = "" }) => {
             La cuenta de servicio del backend es de <b>otro proyecto</b> de Firebase: FCM responde{" "}
             <code className="font-mono">SENDER_ID_MISMATCH</code>. Compara el proyecto del token con el
             de la app en la primera comprobación de este panel.
+          </li>
+          <li>
+            FCM responde <code className="font-mono">RESOURCE_PROJECT_INVALID</code> (400): el{" "}
+            <code className="font-mono">projectId</code> que el backend pone en la URL{" "}
+            <code className="font-mono">projects/{"{projectId}"}/messages:send</code> no coincide con el
+            proyecto de la cuenta de servicio o está vacío. Revisa que{" "}
+            <code className="font-mono">FIREBASE_PROJECT_ID</code> en la API sea exactamente el{" "}
+            <code className="font-mono">project_id</code> del JSON de la cuenta de servicio (y el mismo
+            que <code className="font-mono">VITE_FIREBASE_PROJECT_ID</code> del frontend). Lo más seguro
+            es derivarlo del propio JSON en lugar de duplicarlo en otra variable.
           </li>
           <li>
             El token de la base de datos es <b>viejo</b> (otro navegador, perfil borrado, app

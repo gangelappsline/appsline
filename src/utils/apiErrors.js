@@ -47,7 +47,13 @@ export const firstFieldError = (error) => Object.values(fieldErrors(error))[0] |
  */
 export const apiErrorMessage = (error, fallback = "Ocurrió un error inesperado.") => {
   const status = error?.response?.status;
-  const message = String(error?.response?.data?.message || "").trim();
+  // El backend puede reenviar tal cual el error de Google (FCM, Gemini, ...),
+  // cuya forma es `{ "error": { "message": "...", "status": "...", "details": [...] } }`
+  // en lugar de la forma habitual de Laravel `{ "message": "..." }`.
+  const googleError = error?.response?.data?.error;
+  const googleMessage =
+    (typeof googleError === "string" ? googleError : googleError?.message) || "";
+  const message = String(error?.response?.data?.message || googleMessage || "").trim();
   const usable = message && !GENERIC_MESSAGES.includes(message.toLowerCase());
 
   if (usable) {
