@@ -296,6 +296,7 @@ export const PushProvider = ({ children }) => {
       }
     } catch (err) {
       const message =
+        err?.response?.data?.error?.message ||
         err?.response?.data?.message ||
         err?.message ||
         "No se pudo enviar la notificación de prueba.";

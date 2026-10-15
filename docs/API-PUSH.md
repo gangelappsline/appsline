@@ -533,7 +533,10 @@ class FcmService
 // config/services.php  (agrega este bloque)
 
 'fcm' => [
-    // ID del proyecto de Firebase (Firebase Console → Configuración del proyecto)
+    // ID del proyecto de Firebase. Debe ser EXACTAMENTE el `project_id` del JSON
+    // de la cuenta de servicio: si difiere, FCM responde RESOURCE_PROJECT_INVALID.
+    // Para evitar desincronizaciones, derívalo del propio JSON en lugar de
+    // duplicarlo en otra variable de entorno.
     'project_id' => env('FIREBASE_PROJECT_ID'),
     // Ruta ABSOLUTA al JSON de la cuenta de servicio (NUNCA en el frontend ni en Git)
     'credentials' => env('FIREBASE_CREDENTIALS'),
@@ -829,6 +832,7 @@ npm run test:e2e    # panel completo con la API interceptada
 | Código / mensaje | Significado | Qué hacer |
 |---|---|---|
 | `SENDER_ID_MISMATCH` | El token es de otro proyecto de Firebase | La cuenta de servicio del backend debe ser del **mismo** proyecto que el token (`projectId` que muestra el diagnóstico) |
+| `RESOURCE_PROJECT_INVALID` (400) | El `projectId` de la URL `projects/{projectId}/messages:send` no coincide con el proyecto de la cuenta de servicio o está vacío | Verifica que `FIREBASE_PROJECT_ID` en la API sea exactamente el `project_id` del JSON de la cuenta de servicio (y el mismo que `VITE_FIREBASE_PROJECT_ID` del frontend). Derívalo del propio JSON para no duplicarlo. |
 | `UNREGISTERED` (404) | El token ya no existe (navegador borrado, permiso revocado, app desinstalada) | Borra la fila de `push_devices` y vuelve a activar en ese dispositivo |
 | `INVALID_ARGUMENT` (400) | Token mal formado o payload inválido (por ejemplo, `data` con números/boleanos) | Revisa que todos los valores de `data` sean **strings** |
 | `THIRD_PARTY_AUTH_ERROR` / `MISMATCHED_CREDENTIAL` | Credenciales sin permiso sobre el proyecto | Revisa el rol de la cuenta de servicio (Firebase Admin SDK Administrator Service Agent) |
