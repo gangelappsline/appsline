@@ -12,7 +12,11 @@
  *    registra en la API (`POST /push/devices`).
  *  - En cada carga, si el permiso ya está concedido, el token se sincroniza en
  *    silencio (así se refrescan tokens y se re-asocia el dispositivo).
- *  - Los mensajes que llegan con la pestaña abierta se muestran como toast.
+ *  - Los mensajes que llegan con la pestaña abierta se muestran como toast **y**
+ *    se guardan en la bandeja del usuario (`src/utils/notificationInbox.js`),
+ *    para que el aviso no se pierda cuando el toast desaparece.
+ *  - `unreadCount` sale de esa bandeja: alimenta la insignia de la campana y el
+ *    contador de la pestaña, y solo se limpia cuando el usuario abre la campana.
  *  - Al cerrar sesión el dispositivo se desvincula del usuario.
  */
 import {
@@ -31,6 +35,17 @@ import {
   playNotificationSound,
   setTabIndicator,
 } from "../utils/notificationAlert";
+import {
+  addInboxEntry,
+  clearInbox,
+  markAllRead as markInboxAllRead,
+  markEntryRead,
+  notificationFromPayload,
+  readInbox,
+  removeInboxEntry,
+  subscribeToInbox,
+  unreadCount as countUnread,
+} from "../utils/notificationInbox";
 import {
   PushError,
   deletePushToken,
@@ -78,10 +93,12 @@ export const PushProvider = ({ children }) => {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [syncNonce, setSyncNonce] = useState(0);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState(() => readInbox(userId));
   const [endpointSupported, setEndpointSupported] = useState(() =>
     pushEndpointSupported()
   );
+
+  const unreadCount = useMemo(() => countUnread(notifications), [notifications]);
 
   // El listener de mensajes vive siempre; solo muestra toasts con sesión activa.
   const authenticatedRef = useRef(isAuthenticated);
@@ -169,6 +186,30 @@ export const PushProvider = ({ children }) => {
   }, [isAuthenticated, userId, blocker, refresh, syncNonce]);
 
   /* ---------------------------------------------------------------- */
+  /* Bandeja de notificaciones (localStorage)                          */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * La bandeja se relee al cambiar de usuario y cada vez que cambia en
+   * cualquier pestaña (`subscribeToInbox` escucha el evento propio y el
+   * `storage` del navegador). Así el contador de sin leer siempre coincide con
+   * lo que hay guardado, incluso tras recargar.
+   */
+  useEffect(() => {
+    setNotifications(readInbox(userId));
+    return subscribeToInbox(userId, (list) => setNotifications(list));
+  }, [userId]);
+
+  /** El contador de la pestaña (título + favicon + badge) refleja lo pendiente. */
+  useEffect(() => {
+    try {
+      setTabIndicator(unreadCount);
+    } catch {
+      /* ignore */
+    }
+  }, [unreadCount]);
+
+  /* ---------------------------------------------------------------- */
   /* Mensajes con la pestaña abierta                                   */
   /* ---------------------------------------------------------------- */
 
@@ -181,54 +222,29 @@ export const PushProvider = ({ children }) => {
         setSyncNonce((n) => n + 1);
         return;
       }
-      const title = payload.title || "Nueva notificación";
-      const body = payload.body || "";
-      notify(body ? `${title}: ${body}` : title, "info");
+      // El usuario tocó la notificación del sistema: ese aviso ya se vio, así
+      // que se marca como leído (la app del navegador no puede escribir la
+      // bandeja por nosotros).
+      if (payload.type === "notification-click") {
+        const { id } = notificationFromPayload(payload);
+        if (id) markEntryRead(userId, id);
+        return;
+      }
+
+      // Se guarda primero: si es un reenvío del mismo aviso no se vuelve a
+      // sonar ni a mostrar el toast.
+      const { entry, added } = addInboxEntry(userId, payload);
+      if (!added) return;
+
+      notify(entry.body ? `${entry.title}: ${entry.body}` : entry.title, "info");
       // Aviso visible aunque la pestaña esté abierta: sonido + indicador en la pestaña.
       try {
         playNotificationSound();
       } catch {
         /* ignore */
       }
-      setUnreadCount((prev) => {
-        const next = prev + 1;
-        try {
-          setTabIndicator(next);
-        } catch {
-          /* ignore */
-        }
-        return next;
-      });
     });
-  }, [notify]);
-
-  /* ---------------------------------------------------------------- */
-  /* Indicador de la pestaña y sonido: se limpia al volver a la pestaña  */
-  /* ---------------------------------------------------------------- */
-
-  useEffect(() => {
-    const reset = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "visible") {
-        setUnreadCount(0);
-        clearTabIndicator();
-      }
-    };
-    const onFocus = () => reset();
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", reset);
-    }
-    if (typeof window !== "undefined") {
-      window.addEventListener("focus", onFocus);
-    }
-    return () => {
-      if (typeof document !== "undefined") {
-        document.removeEventListener("visibilitychange", reset);
-      }
-      if (typeof window !== "undefined") {
-        window.removeEventListener("focus", onFocus);
-      }
-    };
-  }, []);
+  }, [notify, userId]);
 
   /* ---------------------------------------------------------------- */
   /* Acciones                                                          */
@@ -356,10 +372,33 @@ export const PushProvider = ({ children }) => {
     }
   }, [notify, refresh, token]);
 
-  const markNotificationsRead = useCallback(() => {
-    setUnreadCount(0);
+  /** Marca todas las notificaciones como leídas (se llama al abrir la campana). */
+  const markAllRead = useCallback(() => {
+    markInboxAllRead(userId);
     clearTabIndicator();
-  }, []);
+  }, [userId]);
+
+  /** Marca una notificación concreta como leída (clic en el aviso). */
+  const markRead = useCallback(
+    (id) => {
+      markEntryRead(userId, id);
+    },
+    [userId]
+  );
+
+  /** Quita una notificación de la bandeja. */
+  const removeNotification = useCallback(
+    (id) => {
+      removeInboxEntry(userId, id);
+    },
+    [userId]
+  );
+
+  /** Vacía la bandeja: el usuario ya no necesita el historial. */
+  const clearNotifications = useCallback(() => {
+    clearInbox(userId);
+    clearTabIndicator();
+  }, [userId]);
 
   const value = useMemo(
     () => ({
@@ -372,6 +411,8 @@ export const PushProvider = ({ children }) => {
       error,
       busy,
       endpointSupported,
+      // Bandeja de notificaciones: lo que la campana del encabezado lista.
+      notifications,
       unreadCount,
       missingEnv: missingFirebaseEnv(),
       enable,
@@ -379,8 +420,13 @@ export const PushProvider = ({ children }) => {
       sendTest,
       retry,
       refresh,
-      markNotificationsRead,
-      clearUnread: markNotificationsRead,
+      markAllRead,
+      markRead,
+      removeNotification,
+      clearNotifications,
+      // Compatibilidad con los nombres anteriores.
+      markNotificationsRead: markAllRead,
+      clearUnread: markAllRead,
     }),
     [
       status,
@@ -391,13 +437,17 @@ export const PushProvider = ({ children }) => {
       error,
       busy,
       endpointSupported,
+      notifications,
       unreadCount,
       enable,
       disable,
       sendTest,
       retry,
       refresh,
-      markNotificationsRead,
+      markAllRead,
+      markRead,
+      removeNotification,
+      clearNotifications,
     ]
   );
 

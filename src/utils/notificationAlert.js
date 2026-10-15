@@ -4,11 +4,19 @@
  *     (`navigator.setAppBadge`) y punto sobre el favicon.
  *   - Sonido de aviso (Web Audio + respaldo con archivo de audio).
  *
+ * El contador representa las notificaciones **sin leer** de la bandeja
+ * (`src/utils/notificationInbox.js`) y solo se limpia cuando el usuario abre la
+ * campana, por eso `setBaseTitle()` permite cambiar el título de la página sin
+ * perder el `(3)` de avisos pendientes.
+ *
  * Son funciones pensadas para ejecutarse en el navegador; en entornos sin
  * `window`/`document` (SSR, pruebas en Node) no hacen nada.
  */
 
 const BASE_TITLE_KEY = "appsline.baseTitle";
+
+/** Último contador aplicado: permite repintar el título cuando cambia la página. */
+let currentCount = 0;
 
 /** Título base de la pestaña (sin contador). */
 export const getBaseTitle = () => {
@@ -28,6 +36,25 @@ export const getBaseTitle = () => {
   return current || "Appsline";
 };
 
+/** Contador de notificaciones sin leer que muestra ahora la pestaña. */
+export const getTabIndicator = () => currentCount;
+
+/**
+ * Fija el título base de la pestaña (por ejemplo `Appsline · Dashboard`) sin
+ * perder el contador de notificaciones sin leer. Las páginas del panel usan
+ * esto en lugar de escribir `document.title` a mano: si no, cada navegación
+ * borraría el aviso de "(3) Appsline · Tareas".
+ */
+export const setBaseTitle = (base) => {
+  const clean = String(base || "Appsline").replace(/^\(\d+\)\s*/, "");
+  try {
+    sessionStorage.setItem(BASE_TITLE_KEY, clean);
+  } catch {
+    /* ignore */
+  }
+  return setTabIndicator(currentCount);
+};
+
 /** Formatea el título de la pestaña con el contador de notificaciones sin leer. */
 export const formatTabTitle = (count = 0, baseTitle) => {
   const base = (baseTitle || getBaseTitle() || "Appsline").replace(/^\(\d+\)\s*/, "");
@@ -39,6 +66,7 @@ export const formatTabTitle = (count = 0, baseTitle) => {
 export const setTabIndicator = (count = 0) => {
   if (typeof document === "undefined") return 0;
   const n = Math.max(0, Number(count) || 0);
+  currentCount = n;
   document.title = formatTabTitle(n);
   // Badging API (Chrome/Edge para PWAs instaladas y, en algunos casos, pestañas).
   try {
@@ -176,6 +204,8 @@ export const playBeep = beepWithWebAudio;
 
 export default {
   getBaseTitle,
+  getTabIndicator,
+  setBaseTitle,
   formatTabTitle,
   setTabIndicator,
   setTabBadge,

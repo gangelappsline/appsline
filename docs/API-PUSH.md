@@ -32,6 +32,9 @@ reciban notificaciones push en el navegador con **Firebase Cloud Messaging (FCM)
    7. El service worker (/firebase-messaging-sw.js) muestra la notificación
       · pestaña cerrada → notificación del sistema (clic = abre ese proyecto)
       · pestaña abierta → notificación + toast dentro del panel
+   8. En ambos casos el aviso queda guardado en la bandeja del navegador
+      (localStorage) y se puede revisar después desde la campana 🔔 del
+      encabezado, aunque el toast ya haya desaparecido.
 ```
 
 Piezas implicadas:
@@ -42,8 +45,9 @@ Piezas implicadas:
 | `src/firebase/config.js` | bundle | Lee las variables `VITE_FIREBASE_*` |
 | `src/firebase/messaging.js` | bundle (import dinámico del SDK) | Permiso, service worker, token FCM, revocación y puente de mensajes |
 | `src/services/push.js` | bundle | Llama a `POST/DELETE/GET /push/devices` y `/push/devices/test` |
-| `src/routes/PushContext.jsx` | bundle | Estado global (activar/desactivar/probar/sincronizar) |
-| `src/components/admin/PushBell.jsx` | bundle | Campana del encabezado del panel |
+| `src/routes/PushContext.jsx` | bundle | Estado global (activar/desactivar/probar/sincronizar) + bandeja de notificaciones |
+| `src/utils/notificationInbox.js` | bundle | Bandeja persistente (`localStorage`) con el historial y el estado leído/sin leer |
+| `src/components/admin/NotificationBell.jsx` | bundle | Campana del encabezado: lista las notificaciones y las marca como leídas (`PushBell.jsx` es un alias) |
 | `src/components/admin/PushSettings.jsx` | bundle | Tarjeta en Configuración → Preferencias |
 | `src/components/admin/PushDiagnostics.jsx` | bundle | Diagnóstico paso a paso + prueba de un token de `push_devices` |
 
@@ -168,6 +172,40 @@ Sin los endpoints de la API el push **igual funciona en el navegador**, pero la
 notificación no llegará desde el servidor; la tarjeta avisa de esa situación.
 
 ---
+
+### 2.4 Centro de notificaciones (campana 🔔)
+
+El *toast* dura unos segundos: si el usuario no estaba mirando la pantalla, el
+aviso se perdía. Para que la información no se pierda, cada push recibido con la
+sesión iniciada se guarda en el navegador:
+
+- `src/utils/notificationInbox.js` mantiene la bandeja en `localStorage`, con
+  una clave por usuario (`appsline.notifications.<id>`), un tope de 100 avisos y
+  el estado `read`/`readAt` de cada uno.
+- La campana del encabezado muestra el número de **sin leer** y, al pulsarla,
+  abre la lista completa (título, cuerpo, categoría, hora y destino). Los avisos
+  que llegaron sin leer se resaltan como **Nueva** durante esa visita.
+- **Al abrir la lista todo queda marcado como leído**, así que el contador de la
+  pestaña (`(3) Appsline · Tareas` + punto en el favicon) desaparece. El
+  contador sobrevive a las recargas porque sale de la bandeja, no de la memoria
+  del *toast*.
+- Cada aviso lleva a su destino (`data.url`); se puede quitar de uno en uno o
+  vaciar la lista (con confirmación en el mismo botón).
+- Al tocar la notificación del sistema, el service worker avisa a las pestañas y
+  ese aviso se marca como leído.
+
+El historial es **local a cada navegador**. Si más adelante quieres que el
+usuario vea las mismas notificaciones en todos sus dispositivos (o que se
+registren aunque no tuviera el panel abierto), agrega un endpoint como este y el
+frontend puede hidratar la bandeja con él:
+
+| Método | Ruta | Respuesta esperada |
+|---|---|---|
+| `GET` | `/api/notifications?per_page=50` | `200 { "data": [ { "id", "title", "body", "url", "type", "read_at", "created_at" } ], "meta": { "unread": 3 } }` |
+| `POST` | `/api/notifications/read` | `{ "ids": [1, 2] }` o vacío para todas → `204` |
+
+> Nada de esto es requisito para que el push funcione: hoy el centro de
+> notificaciones funciona solo con lo que ya envía FCM.
 
 ## 3. Lo que debe agregar la API (Laravel)
 
@@ -890,6 +928,8 @@ Seguridad:
 - [ ] Al activar desde la campana, el navegador muestra la notificación de confirmación.
 - [ ] **Diagnóstico de notificaciones** (Configuración → Preferencias): todo en verde y
       las pruebas “Notificación local” y “Simular push” muestran la notificación.
+- [ ] La campana 🔔 lista la notificación recibida y, al abrirla, el título de la
+      pestaña deja de mostrar el contador de sin leer.
 - [ ] `npm run test:unit` y `npm run build` en verde.
 
 **API (Laravel)**

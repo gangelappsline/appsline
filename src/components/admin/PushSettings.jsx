@@ -221,6 +221,12 @@ const PushSettings = ({ className = "" }) => {
                 <code className="font-mono">POST /push/devices/test</code>, se
                 mostrará una notificación local.
               </p>
+              <p>
+                Cada aviso queda guardado en la <strong>campana 🔔 del encabezado</strong>:
+                ahí puedes revisarlo aunque el aviso flotante ya haya desaparecido. La
+                lista se marca como leída al abrirla, y con eso desaparece el contador
+                de la pestaña.
+              </p>
             </Notice>
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">

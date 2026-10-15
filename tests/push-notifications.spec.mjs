@@ -10,9 +10,38 @@ import { test, expect } from "@playwright/test";
  *      espera FCM y se puede registrar/activar en el navegador.
  *   2. Configuración > Preferencias muestra el control de notificaciones sin
  *      depender de si el entorno trae o no las variables `VITE_FIREBASE_*`.
+ *   3. El centro de notificaciones del encabezado: cada push queda guardado en
+ *      `localStorage`, la campana lo lista y, al abrirla, la alerta de la
+ *      pestaña desaparece (antes el aviso se perdía con el *toast*).
  *
  * Todo se intercepta: no se usan cuentas ni datos reales.
  */
+
+/**
+ * Simula un push recibido con la pestaña abierta.
+ *
+ * El service worker reenvía cada push a las pestañas con `postMessage`; aquí se
+ * lanza el mismo evento que emite ese puente (`src/firebase/messaging.js`), sin
+ * depender de Firebase. Se reintenta hasta que el panel lo guarda en la bandeja
+ * (`appsline.notifications.*`), porque el proveedor tarda un instante en montar.
+ */
+const seedPush = async (page, detail) => {
+  await page.evaluate((payload) => {
+    let attempts = 0;
+    const send = () => {
+      attempts += 1;
+      window.dispatchEvent(new CustomEvent("appsline:push-message", { detail: payload }));
+      let stored = false;
+      for (let i = 0; i < localStorage.length; i += 1) {
+        if (localStorage.key(i)?.startsWith("appsline.notifications.")) {
+          stored = true;
+        }
+      }
+      if (!stored && attempts < 60) setTimeout(send, 100);
+    };
+    send();
+  }, detail);
+};
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -84,4 +113,85 @@ test("Configuración > Preferencias ofrece activar las notificaciones push", asy
   // Firebase o el navegador no soporta push (en ese caso la tarjeta explica qué hacer).
   await expect(page.getByRole("button", { name: "Activar notificaciones" })).toBeVisible();
   await expect(page.getByText("Este dispositivo", { exact: true })).toBeVisible();
+});
+
+/**
+ * Centro de notificaciones del encabezado: antes el aviso solo aparecía unos
+ * segundos como *toast* y se perdía. Ahora queda guardado en `localStorage`, la
+ * campana lo lista al pulsarla y, al abrirla, la alerta de la pestaña
+ * (`(1) Appsline · …`) desaparece.
+ */
+test("la campana lista y conserva las notificaciones, y apaga la alerta de la pestaña", async ({
+  page,
+}) => {
+  await page.goto("/admin/dashboard");
+  await seedPush(page, {
+    title: "Nueva tarea asignada",
+    body: "Revisar el sitio de Acme",
+    url: "/admin/tasks",
+  });
+
+  // Aviso pendiente: insignia con el contador y título de la pestaña marcado.
+  const bell = page.getByRole("button", { name: /^Notificaciones/ });
+  await expect(bell).toBeVisible();
+  await expect(bell).toHaveAccessibleName("Notificaciones (1 sin leer)");
+  await expect(page).toHaveTitle(/^\(1\)/);
+
+  // Un clic abre la lista con el contenido completo y marca todo como leído.
+  await bell.click();
+  const panel = page.getByRole("dialog", { name: "Notificaciones" });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByText("Nueva tarea asignada")).toBeVisible();
+  await expect(panel.getByText("Revisar el sitio de Acme")).toBeVisible();
+  // Lo que estaba sin leer se resalta como nuevo durante esta visita.
+  await expect(panel.getByText("Nueva", { exact: true })).toBeVisible();
+  await expect(page).toHaveTitle(/^Appsline/);
+
+  // Sigue ahí después de recargar: la información no se pierde con el toast.
+  await page.reload();
+  await page.getByRole("button", { name: /^Notificaciones/ }).click();
+  const reopened = page.getByRole("dialog", { name: "Notificaciones" });
+  await expect(reopened.getByText("Nueva tarea asignada")).toBeVisible();
+  await expect(reopened.getByText("Leída")).toBeVisible();
+
+  // Y al pulsar el aviso lleva a su destino y cierra el panel.
+  await reopened.getByText("Nueva tarea asignada").click();
+  await expect(page).toHaveURL(/\/admin\/tasks/);
+  await expect(page.getByRole("dialog", { name: "Notificaciones" })).toBeHidden();
+});
+
+test("la lista de notificaciones se puede vaciar", async ({ page }) => {
+  await page.goto("/admin/dashboard");
+  await seedPush(page, { title: "Comentario nuevo", body: "Ana comentó en Acme" });
+
+  await page.getByRole("button", { name: /^Notificaciones/ }).click();
+  const panel = page.getByRole("dialog", { name: "Notificaciones" });
+  await expect(panel.getByText("Comentario nuevo")).toBeVisible();
+
+  // Vaciar pide confirmación en el mismo botón para no borrar por accidente.
+  await panel.getByRole("button", { name: "Vaciar" }).click();
+  await expect(panel.getByText("Comentario nuevo")).toBeVisible();
+  await panel.getByRole("button", { name: "¿Vaciar?" }).click();
+
+  // La bandeja queda vacía. La campana se oculta cuando no hay nada que listar y
+  // el push no se puede activar en este entorno (sin Firebase configurado); con
+  // las push activas se vería la lista con el estado "Sin notificaciones".
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        let total = 0;
+        for (let i = 0; i < localStorage.length; i += 1) {
+          const key = localStorage.key(i);
+          if (!key?.startsWith("appsline.notifications.")) continue;
+          try {
+            total += JSON.parse(localStorage.getItem(key) || "[]").length;
+          } catch {
+            /* clave ajena */
+          }
+        }
+        return total;
+      })
+    )
+    .toBe(0);
+  await expect(panel.getByText("Comentario nuevo")).toBeHidden();
 });
