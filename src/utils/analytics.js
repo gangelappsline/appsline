@@ -7,6 +7,7 @@
  * local para que el panel nunca se quede sin datos.
  */
 import { isOverdue, projectProgress } from "./format";
+import { taskAssignees } from "./assignees";
 
 /* ------------------------------------------------------------------ */
 /* Fechas                                                               */
@@ -179,6 +180,16 @@ export const assigneeOf = (task) => {
     return { id: raw, name: `#${raw}`, raw: null };
   }
   return { id: null, name: "Sin asignar", raw: null };
+};
+
+/**
+ * Todas las personas asignadas a la tarea (puede haber varias). Si no hay
+ * nadie devuelve una sola entrada "Sin asignar" para que la tarea cuente.
+ */
+export const assigneesOf = (task) => {
+  const people = taskAssignees(task);
+  if (!people.length) return [assigneeOf(task)];
+  return people.map((p) => ({ id: p.id, name: p.name || `#${p.id}`, raw: p }));
 };
 
 /** ¿La tarea está vencida y sin cerrar? */
@@ -391,8 +402,8 @@ export const taskAging = (tasks = []) => {
  */
 export const teamWorkload = (tasks = []) => {
   const map = new Map();
-  tasks.forEach((t) => {
-    const { id, name, raw } = assigneeOf(t);
+  // Una tarea con varias personas cuenta en la carga de cada una de ellas.
+  tasks.forEach((t) => assigneesOf(t).forEach(({ id, name, raw }) => {
     const key = id ?? `unassigned-${name}`;
     if (!map.has(key)) {
       map.set(key, {
@@ -427,7 +438,7 @@ export const teamWorkload = (tasks = []) => {
     }
     const cycle = taskCycleDays(t);
     if (cycle !== null) row.cycleDays.push(cycle);
-  });
+  }));
 
   return Array.from(map.values())
     .map((row) => {

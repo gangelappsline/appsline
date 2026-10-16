@@ -21,6 +21,7 @@ import Products from "./pages/admin/Products.jsx";
 import Users from "./pages/admin/Users.jsx";
 import Projects from "./pages/admin/Projects.jsx";
 import Project from "./pages/admin/Project.jsx";
+import Diagrams from "./pages/admin/Diagrams.jsx";
 import Product from "./pages/admin/Product.jsx";
 import Tasks from "./pages/admin/Tasks.jsx";
 import Calendar from "./pages/admin/Calendar.jsx";
@@ -32,6 +33,8 @@ import ToolsAliasRedirect from "./routes/ToolsAliasRedirect.jsx";
 import ToolsFallback from "./components/tools/ToolsFallback.jsx";
 
 /* Las herramientas se cargan bajo demanda (pdf.js, docx y qrcode pesan). */
+/* El editor de diagramas (React Flow) solo se descarga al abrir un diagrama. */
+const DiagramEditor = lazy(() => import("./pages/admin/DiagramEditor.jsx"));
 const ToolsIndex = lazy(() => import("./pages/tools/ToolsIndex.jsx"));
 const QrGenerator = lazy(() => import("./pages/tools/QrGenerator.jsx"));
 const PdfToWord = lazy(() => import("./pages/tools/PdfToWord.jsx"));
@@ -155,6 +158,24 @@ createRoot(document.getElementById("root")).render(
               element={
                 <ProtectedRoute>
                   <Project />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/projects/:id/diagrams/:diagramId"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-100 text-sm text-slate-500">Cargando el editor de diagramas…</div>}>
+                    <DiagramEditor />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/diagrams"
+              element={
+                <ProtectedRoute>
+                  <Diagrams />
                 </ProtectedRoute>
               }
             />

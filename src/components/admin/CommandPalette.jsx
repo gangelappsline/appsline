@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Dialog, Transition } from "@headlessui/react";
 import {
   FiActivity, FiBarChart2, FiBox, FiBriefcase, FiCalendar, FiCheckSquare, FiCornerDownLeft,
-  FiFolder, FiGrid, FiPlus, FiSearch, FiSettings, FiUsers,
+  FiFolder, FiGitBranch, FiGrid, FiPlus, FiSearch, FiSettings, FiUsers,
 } from "react-icons/fi";
 import { fetchProjects } from "../../services/admin";
 import { cx } from "../../utils/format";
@@ -15,6 +15,7 @@ export const PALETTE_SECTIONS = [
   { to: "/admin/tasks", label: "Mi trabajo", hint: "Todas las tareas", icon: FiCheckSquare, keywords: "tareas pendientes trabajo mías" },
   { to: "/admin/calendar", label: "Calendario", hint: "Vencimientos y entregas", icon: FiCalendar, keywords: "fechas agenda eventos" },
   { to: "/admin/projects", label: "Proyectos", hint: "Portafolio de trabajo", icon: FiFolder, keywords: "proyectos portafolio tablero" },
+  { to: "/admin/diagrams", label: "Diagramas", hint: "Diagramas de flujo de proyectos y tareas", icon: FiGitBranch, keywords: "diagramas flujo flowchart procesos" },
   { to: "/admin/clients", label: "Clientes", hint: "Cartera de clientes", icon: FiBriefcase, keywords: "clientes cartera contactos" },
   { to: "/admin/products", label: "Productos", hint: "Catálogo", icon: FiBox, keywords: "productos catálogo inventario" },
   { to: "/admin/users", label: "Usuarios", hint: "Equipo y roles", icon: FiUsers, keywords: "usuarios equipo roles permisos" },

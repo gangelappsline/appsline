@@ -108,6 +108,55 @@ Dos mejoras del tablero de tareas, ambas con el contrato de la API en
   - `src/utils/richText.js` y `src/utils/tasks.js` no tocan el DOM y están
     cubiertos por pruebas unitarias (`npm run test:unit`).
 
+## Varias personas por tarea
+
+Una tarea puede tener **varias personas asignadas** (contrato en
+[`docs/API-TASKS.md` §4](docs/API-TASKS.md)). El panel manda `assignees: [ids]`
+y, por compatibilidad, `assigned_to` con la primera persona; de vuelta acepta
+`assignees` como objetos o ids y, si no viene, usa `assigned_to`.
+
+- Selector múltiple (`UserMultiSelect`) al crear la tarea y en el detalle (chips
+  con quitar, búsqueda, avatares).
+- Pila de avatares en tarjetas del tablero, lista de `/admin/tasks`, calendario,
+  dashboard y analítica. El filtro por persona y "Solo mis tareas" consideran a
+  **toda** la lista, no solo al primero.
+- La carga por persona cuenta una tarea compartida para cada integrante.
+- "Programar siguiente" (recurrencia) conserva a todas las personas.
+- Lógica sin DOM en `src/utils/assignees.js`, con pruebas unitarias.
+
+> Mientras la API no guarde `assignees`, solo se conserva la primera persona
+> (`assigned_to`) al recargar. Los pasos para la API están en el documento.
+
+## Diagramas de flujo
+
+Editor de diagramas de flujo integrado en el panel, guardado **por proyecto** o
+**por tarea**. Contrato y pasos para la API en
+[`docs/API-DIAGRAMS.md`](docs/API-DIAGRAMS.md).
+
+- **Dónde**: pestaña **Diagramas** de cada proyecto, sección **Diagramas** en el
+  detalle de la tarea, vista global `/admin/diagrams` (menú lateral y paleta de
+  comandos) y el editor a pantalla completa en
+  `/admin/projects/:id/diagrams/:diagramId` (`new` para crear).
+- **Editor** (`src/components/admin/flowchart/`, sobre `@xyflow/react`):
+  15 formas (inicio/fin, proceso, decisión, entrada/salida, subproceso,
+  documento, base de datos, operación manual, preparación, espera, conector,
+  fuera de página, nota, texto libre y carril), conexiones por cualquier lado
+  con tipo de línea, flechas, etiqueta, color, grosor, guiones y animación;
+  panel de propiedades con relleno, borde, radio, opacidad, sombra, tipografía,
+  alineación, icono, enlace, descripción, bloqueo y capas; alinear/distribuir,
+  auto-acomodo (vertical u horizontal), cuadrícula/imán, fondos, minimapa, temas
+  de color aplicables a todo el diagrama, plantillas (proceso básico,
+  aprobación, bug, onboarding), deshacer/rehacer, copiar/pegar/duplicar, menú
+  contextual, atajos de teclado, autoguardado y aviso de cambios sin guardar.
+- **Exportar**: PNG, SVG, JSON (reimportable) y **adjuntar** PNG + JSON como
+  archivo del proyecto o de la tarea con los endpoints de archivos ya existentes.
+- **Sin API todavía**: si `/projects/{id}/diagrams` responde 404/405/501, los
+  diagramas se guardan en el navegador (`localStorage`) y el panel lo avisa con
+  una franja ámbar. Al activar la API no hay que cambiar nada en el frontend.
+- `src/utils/diagrams.js` (modelo, normalización, plantillas, auto-acomodo,
+  alineación) está cubierto por pruebas unitarias; el flujo completo está en
+  `tests/diagrams-assignees.spec.mjs` (Playwright).
+
 ## Notificaciones push web (Firebase Cloud Messaging)
 
 Los usuarios con sesión iniciada pueden recibir notificaciones del panel en el

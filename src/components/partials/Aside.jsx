@@ -9,6 +9,7 @@ import {
   FiCheckSquare,
   FiExternalLink,
   FiFolder,
+  FiGitBranch,
   FiGrid,
   FiHelpCircle,
   FiSettings,
@@ -34,6 +35,7 @@ const navSections = [
     title: "Gestión",
     items: [
       { to: "/admin/projects", label: "Proyectos", icon: FiFolder },
+      { to: "/admin/diagrams", label: "Diagramas", icon: FiGitBranch },
       { to: "/admin/clients", label: "Clientes", icon: FiBriefcase },
       { to: "/admin/products", label: "Productos", icon: FiBox },
       { to: "/admin/users", label: "Usuarios", icon: FiUsers },

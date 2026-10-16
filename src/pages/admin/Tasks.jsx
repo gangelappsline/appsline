@@ -6,9 +6,10 @@ import {
 } from "react-icons/fi";
 import LayoutAdmin from "../../layouts/LayoutAdmin";
 import {
-  Avatar, Badge, Button, Card, EmptyState, SearchInput,
+  Avatar, AvatarStack, Badge, Button, Card, EmptyState, SearchInput,
   StatCard, TableSkeleton, Tabs,
 } from "../../components/admin";
+import { assigneeNames, isAssignedTo, taskAssignees } from "../../utils/assignees";
 import { fetchAllTasks, fetchUsers } from "../../services/admin";
 import { useAuth } from "../../routes/AuthContext";
 import { getPageSize } from "../../utils/prefs";
@@ -30,15 +31,6 @@ const TABS = [
   // Las tareas continuas (sin fecha de entrega) no son un estado: son un tipo.
   { key: "ongoing", label: "Continuas" },
 ];
-
-const assigneeIdOf = (t) => {
-  const raw = t?.assigned_to ?? t?.assignees?.[0] ?? t?.user_id ?? "";
-  return typeof raw === "object" && raw ? raw.id ?? "" : raw ?? "";
-};
-const assigneeOf = (t) => {
-  const raw = t?.assigned_to ?? t?.assignees?.[0] ?? t?.user;
-  return typeof raw === "object" && raw ? raw : null;
-};
 
 const Tasks = () => {
   const navigate = useNavigate();
@@ -75,13 +67,8 @@ const Tasks = () => {
 
   useEffect(() => { setPage(0); }, [tab, search, priority, project, onlyMine]);
 
-  const isMine = (t) => {
-    if (!user) return false;
-    const aid = assigneeIdOf(t);
-    if (aid && (String(aid) === String(user.id) || String(aid) === String(user.email))) return true;
-    const a = assigneeOf(t);
-    return a && (a.id === user.id || (a.email && a.email === user.email));
-  };
+  // Una tarea es "mía" si estoy entre sus responsables (puede haber varios).
+  const isMine = (t) => isAssignedTo(t, user);
 
   const stats = useMemo(() => {
     const mine = tasks.filter(isMine);
@@ -231,7 +218,7 @@ const Tasks = () => {
                     <th className="px-6 py-3.5">Tarea</th>
                     <th className="px-6 py-3.5">Estado</th>
                     <th className="px-6 py-3.5">Prioridad</th>
-                    <th className="px-6 py-3.5">Responsable</th>
+                    <th className="px-6 py-3.5">Responsables</th>
                     <th className="px-6 py-3.5">Entrega</th>
                   </tr>
                 </thead>
@@ -242,7 +229,7 @@ const Tasks = () => {
                     const schedule = taskSchedule(t);
                     const ongoing = schedule.kind === "ongoing";
                     const late = schedule.kind === "overdue";
-                    const who = assigneeOf(t) || users.find((u) => String(u.id) === String(assigneeIdOf(t)));
+                    const people = taskAssignees(t, users);
                     return (
                       <tr key={`${t._project?.id}-${t.id}`} onClick={() => openTask(t)} className="cursor-pointer transition hover:bg-slate-50">
                         <td className="max-w-80 px-6 py-3.5">
@@ -267,7 +254,8 @@ const Tasks = () => {
                         </td>
                         <td className="px-6 py-3.5">
                           <span className="flex items-center gap-2 text-slate-600">
-                            <Avatar user={who} size="xs" /> {who?.name || "Sin asignar"}
+                            {people.length ? <AvatarStack users={people} max={3} size="xs" /> : <Avatar user={null} size="xs" />}
+                            <span className="truncate" title={assigneeNames(t, users, 5)}>{assigneeNames(t, users)}</span>
                           </span>
                         </td>
                         <td className="px-6 py-3.5">
