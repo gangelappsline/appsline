@@ -1,12 +1,26 @@
 /* eslint-disable react/prop-types */
 /**
  * Piezas de presentación del explorador de archivos del proyecto:
- * tarjetas, filas de tabla, chips de tarea y acciones por archivo.
+ * tarjetas, filas de tabla, chips de tarea, iconos por tipo y acciones.
  */
+import {
+  FaFile,
+  FaFileArchive,
+  FaFileAudio,
+  FaFileCode,
+  FaFileCsv,
+  FaFileAlt,
+  FaFileExcel,
+  FaFileImage,
+  FaFilePdf,
+  FaFilePowerpoint,
+  FaFileVideo,
+  FaFileWord,
+} from "react-icons/fa";
 import { FiCopy, FiDownload, FiEye, FiPaperclip, FiTrash2 } from "react-icons/fi";
 import { Badge } from "../../../components/admin";
 import { cx, formatDate } from "../../../utils/format";
-import { fileKindMeta, formatBytes, isPreviewable } from "../../../utils/files";
+import { badgeKindOf, canPreviewFile, fileKindMeta, formatBytes } from "../../../utils/files";
 
 /** Botón del conmutador cuadrícula/lista. */
 export const LayoutButton = ({ active, onClick, icon: Icon, label }) => (
@@ -27,34 +41,81 @@ export const LayoutButton = ({ active, onClick, icon: Icon, label }) => (
   </button>
 );
 
-/** Icono cuadrado con los colores del tipo de archivo. */
-export const FileIcon = ({ kind, large = false }) => {
-  const meta = fileKindMeta(kind);
+/**
+ * Iconos "reales" por tipo de archivo: glifo y colores de la aplicación
+ * con la que todo el mundo los reconoce (Word azul, Excel verde,
+ * PowerPoint naranja, PDF rojo...), en lugar de un icono gris genérico.
+ * La clave sale de `badgeKindOf` (extensión primero, `kind` como respaldo).
+ */
+const FILE_BADGE_META = {
+  pdf: { icon: FaFilePdf, iconClass: "bg-red-50 text-[#e5322d]", textClass: "text-[#e5322d]" },
+  word: { icon: FaFileWord, iconClass: "bg-[#e8effa] text-[#2b579a]", textClass: "text-[#2b579a]" },
+  excel: { icon: FaFileExcel, iconClass: "bg-[#e6f4ec] text-[#217346]", textClass: "text-[#217346]" },
+  powerpoint: {
+    icon: FaFilePowerpoint,
+    iconClass: "bg-[#fdeee9] text-[#d24726]",
+    textClass: "text-[#d24726]",
+  },
+  csv: { icon: FaFileCsv, iconClass: "bg-emerald-50 text-emerald-600", textClass: "text-emerald-600" },
+  text: { icon: FaFileAlt, iconClass: "bg-slate-100 text-slate-500", textClass: "text-slate-500" },
+  image: { icon: FaFileImage, iconClass: "bg-sky-50 text-sky-600", textClass: "text-sky-600" },
+  audio: { icon: FaFileAudio, iconClass: "bg-violet-50 text-violet-600", textClass: "text-violet-600" },
+  video: { icon: FaFileVideo, iconClass: "bg-fuchsia-50 text-fuchsia-600", textClass: "text-fuchsia-600" },
+  archive: { icon: FaFileArchive, iconClass: "bg-amber-50 text-amber-600", textClass: "text-amber-600" },
+  code: { icon: FaFileCode, iconClass: "bg-slate-100 text-slate-600", textClass: "text-slate-600" },
+  generic: { icon: FaFile, iconClass: "bg-slate-100 text-slate-500", textClass: "text-slate-500" },
+};
+
+const fileBadgeMeta = (file) => FILE_BADGE_META[badgeKindOf(file)] || FILE_BADGE_META.generic;
+
+/**
+ * Icono cuadrado con los colores del tipo de archivo.
+ * Acepta el archivo normalizado (`file`) o, como antes, solo `kind` (más
+ * `name`/`extension` cuando se tenga, p. ej. en el modal de carga).
+ */
+export const FileIcon = ({ file, kind, name, extension, large = false }) => {
+  const meta = fileBadgeMeta(file || { kind, name, extension });
   const Icon = meta.icon;
   return (
     <span
       className={cx(
-        "flex items-center justify-center rounded-xl",
+        "flex shrink-0 items-center justify-center rounded-xl",
         meta.iconClass,
-        large ? "h-14 w-14 text-2xl" : "h-10 w-10"
+        large ? "h-14 w-14 text-[26px]" : "h-10 w-10 text-lg"
       )}
     >
-      <Icon />
+      <Icon aria-hidden />
     </span>
   );
 };
 
-/** Miniatura de la imagen o, si falla / no es imagen, el icono del tipo. */
-export const FileThumb = ({ file, broken, onBroken }) => {
-  if (broken || file.kind !== "image") return <FileIcon kind={file.kind} large />;
+/**
+ * Miniatura de la tarjeta/fila: la imagen en sí, o el icono del tipo de
+ * archivo sobre su color con la extensión debajo (DOCX, XLSX, PDF...).
+ */
+export const FileThumb = ({ file, broken, onBroken, large = true }) => {
+  if (!broken && file.kind === "image") {
+    return (
+      <img
+        src={file.url}
+        alt={file.name}
+        loading="lazy"
+        onError={onBroken}
+        className="h-full w-full object-cover"
+      />
+    );
+  }
+  if (!large) return <FileIcon file={file} />;
+  const meta = fileBadgeMeta(file);
   return (
-    <img
-      src={file.url}
-      alt={file.name}
-      loading="lazy"
-      onError={onBroken}
-      className="h-full w-full object-cover"
-    />
+    <span className="flex w-full flex-col items-center justify-center gap-1.5 px-2 py-4">
+      <FileIcon file={file} large />
+      {file.extension && (
+        <span className={cx("text-[10px] font-bold uppercase tracking-widest", meta.textClass)}>
+          .{file.extension}
+        </span>
+      )}
+    </span>
   );
 };
 
@@ -99,7 +160,7 @@ export const IconButton = ({ label, icon: Icon, onClick, danger = false }) => (
 /** Acciones por archivo (previsualizar, copiar enlace, descargar, eliminar). */
 export const FileActions = ({ file, onPreview, onCopy, onDelete }) => (
   <div className="flex items-center gap-0.5">
-    {isPreviewable(file) && <IconButton label="Previsualizar" icon={FiEye} onClick={onPreview} />}
+    {canPreviewFile(file) && <IconButton label="Previsualizar" icon={FiEye} onClick={onPreview} />}
     {file.url && <IconButton label="Copiar enlace" icon={FiCopy} onClick={onCopy} />}
     {file.url && (
       <a
@@ -119,7 +180,7 @@ export const FileActions = ({ file, onPreview, onCopy, onDelete }) => (
 
 export const FileCard = ({ file, broken, onPreview, onOpenTask, onCopy, onDelete, onBroken }) => {
   const meta = fileKindMeta(file.kind);
-  const previewable = isPreviewable(file);
+  const previewable = canPreviewFile(file);
   const isProjectFile = !file.task;
 
   return (
@@ -138,7 +199,7 @@ export const FileCard = ({ file, broken, onPreview, onOpenTask, onCopy, onDelete
                 }
               : undefined
           }
-          className="relative flex items-center justify-center overflow-hidden bg-slate-50/50 min-h-16"
+          className="relative flex items-center justify-center overflow-hidden bg-slate-50/50 min-h-24"
         >
           <FileThumb file={file} broken={broken} onBroken={onBroken} />
           <span className="absolute right-2 top-2 rounded-lg bg-slate-900/70 p-1 text-xs text-white opacity-0 transition group-hover:opacity-100">
@@ -146,8 +207,8 @@ export const FileCard = ({ file, broken, onPreview, onOpenTask, onCopy, onDelete
           </span>
         </a>
       ) : (
-        <div className="flex items-center justify-center bg-slate-50/50 min-h-16">
-          <FileIcon kind={file.kind} large />
+        <div className="flex items-center justify-center bg-slate-50/50 min-h-24">
+          <FileThumb file={file} broken={broken} onBroken={onBroken} />
         </div>
       )}
 
@@ -186,7 +247,7 @@ export const FileRow = ({ file, broken, onPreview, onOpenTask, onCopy, onDelete,
     <td className="max-w-80 px-5 py-3">
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl">
-          <FileThumb file={file} broken={broken} onBroken={onBroken} />
+          <FileThumb file={file} broken={broken} onBroken={onBroken} large={false} />
         </span>
         <div className="min-w-0">
           <p className="truncate text-[13px] font-semibold text-slate-800">{file.name}</p>

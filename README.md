@@ -45,6 +45,40 @@ formatos, ejemplos de Laravel y checklist) está en
   `appsline.display.`. Expandir una tarjeta individual es temporal; el control global
   aplica la misma densidad a todas las tarjetas. No se modifican datos del proyecto.
 
+### Previsualización de archivos
+
+En la pestaña **Archivos** del proyecto (y en los adjuntos del detalle de
+tarea) casi todo se puede ver sin descargar, igual que las imágenes:
+
+- **PDF** con el visor nativo del navegador e **imágenes** como hasta ahora.
+- **DOCX, XLSX, PPTX, CSV y TXT/MD** se convierten **en el navegador**:
+  el archivo se descarga y se procesa en el cliente (`mammoth`,
+  `read-excel-file` y `jszip`, cargados bajo demanda solo al previsualizar
+  ese tipo; `src/pages/admin/project/FilePreview.jsx`). Nada se sube a
+  servicios de terceros. El XLSX se muestra por hojas como tabla, el CSV
+  igual, y el PPTX como una vista simplificada con el texto y las imágenes
+  de cada diapositiva (sin el diseño original de PowerPoint).
+- Límite de **20 MB** para convertir en el navegador; por encima (o si la
+  lectura falla) se ofrece abrir/descargar el original.
+- Los formatos sin parser web (**.doc/.xls/.ppt antiguos**, .odt, etc.) no
+  se convierten: muestran el respaldo con su icono y, si la URL del archivo
+  es pública, el botón **“Ver con el visor de Office”** (el visor en línea
+  de Microsoft descarga el archivo desde su URL; no sirve en localhost ni
+  con archivos privados).
+- Cada tipo tiene su **icono con los colores de su aplicación** (Word azul,
+  Excel verde, PowerPoint naranja, PDF rojo…) y la extensión en la tarjeta,
+  tanto en el explorador como en los adjuntos de la tarea.
+- La clasificación y los parsers puros viven en `src/utils/filePreview.js`
+  (cubiertos por `tests/unit/file-preview.test.mjs`) y la e2e que genera
+  documentos reales y los previsualiza está en `tests/file-preview.spec.mjs`.
+
+> **Requisito del backend:** para convertir DOCX/XLSX/PPTX/TXT el panel lee
+> los bytes del archivo con `fetch`, así que el servidor que sirve los
+> archivos (p. ej. `/storage/...`) debe mandar CORS para el origen del
+> panel (o servirlos a través de la API, que ya lo manda). Las imágenes y
+> el PDF no lo necesitan porque los pinta el navegador directamente. Si la
+> lectura falla, la vista previa cae al respaldo sin romperse.
+
 ## Tareas continuas (ongoing) y texto enriquecido
 
 Dos mejoras del tablero de tareas, ambas con el contrato de la API en

@@ -19,6 +19,7 @@ import {
   FiVideo,
 } from "react-icons/fi";
 import { API_URL } from "../services/api";
+import { isOfficeExtension, officeViewerUrl, previewKindOf } from "./filePreview.js";
 
 /* ------------------------------------------------------------------ */
 /* Tipos de archivo                                                    */
@@ -358,9 +359,24 @@ export const normalizeProjectFile = (raw = {}, { task = null, scope = null } = {
   };
 };
 
-/** ¿Se puede previsualizar dentro del panel (sin descargar)? */
+export { badgeKindOf, officeViewerUrl, previewKindOf } from "./filePreview.js";
+
+/**
+ * ¿Se puede previsualizar dentro del panel (sin descargar)?
+ * Imágenes y PDF se muestran con el navegador; DOCX, XLSX, PPTX, CSV y
+ * texto se convierten en el navegador (ver `utils/filePreview.js`).
+ */
 export const isPreviewable = (file) =>
-  Boolean(file?.url) && (file.kind === "image" || file.kind === "pdf");
+  Boolean(file?.url) && previewKindOf(file) !== null;
+
+/**
+ * ¿Merece la pena abrir el modal de previsualización? Además de los formatos
+ * convertibles en el navegador, los documentos de Office antiguos con URL
+ * pública pueden verse con el visor en línea (el modal ofrece ese respaldo).
+ */
+export const canPreviewFile = (file) =>
+  isPreviewable(file) ||
+  Boolean(file?.url && isOfficeExtension(file?.extension) && officeViewerUrl(file.url));
 
 /** Peso legible: 1536 -> "1.5 KB". */
 export const formatBytes = (bytes) => {

@@ -11,7 +11,7 @@ import {
   FiChevronDown,
   FiClock,
   FiDownload,
-  FiFile,
+  FiEye,
   FiFilter,
   FiFlag,
   FiGrid,
@@ -74,7 +74,14 @@ import {
 } from "../../utils/format";
 import { prepareFilesForUpload } from "../../utils/images";
 import CalendarTab from "./project/CalendarTab";
+import FilePreviewModal from "./project/FilePreviewModal";
+import { FileIcon } from "./project/FileViews";
 import FilesTab from "./project/FilesTab";
+import {
+  formatBytes,
+  canPreviewFile,
+  normalizeProjectFile,
+} from "../../utils/files";
 import { peopleMentionedIn } from "../../utils/mentions";
 import {
   isEmptyRichText,
@@ -1601,6 +1608,12 @@ const TaskDrawer = ({
   const schedule = taskSchedule(task);
   const ongoing = schedule.kind === "ongoing";
   const cadence = recurrenceOf(task);
+  const [previewFile, setPreviewFile] = useState(null);
+  // Adjuntos normalizados (tipo, URL absoluta y peso legible) para pintar el
+  // icono de cada formato y poder previsualizarlos como en la pestaña Archivos.
+  const normalizedAttachments = attachments.map((file) =>
+    normalizeProjectFile(file, { task: { id: task.id, title: task.title } }),
+  );
 
   return (
     <Drawer open wide onClose={onClose}>
@@ -1884,30 +1897,39 @@ const TaskDrawer = ({
                 onChange={onFiles}
               />
             </div>
-            {attachments.length > 0 ? (
+            {normalizedAttachments.length > 0 ? (
               <div className="mt-3 space-y-2">
-                {attachments.map((f, i) => (
+                {normalizedAttachments.map((f) => (
                   <div
-                    key={f.id || i}
+                    key={f.key}
                     className="flex items-center gap-3 rounded-xl border border-slate-200 p-2.5"
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-                      <FiFile />
-                    </span>
+                    <FileIcon file={f} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-semibold text-slate-700">
-                        {f.name || f.file_name || `Archivo ${i + 1}`}
+                        {f.name}
                       </p>
                       <p className="text-xs text-slate-400">
-                        {f.size
-                          ? `${Math.ceil(f.size / 1024)} KB`
-                          : "Archivo adjunto"}
+                        {f.kindLabel}
+                        {f.size ? ` · ${formatBytes(f.size)}` : ""}
                       </p>
                     </div>
-                    {(f.url || f.path) && (
+                    {canPreviewFile(f) && (
+                      <button
+                        type="button"
+                        title="Previsualizar"
+                        aria-label={`Previsualizar ${f.name}`}
+                        onClick={() => setPreviewFile(f)}
+                        className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                      >
+                        <FiEye />
+                      </button>
+                    )}
+                    {f.url && (
                       <a
-                        href={f.url || f.path}
-                        download
+                        href={f.url}
+                        target="_blank"
+                        rel="noreferrer"
                         title="Descargar"
                         className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
                       >
@@ -2045,6 +2067,7 @@ const TaskDrawer = ({
           )}
         </div>
       </div>
+      <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
     </Drawer>
   );
 };
