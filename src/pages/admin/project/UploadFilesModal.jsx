@@ -183,7 +183,10 @@ const UploadFilesModal = ({
                   key={item.id}
                   className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-2.5"
                 >
-                  <FileIcon kind={kindOfFile({ name: item.file.name, mime: item.file.type })} />
+                  <FileIcon
+                    kind={kindOfFile({ name: item.file.name, mime: item.file.type })}
+                    name={item.file.name}
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px] font-semibold text-slate-700">
                       {item.file.name}

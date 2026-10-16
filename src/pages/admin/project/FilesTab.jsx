@@ -3,10 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FiAlertCircle,
   FiColumns,
-  FiCopy,
-  FiDownload,
   FiEye,
-  FiFile,
   FiFolder,
   FiInfo,
   FiList,
@@ -22,7 +19,6 @@ import {
   ConfirmDialog,
   EmptyState,
   MiniStat,
-  Modal,
   SearchInput,
   TableSkeleton,
   useToast,
@@ -35,14 +31,15 @@ import {
   readApiStatus,
   uploadProjectFiles,
 } from "../../../services/admin";
-import { cx, formatDateTime } from "../../../utils/format";
+import { cx } from "../../../utils/format";
 import {
   FILE_GROUPS,
   formatBytes,
   groupOfKind,
-  isPreviewable,
+  canPreviewFile,
   normalizeProjectFile,
 } from "../../../utils/files";
+import FilePreviewModal from "./FilePreviewModal";
 import { FileCard, FileRow, LayoutButton } from "./FileViews";
 import UploadFilesModal from "./UploadFilesModal";
 
@@ -599,7 +596,7 @@ const FilesTab = ({ projectId, projectName, tasks = [], onOpenTask, onCountChang
                 key={file.key}
                 file={file}
                 broken={!file.url || brokenThumbs.has(file.url)}
-                onPreview={() => isPreviewable(file) && setPreview(file)}
+                onPreview={() => canPreviewFile(file) && setPreview(file)}
                 onOpenTask={() => openTaskOf(file)}
                 onCopy={() => copyLink(file)}
                 onDelete={() => setPendingDelete(file)}
@@ -626,7 +623,7 @@ const FilesTab = ({ projectId, projectName, tasks = [], onOpenTask, onCountChang
                       key={file.key}
                       file={file}
                       broken={!file.url || brokenThumbs.has(file.url)}
-                      onPreview={() => isPreviewable(file) && setPreview(file)}
+                      onPreview={() => canPreviewFile(file) && setPreview(file)}
                       onOpenTask={() => openTaskOf(file)}
                       onCopy={() => copyLink(file)}
                       onDelete={() => setPendingDelete(file)}
@@ -664,72 +661,7 @@ const FilesTab = ({ projectId, projectName, tasks = [], onOpenTask, onCountChang
       />
 
       {/* ---------- Previsualización ---------- */}
-      <Modal
-        open={Boolean(preview)}
-        onClose={() => setPreview(null)}
-        size="2xl"
-        title={preview?.name}
-        subtitle={
-          preview
-            ? [
-                preview.kindLabel,
-                preview.size ? formatBytes(preview.size) : null,
-                preview.task?.title || "Archivo del proyecto",
-                preview.createdAt ? formatDateTime(preview.createdAt) : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")
-            : ""
-        }
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setPreview(null)}>
-              Cerrar
-            </Button>
-            {preview?.url && (
-              <>
-                <Button variant="secondary" onClick={() => copyLink(preview)}>
-                  <FiCopy /> Copiar enlace
-                </Button>
-                <a
-                  href={preview.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-secondary text-brand-700"
-                >
-                  <FiDownload /> Abrir original
-                </a>
-              </>
-            )}
-          </>
-        }
-      >
-        {preview && isPreviewable(preview) ? (
-          preview.kind === "image" ? (
-            <img
-              src={preview.url}
-              alt={preview.name}
-              className="mx-auto max-h-[60vh] w-auto rounded-xl border border-slate-200 object-contain"
-            />
-          ) : (
-            <iframe
-              src={preview.url}
-              title={preview.name}
-              className="h-[60vh] w-full rounded-xl border border-slate-200 bg-slate-50"
-            />
-          )
-        ) : (
-          <div className="flex flex-col items-center gap-2 py-10 text-center">
-            <FiFile className="text-2xl text-slate-300" />
-            <p className="text-sm font-medium text-slate-600">
-              Este tipo de archivo no se puede previsualizar
-            </p>
-            <p className="text-xs text-slate-400">
-              Descárgalo para abrirlo en tu equipo o compartirlo con el cliente.
-            </p>
-          </div>
-        )}
-      </Modal>
+      <FilePreviewModal file={preview} onClose={() => setPreview(null)} onCopy={copyLink} />
 
       {/* ---------- Eliminar ---------- */}
       <ConfirmDialog
