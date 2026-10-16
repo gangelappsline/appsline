@@ -1,3 +1,4 @@
+import { taskAssignees } from "../utils/assignees";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchDashboard, fetchProjects } from "../services/admin";
 
@@ -74,15 +75,8 @@ export const useDashboard = () => {
     if (asList(payload.tasks_per_user).length) return payload.tasks_per_user;
     const map = {};
     const now = new Date();
-    allTasks.forEach((t) => {
-      const uid =
-        typeof t.assigned_to === "object"
-          ? t.assigned_to?.id
-          : t.assigned_to ?? t.user_id ?? null;
-      const name =
-        typeof t.assigned_to === "object"
-          ? t.assigned_to?.name
-          : t.user?.name ?? `#${uid ?? "?"}`;
+    // Una tarea con varias personas asignadas cuenta para cada una.
+    allTasks.forEach((t) => taskAssignees(t).forEach(({ id: uid, name }) => {
       if (!uid) return;
       if (!map[uid]) map[uid] = { id: uid, name, total: 0, on_time: 0, late: 0 };
       map[uid].total++;
@@ -94,7 +88,7 @@ export const useDashboard = () => {
       } else if (!finished && due && due < now) {
         map[uid].late++;
       }
-    });
+    }));
     return Object.values(map);
   }, [payload, allTasks]);
 

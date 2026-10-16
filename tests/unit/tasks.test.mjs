@@ -138,6 +138,7 @@ test("la siguiente ronda se crea como tarea puntual con su fecha", () => {
     description: "<p>Enviar el <strong>reporte</strong></p>",
     status: "pending",
     priority: "high",
+    assignees: [7],
     assigned_to: 7,
     estimated_hours: 2,
     task_type: TASK_TYPE_ONCE,

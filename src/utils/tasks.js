@@ -17,6 +17,7 @@
  * El panel es tolerante: también reconoce `is_ongoing`, `is_recurring`,
  * `recurring` o `type` por si el backend ya usaba otro nombre.
  */
+import { assigneesPayload, taskAssigneeIds } from "./assignees.js";
 import { formatDate, isOverdue } from "./format.js";
 import { richTextToPlain } from "./richText.js";
 
@@ -266,7 +267,8 @@ export const nextRoundPayload = (task, dateISO) => ({
   description: task?.description || "",
   status: "pending",
   priority: task?.priority || "medium",
-  assigned_to: task?.assigned_to ?? task?.assignees?.[0]?.id ?? task?.user_id ?? null,
+  // Todas las personas asignadas pasan a la siguiente ronda.
+  ...assigneesPayload(taskAssigneeIds(task)),
   estimated_hours:
     task?.estimated_hours === undefined || task?.estimated_hours === null
       ? null

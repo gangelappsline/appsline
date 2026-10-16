@@ -24,6 +24,7 @@ export { default as SubtaskProgress, subtaskRollup, isSubtaskDone } from "./Subt
 export { default as SearchInput } from "./SearchInput";
 export { default as StatCard } from "./StatCard";
 export { default as Tabs } from "./Tabs";
+export { default as UserMultiSelect } from "./UserMultiSelect";
 export { Skeleton, TableSkeleton, CardsSkeleton } from "./Skeleton";
 export { ToastProvider, useToast, TOASTS_PREF_KEY, toastsEnabled } from "./Toasts";
 export { ProgressRing, BarChart, RankBars } from "./Charts";

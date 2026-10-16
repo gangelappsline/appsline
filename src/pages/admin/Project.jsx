@@ -14,6 +14,7 @@ import {
   FiEye,
   FiFilter,
   FiFlag,
+  FiGitBranch,
   FiGrid,
   FiLink,
   FiList,
@@ -50,6 +51,7 @@ import {
   RichTextEditor,
   SearchInput,
   SubtaskProgress,
+  UserMultiSelect,
   useToast,
 } from "../../components/admin";
 import {
@@ -77,6 +79,14 @@ import CalendarTab from "./project/CalendarTab";
 import FilePreviewModal from "./project/FilePreviewModal";
 import { FileIcon } from "./project/FileViews";
 import FilesTab from "./project/FilesTab";
+import DiagramsTab, { TaskDiagramsSection } from "./project/DiagramsTab";
+import { fetchTaskDiagrams } from "../../services/diagrams";
+import {
+  assigneeNames,
+  assigneesPayload,
+  taskAssigneeIds,
+  taskAssignees,
+} from "../../utils/assignees";
 import {
   formatBytes,
   canPreviewFile,
@@ -145,14 +155,15 @@ const columnOf = (status) =>
   COLUMNS.find((c) => c.key === status) || COLUMNS[0];
 
 /** Vistas de la página; la clave viaja en `?view=` para poder compartirla. */
-const VIEW_KEYS = ["board", "list", "calendar", "files"];
+const VIEW_KEYS = ["board", "list", "calendar", "files", "diagrams"];
 
 const EMPTY_TASK = {
   title: "",
   description: "",
   status: "pending",
   priority: "medium",
-  assigned_to: "",
+  /* Varias personas: ids. `assigned_to` se deriva (la primera) por compatibilidad. */
+  assignees: [],
   due_date: "",
   estimated_hours: "",
   /* "once" = puntual (con fecha) · "ongoing" = continua (sin fecha) */
@@ -160,15 +171,9 @@ const EMPTY_TASK = {
   recurrence: "none",
 };
 
-/* Helpers tolerantes a las distintas formas de "responsable" de la API. */
-const assigneeOf = (task) => {
-  const raw = task?.assigned_to ?? task?.assignees?.[0] ?? task?.user;
-  return typeof raw === "object" && raw ? raw : null;
-};
-const assigneeId = (task) => {
-  const raw = task?.assigned_to ?? task?.assignees?.[0] ?? task?.user_id ?? "";
-  return typeof raw === "object" && raw ? (raw.id ?? "") : (raw ?? "");
-};
+/** ¿La tarea tiene asignada a esta persona? (acepta varias personas por tarea). */
+const hasAssignee = (task, personId) =>
+  taskAssigneeIds(task).some((id) => String(id) === String(personId));
 
 /**
  * Personas mencionadas en un comentario. La API puede devolver objetos de
@@ -218,6 +223,10 @@ const Project = () => {
     return VIEW_KEYS.includes(requested) ? requested : "board";
   });
   const [fileCount, setFileCount] = useState(null);
+  const [diagramCount, setDiagramCount] = useState(null);
+  /* Diagramas de flujo vinculados a la tarea abierta en el detalle. */
+  const [taskDiagrams, setTaskDiagrams] = useState([]);
+  const [taskDiagramsLoading, setTaskDiagramsLoading] = useState(false);
   const [summaryOpen, setSummaryOpen] = useDisplayPreference(
     "project.summary",
     false,
@@ -286,7 +295,7 @@ const Project = () => {
       return (
         matches &&
         (!priority || task.priority === priority) &&
-        (!person || String(assigneeId(task)) === String(person)) &&
+        (!person || hasAssignee(task, person)) &&
         (!taskType ||
           (taskType === TASK_TYPE_ONGOING
             ? isOngoingTask(task)
@@ -370,6 +379,7 @@ const Project = () => {
   };
 
   const handleFilesCount = useCallback((count) => setFileCount(count), []);
+  const handleDiagramsCount = useCallback((count) => setDiagramCount(count), []);
 
   const handleDrop = (status) => {
     setDropColumn(null);
@@ -391,7 +401,7 @@ const Project = () => {
         description: isEmptyRichText(draft.description)
           ? ""
           : toRichHtml(draft.description),
-        assigned_to: draft.assigned_to || null,
+        ...assigneesPayload(draft.assignees),
         estimated_hours:
           draft.estimated_hours === "" ? null : Number(draft.estimated_hours),
         due_date: ongoing ? null : draft.due_date || null,
@@ -457,6 +467,12 @@ const Project = () => {
         : [],
     );
     setDetailTab("comments");
+    setTaskDiagrams([]);
+    setTaskDiagramsLoading(true);
+    fetchTaskDiagrams(id, task.id)
+      .then((list) => setTaskDiagrams(list))
+      .catch(() => setTaskDiagrams([]))
+      .finally(() => setTaskDiagramsLoading(false));
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -789,6 +805,14 @@ const Project = () => {
               count={fileCount}
               title="Archivos del proyecto y de sus tareas"
             />
+            <ViewTab
+              active={view === "diagrams"}
+              onClick={() => changeView("diagrams")}
+              icon={FiGitBranch}
+              label="Diagramas"
+              count={diagramCount}
+              title="Diagramas de flujo del proyecto y de sus tareas"
+            />
           </div>
           <div className="flex items-center gap-2">
             {view === "files" && (
@@ -813,7 +837,7 @@ const Project = () => {
         <div
           className={cx(
             "border-b border-slate-100 bg-white px-3 py-2 sm:px-4",
-            view === "files" && "hidden",
+            (view === "files" || view === "diagrams") && "hidden",
           )}
         >
           <div className="flex flex-wrap items-center gap-2">
@@ -961,6 +985,7 @@ const Project = () => {
                       (t) => (t.status || "pending") === col.key,
                     )}
                     projectId={id}
+                    users={users}
                     compactCards={compactCards}
                     isDropTarget={dropColumn === col.key}
                     onDragOver={(e) => {
@@ -981,13 +1006,20 @@ const Project = () => {
               </div>
             </div>
           ) : view === "list" ? (
-            <TaskTable tasks={filtered} onOpen={openTask} />
+            <TaskTable tasks={filtered} users={users} onOpen={openTask} />
           ) : view === "calendar" ? (
             <CalendarTab
               project={project}
               tasks={filtered}
               onOpenTask={openTask}
               onReschedule={rescheduleTask}
+            />
+          ) : view === "diagrams" ? (
+            <DiagramsTab
+              projectId={id}
+              tasks={tasks}
+              onOpenTask={openTask}
+              onCountChange={handleDiagramsCount}
             />
           ) : (
             <FilesTab
@@ -1104,21 +1136,17 @@ const Project = () => {
               <option value="low">Baja</option>
             </select>
           </Field>
-          <Field label="Responsable">
-            <select
-              value={draft.assigned_to}
-              onChange={(e) =>
-                setDraft({ ...draft, assigned_to: e.target.value })
-              }
-              className="admin-input"
-            >
-              <option value="">Sin asignar</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
+          <Field
+            label="Responsables"
+            hint="Puedes asignar a varias personas; todas la verán en “Mi trabajo”."
+          >
+            <UserMultiSelect
+              users={users}
+              value={draft.assignees}
+              onChange={(ids) => setDraft({ ...draft, assignees: ids })}
+              placeholder="Sin asignar"
+              ariaLabel="Responsables de la tarea"
+            />
           </Field>
           {draft.task_type === TASK_TYPE_ONGOING ? (
             <Field
@@ -1193,6 +1221,9 @@ const Project = () => {
           setNewSubtask={setNewSubtask}
           onAddSubtask={addSubtask}
           onToggleSubtask={toggleSubtask}
+          projectId={id}
+          diagrams={taskDiagrams}
+          diagramsLoading={taskDiagramsLoading}
         />
       )}
       <ConfirmDialog
@@ -1253,6 +1284,7 @@ const KanbanColumn = ({
   onAdd,
   hasFilters,
   compactCards,
+  users = [],
 }) => {
   const Icon = column.icon;
   return (
@@ -1301,6 +1333,7 @@ const KanbanColumn = ({
             key={`${task.id}-${compactCards}`}
             compact={compactCards}
             task={task}
+            users={users}
             projectId={projectId}
             color={column.color}
             onOpen={() => onOpen(task)}
@@ -1331,10 +1364,10 @@ const KanbanColumn = ({
   );
 };
 
-const TaskCard = ({ task, projectId, color, onOpen, onDrag, compact }) => {
+const TaskCard = ({ task, users = [], projectId, color, onOpen, onDrag, compact }) => {
   const [expanded, setExpanded] = useState(!compact);
   const detailsId = `task-card-details-${task.id}`;
-  const user = assigneeOf(task);
+  const people = taskAssignees(task, users);
   const subtasks = task.subtasks || [];
   const tags = task.tags || task.labels || [];
   const commentCount = task.comments_count ?? task.comments?.length ?? 0;
@@ -1454,7 +1487,13 @@ const TaskCard = ({ task, projectId, color, onOpen, onDrag, compact }) => {
       </div>
 
       <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
-        <Avatar user={user} size="xs" />
+        <span title={assigneeNames(task, users, 3)} className="flex items-center">
+          {people.length ? (
+            <AvatarStack users={people} max={3} size="xs" />
+          ) : (
+            <Avatar user={null} size="xs" />
+          )}
+        </span>
         <div className="flex items-center gap-2.5 text-xs text-slate-400">
           {commentCount > 0 && (
             <span className="flex items-center gap-1">
@@ -1477,7 +1516,7 @@ const TaskCard = ({ task, projectId, color, onOpen, onDrag, compact }) => {
   );
 };
 
-const TaskTable = ({ tasks, onOpen }) => (
+const TaskTable = ({ tasks, users = [], onOpen }) => (
   <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
     <div className="overflow-x-auto">
       <table className="w-full min-w-[760px] text-left text-sm">
@@ -1486,7 +1525,7 @@ const TaskTable = ({ tasks, onOpen }) => (
             <th className="px-5 py-3.5">Tarea</th>
             <th className="px-5 py-3.5">Estado</th>
             <th className="px-5 py-3.5">Prioridad</th>
-            <th className="px-5 py-3.5">Responsable</th>
+            <th className="px-5 py-3.5">Responsables</th>
             <th className="px-5 py-3.5">Entrega</th>
           </tr>
         </thead>
@@ -1494,7 +1533,7 @@ const TaskTable = ({ tasks, onOpen }) => (
           {tasks.map((task) => {
             const col = columnOf(task.status);
             const prio = priorityMeta(task.priority);
-            const user = assigneeOf(task);
+            const people = taskAssignees(task, users);
             const schedule = taskSchedule(task);
             return (
               <tr
@@ -1533,8 +1572,14 @@ const TaskTable = ({ tasks, onOpen }) => (
                 </td>
                 <td className="px-5 py-3.5">
                   <span className="flex items-center gap-2 text-slate-600">
-                    <Avatar user={user} size="xs" />{" "}
-                    {user?.name || "Sin asignar"}
+                    {people.length ? (
+                      <AvatarStack users={people} max={3} size="xs" />
+                    ) : (
+                      <Avatar user={null} size="xs" />
+                    )}{" "}
+                    <span className="truncate" title={assigneeNames(task, users, 5)}>
+                      {assigneeNames(task, users)}
+                    </span>
                   </span>
                 </td>
                 <td
@@ -1600,6 +1645,9 @@ const TaskDrawer = ({
   setNewSubtask,
   onAddSubtask,
   onToggleSubtask,
+  projectId,
+  diagrams = [],
+  diagramsLoading = false,
 }) => {
   const subtasks = task.subtasks || [];
   const doneCount = subtasks.filter(
@@ -1712,22 +1760,15 @@ const TaskDrawer = ({
                 <option value="low">Baja</option>
               </select>
             </Property>
-            <Property icon={FiUser} label="Responsable">
-              <select
-                aria-label="Responsable"
-                value={assigneeId(task) || ""}
-                onChange={(e) =>
-                  onUpdate({ assigned_to: e.target.value || null })
-                }
-                className="admin-input !w-auto !border-transparent !bg-slate-50 !py-1.5 text-[13px] font-semibold"
-              >
-                <option value="">Sin asignar</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
+            <Property icon={FiUsers} label="Responsables">
+              <UserMultiSelect
+                compact
+                users={users}
+                value={taskAssigneeIds(task)}
+                onChange={(ids) => onUpdate(assigneesPayload(ids))}
+                placeholder="Sin asignar"
+                ariaLabel="Responsables"
+              />
             </Property>
             <Property icon={FiRepeat} label="Tipo de tarea">
               <select
@@ -1875,6 +1916,14 @@ const TaskDrawer = ({
               </button>
             </div>
           </section>
+
+          {/* Diagramas de flujo vinculados a la tarea */}
+          <TaskDiagramsSection
+            projectId={projectId}
+            task={task}
+            diagrams={diagrams}
+            loading={diagramsLoading}
+          />
 
           {/* Archivos */}
           <section className="py-5">

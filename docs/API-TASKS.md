@@ -1,6 +1,6 @@
-# Tareas continuas, recurrencia y texto enriquecido
+# Tareas continuas, recurrencia, texto enriquecido y varias personas asignadas
 
-Contrato con la API para las dos mejoras del tablero de tareas:
+Contrato con la API para las mejoras del tablero de tareas:
 
 1. **Tareas continuas / recurrentes** (`ongoing`): trabajo que se mantiene abierto
    y **no tiene fecha de entrega** (soporte, mantenimiento, seguimiento de un
@@ -8,6 +8,8 @@ Contrato con la API para las dos mejoras del tablero de tareas:
    ronda.
 2. **Descripciones y comentarios con formato**: el texto viaja como **HTML
    sencillo** (`<strong>`, `<ul><li>`, `<a>`…), no como texto plano.
+3. **Varias personas asignadas** a una misma tarea (`assignees`), manteniendo
+   `assigned_to` por compatibilidad. Ver §4.
 
 > El frontend ya está implementado (`src/utils/tasks.js` y
 > `src/utils/richText.js` son la referencia). Este documento es la parte que hay
@@ -256,7 +258,162 @@ Los avisos de "vence pronto" / "vencida" deben ignorar las tareas `ongoing`
 
 ---
 
-## 4. Checklist
+## 4. Varias personas asignadas (`assignees`)
+
+### Qué manda el panel
+
+Al crear o editar una tarea el panel envía **las dos cosas**:
+
+```json
+{
+  "title": "Integrar pasarela de pago",
+  "assignees": [3, 7, 12],
+  "assigned_to": 3
+}
+```
+
+- `assignees`: arreglo de **ids de usuario**, sin repetidos, en el orden en que se
+  eligieron. Vacío (`[]`) significa "sin asignar".
+- `assigned_to`: la **primera** persona del arreglo (o `null`). Existe solo para
+  que la API actual siga funcionando mientras se agrega el soporte; cuando la
+  API ya lea `assignees`, puede ignorar `assigned_to` o seguir guardándolo como
+  "responsable principal".
+
+Al cambiar la asignación desde el detalle de la tarea se manda un `PUT` con esos
+dos campos (y nada más).
+
+### Qué espera de vuelta
+
+En `GET .../tasks` y `GET .../tasks/{id}`:
+
+```json
+{
+  "id": 42,
+  "assigned_to": { "id": 3, "name": "Ana García", "avatar": "https://…" },
+  "assignees": [
+    { "id": 3, "name": "Ana García", "avatar": "https://…" },
+    { "id": 7, "name": "Luis Pérez", "avatar": null },
+    { "id": 12, "name": "Marta Ruiz", "avatar": null }
+  ]
+}
+```
+
+Tolerancia del panel (`src/utils/assignees.js`): acepta `assignees` como objetos
+o como ids (`[3, 7, 12]`), y también `assigned_users`, `assignee_ids` o
+`assigned_user_ids`. Si solo llega `assigned_to`, esa persona es la única
+asignada. Si llegan ambos y `assigned_to` no está en la lista, se agrega al
+frente (así no se pierde nada durante la transición).
+
+### Migración (pivote)
+
+```php
+// database/migrations/2026_10_16_000001_create_task_user_table.php
+Schema::create('task_user', function (Blueprint $table) {
+    $table->foreignId('task_id')->constrained()->cascadeOnDelete();
+    $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+    $table->unsignedSmallInteger('position')->default(0); // orden elegido en el panel
+    $table->timestamps();
+    $table->primary(['task_id', 'user_id']);
+});
+
+// Copia la asignación actual al pivote para no perder datos.
+DB::table('tasks')->whereNotNull('assigned_to')->orderBy('id')->chunk(500, function ($tasks) {
+    $rows = $tasks->map(fn ($t) => [
+        'task_id' => $t->id, 'user_id' => $t->assigned_to, 'position' => 0,
+        'created_at' => now(), 'updated_at' => now(),
+    ])->all();
+    DB::table('task_user')->insertOrIgnore($rows);
+});
+```
+
+### Modelo
+
+```php
+// app/Models/Task.php
+public function assignees()
+{
+    return $this->belongsToMany(User::class)
+        ->withPivot('position')
+        ->withTimestamps()
+        ->orderByPivot('position');
+}
+
+/** Responsable principal (compatibilidad): el primero de la lista. */
+public function assignee()
+{
+    return $this->belongsTo(User::class, 'assigned_to');
+}
+```
+
+### Validación y guardado
+
+```php
+// StoreTaskRequest / UpdateTaskRequest
+'assignees' => ['sometimes', 'array', 'max:20'],
+'assignees.*' => ['integer', 'distinct', 'exists:users,id'],
+'assigned_to' => ['nullable', 'exists:users,id'],
+```
+
+```php
+// TaskController@store / @update
+$data = $request->validated();
+$assignees = $data['assignees'] ?? null;
+unset($data['assignees']);
+
+// Compatibilidad: si solo llega assigned_to (cliente viejo) se convierte en lista.
+if ($assignees === null && array_key_exists('assigned_to', $data)) {
+    $assignees = $data['assigned_to'] ? [$data['assigned_to']] : [];
+}
+if ($assignees !== null) {
+    $data['assigned_to'] = $assignees[0] ?? null; // principal = el primero
+}
+
+$task = isset($task) ? tap($task)->update($data) : $project->tasks()->create($data);
+
+if ($assignees !== null) {
+    $task->assignees()->sync(
+        collect($assignees)->values()->mapWithKeys(fn ($id, $i) => [$id => ['position' => $i]])->all()
+    );
+}
+
+return new TaskResource($task->load('assignees', 'assignee'));
+```
+
+### Recurso
+
+```php
+// TaskResource
+'assigned_to' => $this->whenLoaded('assignee', fn () => UserResource::make($this->assignee)),
+'assignees' => UserResource::collection($this->whenLoaded('assignees')),
+```
+
+Carga siempre `assignees` en los listados (`->with('assignees')`) para que el
+tablero no tenga que adivinar.
+
+### Dónde impacta en el resto de la API
+
+- **Notificaciones** (push, correo, "tarea asignada", menciones): avisar a
+  **todas** las personas de `assignees`, no solo a `assigned_to`.
+- **"Mis tareas" / filtros por usuario**: `whereHas('assignees', fn ($q) => $q->where('users.id', $userId))`
+  en lugar de `where('assigned_to', $userId)`.
+- **Analítica por persona** (`/analytics/team`, carga de trabajo): una tarea con
+  tres personas cuenta en la carga de las tres. El panel ya lo calcula así en el
+  cliente (`teamWorkload` en `src/utils/analytics.js`).
+- **Dashboard** (`tasks_per_user`): ídem.
+
+### Checklist
+
+- [ ] Tabla pivote `task_user` con la copia de `assigned_to`.
+- [ ] `POST/PUT .../tasks` aceptan `assignees[]` y hacen `sync` (manteniendo `assigned_to` = primero).
+- [ ] `GET` devuelve `assignees` (objetos con `id`, `name`, `avatar`) en listados y detalle.
+- [ ] Notificaciones y "mis tareas" consideran a todas las personas asignadas.
+- [x] Panel: selector múltiple al crear/editar, pila de avatares en tarjetas y listas,
+      filtro por persona que busca en toda la lista, "Mi trabajo" cuenta la tarea si
+      estoy entre los asignados, "Programar siguiente" conserva a todas las personas.
+
+---
+
+## 5. Checklist general
 
 **Base de datos**
 
