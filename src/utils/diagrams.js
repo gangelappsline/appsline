@@ -68,6 +68,87 @@ export const SHAPE_GROUPS = [
 
 export const shapeMeta = (key) => SHAPES.find((s) => s.key === key) || SHAPES[1];
 
+/** Tipo de nodo/conexión de React Flow que usa el editor. */
+export const FLOW_TYPE = "flow";
+
+/** Forma que se dibuja cuando un nodo llega sin ningún tipo reconocible. */
+export const FALLBACK_SHAPE = "process";
+
+/**
+ * Nombres alternativos de cada forma.
+ *
+ * Un backend, una importación o una integración pueden guardar «diamond» en
+ * lugar de «decision». Antes cualquier valor no idéntico a una clave del
+ * catálogo se convertía en «process» y el tipo se perdía para siempre al
+ * volver a guardar.
+ */
+export const SHAPE_ALIASES = {
+  start: "terminal", end: "terminal", terminator: "terminal", oval: "terminal", ellipse: "terminal", stadium: "terminal",
+  inicio: "terminal", fin: "terminal", comienzo: "terminal", terminador: "terminal",
+  rect: "process", rectangle: "process", action: "process", step: "process", task: "process",
+  actividad: "process", proceso: "process", rectangulo: "process",
+  diamond: "decision", rhombus: "decision", question: "decision", condition: "decision",
+  pregunta: "decision", decision_diamond: "decision", rombo: "decision",
+  data: "io", parallelogram: "io", entrada: "io", salida: "io", entrada_salida: "io", paralelogramo: "io",
+  sub_process: "subprocess", predefined: "subprocess", predefined_process: "subprocess",
+  subproceso: "subprocess", proceso_predefinido: "subprocess",
+  doc: "document", report: "document", documento: "document", reporte: "document",
+  db: "database", cylinder: "database", storage: "database", base_de_datos: "database", cilindro: "database",
+  manual_input: "manual", manual_operation: "manual", entrada_manual: "manual", operacion_manual: "manual",
+  prep: "preparation", hexagon: "preparation", preparacion: "preparation", hexagono: "preparation",
+  wait: "delay", pause: "delay", espera: "delay", retraso: "delay", demora: "delay",
+  circle: "connector", jump: "connector", conector: "connector", punto_de_conexion: "connector",
+  off_page: "offpage", off_page_connector: "offpage", fuera_de_pagina: "offpage", continuacion: "offpage",
+  comment: "note", annotation: "note", sticky: "note", nota: "note", comentario: "note", anotacion: "note",
+  label: "text", texto: "text", texto_libre: "text",
+  img: "image", picture: "image", photo: "image", imagen: "image", fotografia: "image",
+  glyph: "icon", icono: "icon", simbolo: "icon",
+  lane: "swimlane", pool: "swimlane", group: "swimlane", carril: "swimlane", banda: "swimlane", grupo: "swimlane",
+};
+
+const shapeName = (value) =>
+  String(value)
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\s/-]+/g, "_");
+
+/** Traduce cualquier nombre de forma a una clave del catálogo (`null` si no existe). */
+export const resolveShapeKey = (value) => {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const known = (key) => (SHAPES.some((shape) => shape.key === key) ? key : SHAPE_ALIASES[key] || null);
+  const key = shapeName(value);
+  // «swim-lane», «sub process» o «off_page» también son nombres válidos.
+  return known(key) || known(key.replace(/_/g, ""));
+};
+
+/** Campos donde distintas versiones o integraciones llegan a guardar el tipo. */
+const SHAPE_FIELDS = ["shape", "shapeKey", "shape_key", "shapeType", "shape_type", "nodeType", "node_type"];
+
+/**
+ * Tipo de un nodo tal como viene guardado.
+ *
+ * Busca en todos los sitios razonables (`data.shape`, `data.shapeType`,
+ * `node.shape`, `node.type`…) y acepta sinónimos. Si el valor no es del
+ * catálogo se conserva tal cual en lugar de reescribirlo a «process»: se dibuja
+ * como rectángulo, pero una corrección posterior todavía puede recuperarlo.
+ */
+export const resolveNodeShape = (raw = {}, data = {}) => {
+  const candidates = [
+    ...SHAPE_FIELDS.map((field) => data?.[field]),
+    ...SHAPE_FIELDS.map((field) => raw?.[field]),
+    raw?.shape,
+    raw?.type !== FLOW_TYPE ? raw?.type : null,
+  ];
+  for (const candidate of candidates) {
+    const key = resolveShapeKey(candidate);
+    if (key) return key;
+  }
+  const exotic = candidates.find((candidate) => typeof candidate === "string" && candidate.trim());
+  return exotic ? exotic.trim() : FALLBACK_SHAPE;
+};
+
 /* ------------------------------------------------------------------ */
 /* Estilos                                                             */
 /* ------------------------------------------------------------------ */
@@ -212,12 +293,15 @@ export const newId = (prefix = "n") => {
 
 /** Crea un nodo de la forma indicada en la posición dada. */
 export const makeNode = (shape = "process", position = { x: 0, y: 0 }, overrides = {}) => {
-  const meta = shapeMeta(shape);
+  const meta = shapeMeta(resolveShapeKey(shape) || shape);
   const { data: dataOverrides = {}, ...rest } = overrides;
-  const { style: styleOverrides = {}, ...otherData } = dataOverrides;
+  const { style: styleOverrides = {}, image: imageOverride, ...otherData } = dataOverrides;
+  // Igual que al normalizar: una imagen que no sea ráster embebido no entra.
+  const image = normalizeDiagramImage(imageOverride);
+  if (image) otherData.image = image;
   const node = {
     id: overrides.id || newId("n"),
-    type: "flow",
+    type: FLOW_TYPE,
     position: { x: Math.round(position.x), y: Math.round(position.y) },
     width: overrides.width || meta.w,
     height: overrides.height || meta.h,
@@ -248,7 +332,7 @@ export const makeEdge = (source, target, overrides = {}) => {
   const { data: dataOverrides = {}, ...rest } = overrides;
   return {
     id: overrides.id || newId("e"),
-    type: "flow",
+    type: FLOW_TYPE,
     source,
     target,
     sourceHandle: overrides.sourceHandle ?? null,
@@ -276,17 +360,41 @@ const parseMaybeJson = (value) => {
   }
 };
 
+/** Objeto plano o `null`: tolera campos que la API devuelva como JSON en texto. */
+const asObject = (value) => {
+  const parsed = typeof value === "string" ? parseMaybeJson(value) : value;
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+};
+
 const normalizeNode = (raw) => {
   if (!raw || typeof raw !== "object") return null;
-  const data = raw.data || {};
-  const shape = shapeMeta(data.shape || raw.shape).key;
-  const position = raw.position || { x: raw.x, y: raw.y };
-  const width = Math.max(44, toNumber(raw.width ?? raw.measured?.width ?? raw.style?.width, shapeMeta(shape).w));
-  const height = Math.max(28, toNumber(raw.height ?? raw.measured?.height ?? raw.style?.height, shapeMeta(shape).h));
+  // `data` puede venir como objeto o como JSON en texto según el backend.
+  const data = asObject(raw.data) || {};
+  const shape = resolveNodeShape(raw, data);
+  const meta = shapeMeta(shape);
+  const position = asObject(raw.position) || { x: raw.x, y: raw.y };
+  const width = Math.max(44, toNumber(raw.width ?? raw.measured?.width ?? raw.style?.width, meta.w));
+  const height = Math.max(28, toNumber(raw.height ?? raw.measured?.height ?? raw.style?.height, meta.h));
   const image = normalizeDiagramImage(data.image);
+  const normalizedData = {
+    // Mantener metadatos de nodos introducidos por versiones nuevas o
+    // integraciones; reconstruir solo los campos que normalizamos aquí
+    // provocaba que desaparecieran al guardar y volver a cargar.
+    ...data,
+    label: typeof data.label === "string" ? data.label : raw.label || meta.label,
+    shape,
+    locked: Boolean(data.locked),
+    description: data.description || "",
+    link: data.link || "",
+    style: { ...DEFAULT_NODE_STYLE, fill: meta.fill, stroke: meta.stroke, ...(asObject(data.style) || {}) },
+  };
+  // Una imagen rechazada (SVG, `javascript:`, `blob:`, URL externa o demasiado
+  // grande) NO puede sobrevivir a través del spread de metadatos: se quita.
+  if (image) normalizedData.image = image;
+  else delete normalizedData.image;
   return {
     id: String(raw.id || newId("n")),
-    type: "flow",
+    type: FLOW_TYPE,
     position: {
       x: toNumber(position?.x, 0),
       y: toNumber(position?.y, 0),
@@ -294,20 +402,8 @@ const normalizeNode = (raw) => {
     width,
     height,
     zIndex: raw.zIndex ?? (shape === "swimlane" ? -1 : undefined),
-    parentId: raw.parentId || undefined,
-    data: {
-      // Mantener metadatos de nodos introducidos por versiones nuevas o
-      // integraciones; reconstruir solo los campos que normalizamos aquí
-      // provocaba que desaparecieran al guardar y volver a cargar.
-      ...data,
-      label: typeof data.label === "string" ? data.label : raw.label || shapeMeta(shape).label,
-      shape,
-      locked: Boolean(data.locked),
-      description: data.description || "",
-      link: data.link || "",
-      ...(image ? { image } : {}),
-      style: { ...DEFAULT_NODE_STYLE, fill: shapeMeta(shape).fill, stroke: shapeMeta(shape).stroke, ...(data.style || {}) },
-    },
+    parentId: raw.parentId || raw.parent_id || raw.parentNode || undefined,
+    data: normalizedData,
   };
 };
 
@@ -316,14 +412,14 @@ const normalizeEdge = (raw, nodeIds) => {
   const source = String(raw.source ?? raw.from ?? "");
   const target = String(raw.target ?? raw.to ?? "");
   if (!nodeIds.has(source) || !nodeIds.has(target)) return null;
-  const data = raw.data || {};
+  const data = asObject(raw.data) || {};
   return {
     id: String(raw.id || newId("e")),
-    type: "flow",
+    type: FLOW_TYPE,
     source,
     target,
-    sourceHandle: raw.sourceHandle ?? null,
-    targetHandle: raw.targetHandle ?? null,
+    sourceHandle: raw.sourceHandle ?? raw.source_handle ?? raw.sourcePort ?? null,
+    targetHandle: raw.targetHandle ?? raw.target_handle ?? raw.targetPort ?? null,
     data: {
       ...DEFAULT_EDGE_STYLE,
       ...(typeof raw.label === "string" && !data.label ? { label: raw.label } : null),
@@ -421,6 +517,286 @@ export const serializeDiagram = (diagram) => {
       settings: normalized.data.settings,
     },
   };
+};
+
+/* ------------------------------------------------------------------ */
+/* Integridad del contenido                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Claves que `serializeDiagram` escribe SIEMPRE en cada nodo y conexión.
+ *
+ * Sirven como huella: si el registro que devuelve la API no las trae, es que
+ * las descartó al guardar. Es lo que pasa con un `$request->validated()` de
+ * Laravel validado campo por campo —desde Laravel 9 el validador poda toda
+ * clave de un arreglo que no tenga su propia regla— y el síntoma visible es que
+ * al reabrir el diagrama todos los nodos aparecen como «Proceso».
+ */
+export const NODE_STORED_KEYS = ["type", "position", "width", "height", "data"];
+export const NODE_DATA_STORED_KEYS = ["label", "shape", "locked", "description", "link", "style"];
+/** Escritas solo cuando tienen valor; se restauran pero no se reclaman. */
+export const NODE_OPTIONAL_STORED_KEYS = ["zIndex", "parentId"];
+export const EDGE_STORED_KEYS = ["type", "source", "target", "sourceHandle", "targetHandle", "data"];
+export const EDGE_DATA_STORED_KEYS = Object.keys(DEFAULT_EDGE_STYLE);
+export const CONTENT_STORED_KEYS = ["nodes", "edges", "settings"];
+
+/** Nombres legibles de cada pérdida, en orden de importancia para el aviso. */
+const LOSS_LABELS = [
+  ["data.nodes[].data.shape", "el tipo de los nodos (data.shape)"],
+  ["data.nodes[].data.style", "los colores y estilos (data.style)"],
+  ["data.nodes[].data.image", "las imágenes incrustadas (data.image)"],
+  ["data.edges[].data", "el estilo y las etiquetas de las conexiones (edges[].data)"],
+  ["data.edges[].sourceHandle", "los lados de conexión de las flechas (sourceHandle/targetHandle)"],
+  ["data.edges[].targetHandle", "los lados de conexión de las flechas (sourceHandle/targetHandle)"],
+  ["data.nodes[].width", "el tamaño de los nodos (width/height)"],
+  ["data.nodes[].height", "el tamaño de los nodos (width/height)"],
+  ["data.nodes[].data.label", "los textos de los nodos (data.label)"],
+  ["data.nodes[].data.locked", "los metadatos de los nodos (bloqueo, descripción, enlace)"],
+  ["data.nodes[].data.description", "los metadatos de los nodos (bloqueo, descripción, enlace)"],
+  ["data.nodes[].data.link", "los metadatos de los nodos (bloqueo, descripción, enlace)"],
+  ["data.nodes[].data", "el contenido de los nodos (nodes[].data)"],
+  ["data.nodes[].position", "la posición de los nodos (position)"],
+  ["data.nodes", "la lista de nodos"],
+  ["data.edges", "la lista de conexiones"],
+  ["data.settings", "los ajustes del lienzo (settings)"],
+];
+
+/** Pérdidas reales pero irrelevantes para el usuario (siempre valen "flow"). */
+const SILENT_LOSSES = ["data.nodes[].type", "data.edges[].type"];
+
+/** Contenido de un registro tal como vino (sin normalizar), tolerante a JSON en texto. */
+const diagramContent = (raw) => {
+  const source = asObject(raw) || {};
+  const data = asObject(source.data ?? source.content ?? source.payload) || {};
+  return {
+    data,
+    nodes: Array.isArray(data.nodes) ? data.nodes : Array.isArray(source.nodes) ? source.nodes : null,
+    edges: Array.isArray(data.edges) ? data.edges : Array.isArray(source.edges) ? source.edges : null,
+    settings: data.settings ?? source.settings ?? null,
+  };
+};
+
+/** Frase en español con lo que la API dejó fuera (lo más importante primero). */
+export const describeDiagramLoss = (missing = []) => {
+  const found = missing.filter((path) => !SILENT_LOSSES.includes(path));
+  const labels = [];
+  found.forEach((path) => {
+    const index = LOSS_LABELS.findIndex(([key]) => key === path);
+    const label = index >= 0 ? LOSS_LABELS[index][1] : path;
+    if (!labels.some((item) => item.label === label)) labels.push({ index: index < 0 ? LOSS_LABELS.length : index, label });
+  });
+  if (!labels.length) return missing.length ? "contenido del diagrama" : "";
+  labels.sort((a, b) => a.index - b.index);
+  const shown = labels.slice(0, 4).map((item) => item.label);
+  const rest = labels.length - shown.length;
+  if (shown.length === 1) return shown[0];
+  const joined = `${shown.slice(0, -1).join(", ")} y ${shown[shown.length - 1]}`;
+  return rest > 0 ? `${joined}, entre otros ${rest} detalles del dibujo` : joined;
+};
+
+/**
+ * Revisa un registro recibido de la API y dice si le falta contenido que el
+ * panel siempre envía. `inspected: false` cuando la respuesta no trae dibujo
+ * (un `PUT` 204 o una respuesta de solo metadatos no son una pérdida).
+ */
+export const inspectDiagramPayload = (received) => {
+  const { nodes, edges, settings } = diagramContent(received);
+  const empty = { ok: true, inspected: false, missing: [], summary: "", nodes: 0, edges: 0 };
+  // Sin dibujo que revisar (PUT 204, respuesta de solo metadatos) no hay pérdida.
+  if (nodes === null && edges === null && settings === null) return empty;
+  const missing = [];
+  const note = (path) => {
+    if (!missing.includes(path)) missing.push(path);
+  };
+  let damagedNodes = 0;
+  let damagedEdges = 0;
+
+  (nodes || []).forEach((node) => {
+    const item = asObject(node);
+    const data = item ? asObject(item.data) : null;
+    let damaged = false;
+    NODE_STORED_KEYS.forEach((key) => {
+      if (key === "data") {
+        if (!data) {
+          note("data.nodes[].data");
+          damaged = true;
+        }
+        return;
+      }
+      if (!item || item[key] === undefined) {
+        note(`data.nodes[].${key}`);
+        damaged = true;
+      }
+    });
+    if (data) {
+      NODE_DATA_STORED_KEYS.forEach((key) => {
+        if (data[key] === undefined) {
+          note(`data.nodes[].data.${key}`);
+          damaged = true;
+        }
+      });
+    }
+    if (damaged) damagedNodes += 1;
+  });
+
+  (edges || []).forEach((edge) => {
+    const item = asObject(edge);
+    const data = item ? asObject(item.data) : null;
+    let damaged = false;
+    EDGE_STORED_KEYS.forEach((key) => {
+      if (key === "data") {
+        if (!data) {
+          note("data.edges[].data");
+          damaged = true;
+        }
+        return;
+      }
+      if (!item || item[key] === undefined) {
+        note(`data.edges[].${key}`);
+        damaged = true;
+      }
+    });
+    if (data) {
+      EDGE_DATA_STORED_KEYS.forEach((key) => {
+        if (data[key] === undefined) {
+          note("data.edges[].data");
+          damaged = true;
+        }
+      });
+    }
+    if (damaged) damagedEdges += 1;
+  });
+
+  if (nodes === null) note("data.nodes");
+  if (edges === null) note("data.edges");
+  if (settings === null) note("data.settings");
+
+  return {
+    ok: missing.length === 0,
+    inspected: true,
+    missing,
+    summary: describeDiagramLoss(missing),
+    nodes: damagedNodes,
+    edges: damagedEdges,
+  };
+};
+
+/**
+ * Completa un registro podado con una copia de referencia (la última que este
+ * navegador envió, o una lectura completa del mismo diagrama).
+ *
+ * Reglas estrictas para no inventar nada:
+ *  - solo rellena claves AUSENTES; nunca pisa un valor que la API sí devolvió;
+ *  - solo toca nodos y conexiones que existen en el registro recibido: nada de
+ *    resucitar elementos borrados en otro equipo;
+ *  - `style` e `image` se completan clave por clave.
+ */
+export const repairDiagramPayload = (received, reference) => {
+  const target = diagramContent(received);
+  const source = diagramContent(reference);
+  const fields = new Set();
+  let repairedNodes = 0;
+  let repairedEdges = 0;
+
+  const fill = (current, ref, path) => {
+    const base = { ...(asObject(current) || {}) };
+    const extra = asObject(ref) || {};
+    let touched = false;
+    Object.keys(extra).forEach((key) => {
+      if (base[key] === undefined) {
+        base[key] = extra[key];
+        fields.add(`${path}.${key}`);
+        touched = true;
+      } else if (key === "style" || key === "image") {
+        const nested = fill(base[key], extra[key], `${path}.${key}`);
+        if (nested.touched) {
+          base[key] = nested.value;
+          touched = true;
+        }
+      }
+    });
+    return { value: base, touched };
+  };
+
+  const nodesById = new Map((source.nodes || []).map((node) => [String(asObject(node)?.id ?? ""), asObject(node)]));
+  const edgesById = new Map();
+  const edgesByPair = new Map();
+  (source.edges || []).forEach((edge) => {
+    const item = asObject(edge);
+    if (!item) return;
+    if (item.id !== undefined && item.id !== null) edgesById.set(String(item.id), item);
+    const pair = `${item.source}>${item.target}`;
+    if (!edgesByPair.has(pair)) edgesByPair.set(pair, item);
+  });
+
+  // Si la respuesta ni siquiera trae la lista, se recupera entera de la copia.
+  if (target.nodes === null && source.nodes?.length) {
+    fields.add("data.nodes");
+    repairedNodes += source.nodes.length;
+  }
+  if (target.edges === null && source.edges?.length) {
+    fields.add("data.edges");
+    repairedEdges += source.edges.length;
+  }
+
+  const nodes = (target.nodes ?? source.nodes ?? []).map((node) => {
+    const item = asObject(node);
+    if (!item) return node;
+    const ref = nodesById.get(String(item.id ?? ""));
+    if (!ref) return node;
+    const out = { ...item };
+    let touched = false;
+    [...NODE_STORED_KEYS, ...NODE_OPTIONAL_STORED_KEYS].forEach((key) => {
+      if (key === "data" || out[key] !== undefined || ref[key] === undefined) return;
+      out[key] = ref[key];
+      fields.add(`data.nodes[].${key}`);
+      touched = true;
+    });
+    const data = fill(out.data, ref.data, "data.nodes[].data");
+    if (data.touched) touched = true;
+    out.data = data.value;
+    if (touched) repairedNodes += 1;
+    return out;
+  });
+
+  const edges = (target.edges ?? source.edges ?? []).map((edge) => {
+    const item = asObject(edge);
+    if (!item) return edge;
+    // Por id y, si el registro viene sin él (listados ligeros), por sus extremos.
+    const ref = edgesById.get(String(item.id ?? "")) || edgesByPair.get(`${item.source}>${item.target}`);
+    if (!ref) return edge;
+    const out = { ...item };
+    let touched = false;
+    if (out.id === undefined && ref.id !== undefined) {
+      out.id = ref.id;
+      fields.add("data.edges[].id");
+      touched = true;
+    }
+    EDGE_STORED_KEYS.forEach((key) => {
+      if (key === "data" || out[key] !== undefined || ref[key] === undefined) return;
+      out[key] = ref[key];
+      fields.add(`data.edges[].${key}`);
+      touched = true;
+    });
+    const data = fill(out.data, ref.data, "data.edges[].data");
+    if (data.touched) touched = true;
+    out.data = data.value;
+    if (touched) repairedEdges += 1;
+    return out;
+  });
+
+  const data = { ...target.data };
+  data.nodes = nodes;
+  data.edges = edges;
+  if (data.version === undefined && source.data.version !== undefined) data.version = source.data.version;
+  if (data.viewport === undefined && source.data.viewport !== undefined) {
+    data.viewport = source.data.viewport;
+    fields.add("data.viewport");
+  }
+  const settings = fill(data.settings, source.data.settings, "data.settings");
+  data.settings = settings.value;
+
+  return { data, fields: [...fields], nodes: repairedNodes, edges: repairedEdges, repaired: fields.size > 0 };
 };
 
 /** Diagrama nuevo (vacío o a partir de una plantilla). */

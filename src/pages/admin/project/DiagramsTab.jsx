@@ -216,11 +216,12 @@ const DiagramsTab = ({ projectId, tasks = [], onOpenTask, onCountChange, default
   const duplicate = async (diagram) => {
     setBusy(true);
     try {
-      await duplicateDiagram(projectId, diagram);
-      notify("Diagrama duplicado");
+      const copy = await duplicateDiagram(projectId, diagram);
+      if (copy?.integrity) notify(copy.integrity.message, "error");
+      else notify("Diagrama duplicado");
       await load();
-    } catch {
-      notify("No se pudo duplicar el diagrama", "error");
+    } catch (error) {
+      notify(error?.message || "No se pudo duplicar el diagrama", "error");
     } finally {
       setBusy(false);
     }
@@ -231,17 +232,19 @@ const DiagramsTab = ({ projectId, tasks = [], onOpenTask, onCountChange, default
     if (!editing) return;
     setBusy(true);
     try {
-      await saveDiagram(projectId, {
+      const saved = await saveDiagram(projectId, {
         ...editing.diagram,
         name: editing.name.trim() || editing.diagram.name,
         description: editing.description,
         task_id: editing.task_id || null,
       });
-      notify("Diagrama actualizado");
+      // La API puede aceptar el cambio y aun así devolver el dibujo podado.
+      if (saved?.integrity) notify(saved.integrity.message, "error");
+      else notify("Diagrama actualizado");
       setEditing(null);
       await load();
-    } catch {
-      notify("No se pudo actualizar el diagrama", "error");
+    } catch (error) {
+      notify(error?.message || "No se pudo actualizar el diagrama", "error");
     } finally {
       setBusy(false);
     }

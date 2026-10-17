@@ -14,12 +14,16 @@ import {
   alignNodes,
   autoLayout,
   createDiagram,
+  describeDiagramLoss,
   diagramBounds,
   diagramStats,
   distributeNodes,
+  inspectDiagramPayload,
   makeEdge,
   makeNode,
   normalizeDiagram,
+  repairDiagramPayload,
+  resolveShapeKey,
   serializeDiagram,
   shapeMeta,
   unwrapDiagramResponse,
@@ -288,4 +292,200 @@ test("las vueltas de una plantilla no adelantan las correcciones al inicio al ca
       assert.equal(main.sourceHandle, direction === "TB" ? "bottom" : "right");
     }
   }
+});
+
+/* ------------------------------------------------------------------ */
+/* Tipo de nodo: nunca se pierde ni se convierte en «Proceso»           */
+/* ------------------------------------------------------------------ */
+
+test("cada forma del catálogo sobrevive a guardar y volver a leer", () => {
+  const nodes = SHAPES.map((shape, index) =>
+    makeNode(shape.key, { x: (index % 4) * 260, y: Math.floor(index / 4) * 200 }, { id: `n${index}`, data: { label: shape.label } }),
+  );
+  const sent = serializeDiagram({ name: "Todas las formas", data: { nodes, edges: [] } });
+  const back = normalizeDiagram({ id: 1, name: "Todas las formas", data: JSON.parse(JSON.stringify(sent.data)) });
+  assert.deepEqual(
+    back.data.nodes.map((node) => node.data.shape),
+    SHAPES.map((shape) => shape.key),
+  );
+  assert.deepEqual(
+    back.data.nodes.map((node) => node.data.style.fill),
+    nodes.map((node) => node.data.style.fill),
+  );
+});
+
+test("reconoce el tipo aunque venga con otro nombre o en otro campo", () => {
+  assert.equal(resolveShapeKey("Diamond"), "decision");
+  assert.equal(resolveShapeKey("terminator"), "terminal");
+  assert.equal(resolveShapeKey("Sub-Process"), "subprocess");
+  assert.equal(resolveShapeKey("base de datos"), "database");
+  assert.equal(resolveShapeKey("Entrada / Salida".replace(" / ", "/")), "io");
+  assert.equal(resolveShapeKey("no-existe"), null);
+  assert.equal(resolveShapeKey(42), null);
+
+  const raw = {
+    data: {
+      nodes: [
+        { id: "a", position: { x: 0, y: 0 }, data: { label: "Uno", shape: "diamond" } },
+        { id: "b", position: { x: 0, y: 120 }, shapeType: "cylinder", data: { label: "Dos" } },
+        { id: "c", position: { x: 0, y: 240 }, type: "note", data: { label: "Tres" } },
+        { id: "d", position: { x: 0, y: 360 }, data: { label: "Cuatro", node_type: "swim-lane" } },
+        { id: "e", position: { x: 0, y: 480 }, data: { label: "Cinco", shape: "forma-interna-rara" } },
+        { id: "f", position: { x: 0, y: 600 }, data: JSON.stringify({ label: "Seis", shape: "decision" }) },
+      ],
+      edges: [],
+    },
+  };
+  const shapes = normalizeDiagram(raw).data.nodes.map((node) => node.data.shape);
+  assert.deepEqual(shapes, ["decision", "database", "note", "swimlane", "forma-interna-rara", "decision"]);
+  // El tipo desconocido se conserva tal cual (se dibuja como rectángulo) en vez
+  // de reescribirse a «process» y perderse para siempre.
+  assert.equal(normalizeDiagram(raw).data.nodes[4].data.shape, "forma-interna-rara");
+  assert.equal(normalizeDiagram(raw).data.nodes[5].data.label, "Seis");
+});
+
+test("sin ningún tipo reconocible el nodo es un Proceso, y las conexiones conservan su estilo", () => {
+  const d = normalizeDiagram({
+    data: {
+      nodes: [{ id: "a", position: { x: 4, y: 6 } }, { id: "b", position: { x: 4, y: 160 } }],
+      edges: [{ id: "e", source: "a", target: "b", source_handle: "right", target_handle: "left", data: { kind: "bezier", color: "#ff0000" } }],
+    },
+  });
+  assert.equal(d.data.nodes[0].data.shape, "process");
+  assert.equal(d.data.edges[0].sourceHandle, "right");
+  assert.equal(d.data.edges[0].targetHandle, "left");
+  assert.equal(d.data.edges[0].data.kind, "bezier");
+  assert.equal(d.data.edges[0].data.color, "#ff0000");
+});
+
+test("una imagen inválida no sobrevive a través de los metadatos del nodo", () => {
+  const node = makeNode("image", { x: 0, y: 0 }, { data: { image: { src: "javascript:alert(1)", name: "x.png" } } });
+  assert.equal(node.data.image, undefined);
+  assert.equal("image" in serializeDiagram({ nodes: [node] }).data.nodes[0].data, false);
+});
+
+/* ------------------------------------------------------------------ */
+/* Integridad: qué conserva realmente la API                            */
+/* ------------------------------------------------------------------ */
+
+const mixedDiagram = () =>
+  createDiagram({
+    name: "Flujo con variantes",
+    template: "blank",
+  });
+
+const variantNodes = () => [
+  makeNode("terminal", { x: 100, y: 40 }, { id: "a", data: { label: "Inicio" } }),
+  makeNode("decision", { x: 100, y: 180 }, { id: "b", data: { label: "¿Ok?", description: "Revisar" } }),
+  makeNode("database", { x: 380, y: 180 }, { id: "c", data: { label: "Guardar", style: { fill: "#0f172a" } } }),
+];
+
+const variantPayload = () =>
+  serializeDiagram({
+    ...mixedDiagram(),
+    data: { ...mixedDiagram().data, nodes: variantNodes(), edges: [makeEdge("a", "b", { id: "e1", data: { label: "sí", color: "#dc2626" } })] },
+  });
+
+/** Lo que devuelve un backend que valida campo por campo (`$request->validated()`). */
+const prunedByFieldRules = (payload) => ({
+  name: payload.name,
+  description: payload.description,
+  task_id: payload.task_id,
+  data: {
+    version: payload.data.version,
+    nodes: payload.data.nodes.map((node) => ({
+      id: node.id,
+      position: node.position,
+      data: { label: node.data.label, link: node.data.link },
+    })),
+    edges: payload.data.edges.map((edge) => ({ id: edge.id, source: edge.source, target: edge.target })),
+    viewport: payload.data.viewport,
+    settings: payload.data.settings,
+  },
+});
+
+test("el panel siempre envía el tipo de cada nodo (huella de integridad)", () => {
+  const payload = variantPayload();
+  assert.deepEqual(inspectDiagramPayload(payload), { ok: true, inspected: true, missing: [], summary: "", nodes: 0, edges: 0 });
+  assert.deepEqual(inspectDiagramPayload({ id: 7, name: "x" }), { ok: true, inspected: false, missing: [], summary: "", nodes: 0, edges: 0 });
+});
+
+test("detecta y describe el registro podado que devuelve una API que valida por campo", () => {
+  const report = inspectDiagramPayload({ id: 7, ...prunedByFieldRules(variantPayload()) });
+  assert.equal(report.ok, false);
+  assert.ok(report.missing.includes("data.nodes[].data.shape"));
+  assert.ok(report.missing.includes("data.nodes[].data.style"));
+  assert.ok(report.missing.includes("data.edges[].data"));
+  assert.equal(report.nodes, 3);
+  assert.equal(report.edges, 1);
+  assert.match(report.summary, /el tipo de los nodos \(data\.shape\)/);
+  assert.match(report.summary, /los colores y estilos \(data\.style\)/);
+  // El texto y la posición sí llegaron: no se denuncian.
+  assert.equal(report.missing.includes("data.nodes[].data.label"), false);
+  assert.equal(report.missing.includes("data.nodes[].position"), false);
+  assert.match(describeDiagramLoss(report.missing), /y|entre otros/);
+});
+
+test("completa un registro podado con la copia de referencia sin inventar nada", () => {
+  const payload = variantPayload();
+  const pruned = prunedByFieldRules(payload);
+  const repaired = repairDiagramPayload({ id: 7, ...pruned }, payload);
+  assert.equal(repaired.repaired, true);
+  assert.equal(repaired.nodes, 3);
+  assert.equal(repaired.edges, 1);
+  assert.deepEqual(repaired.data.nodes.map((node) => node.data.shape), ["terminal", "decision", "database"]);
+
+  const diagram = normalizeDiagram({ id: 7, name: payload.name, data: repaired.data });
+  // Estilos, descripciones y conectores recuperados.
+  assert.equal(diagram.data.nodes[2].data.style.fill, "#0f172a");
+  assert.equal(diagram.data.nodes[1].data.description, "Revisar");
+  assert.equal(diagram.data.nodes[0].width, shapeMeta("terminal").w);
+  assert.equal(diagram.data.edges[0].data.label, "sí");
+  assert.equal(diagram.data.edges[0].data.color, "#dc2626");
+  assert.equal(inspectDiagramPayload({ data: repaired.data }).ok, true);
+  // Lo que la API sí devolvió manda: el texto editado en el servidor no se pisa.
+  const edited = prunedByFieldRules(payload);
+  edited.data.nodes[0].data.label = "Inicio editado en la API";
+  const merged = repairDiagramPayload({ id: 7, ...edited }, payload);
+  assert.equal(merged.data.nodes[0].data.label, "Inicio editado en la API");
+  assert.equal(merged.data.nodes[0].data.shape, "terminal");
+});
+
+test("la restauración no resucita nodos borrados ni estilos cambiados a propósito", () => {
+  const payload = variantPayload();
+  const kept = prunedByFieldRules(payload);
+  kept.data.nodes = kept.data.nodes.filter((node) => node.id !== "c"); // borrado en otro equipo
+  kept.data.edges = [];
+  const repaired = repairDiagramPayload({ id: 7, ...kept }, payload);
+  assert.deepEqual(repaired.data.nodes.map((node) => node.id), ["a", "b"]);
+  assert.deepEqual(repaired.data.edges, []);
+
+  // Un cambio legítimo del servidor (tipo presente) no se sobrescribe.
+  const changed = prunedByFieldRules(payload);
+  changed.data.nodes[1].data.shape = "process";
+  assert.equal(repairDiagramPayload({ id: 7, ...changed }, payload).data.nodes[1].data.shape, "process");
+});
+
+test("un listado ligero se detecta como incompleto y se completa con el registro completo", () => {
+  const payload = variantPayload();
+  const light = {
+    id: 9,
+    name: payload.name,
+    data: {
+      nodes: payload.data.nodes.map((node) => ({
+        id: node.id,
+        position: node.position,
+        width: node.width,
+        height: node.height,
+        data: { shape: node.data.shape, style: { fill: node.data.style.fill } },
+      })),
+      edges: payload.data.edges.map((edge) => ({ source: edge.source, target: edge.target })),
+    },
+  };
+  const report = inspectDiagramPayload(light);
+  assert.equal(report.ok, false);
+  const repaired = repairDiagramPayload(light, payload);
+  assert.equal(repaired.data.nodes[1].data.description, "Revisar");
+  assert.equal(repaired.data.edges[0].data.label, "sí");
+  assert.equal(repaired.data.nodes[0].data.shape, "terminal");
 });

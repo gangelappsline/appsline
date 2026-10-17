@@ -6,8 +6,8 @@
  * maneja el 401). Si el backend cambia su formato de respuesta, solo hay
  * que ajustar los normalizadores de este archivo.
  */
-import api from "../services/api";
-import { prepareFilesForUpload, toWebpIfImage } from "../utils/images";
+import api from "../services/api.js";
+import { prepareFilesForUpload, toWebpIfImage } from "../utils/images.js";
 
 /* ------------------------------------------------------------------ */
 /* Normalizadores: la API responde con formas distintas según el        */

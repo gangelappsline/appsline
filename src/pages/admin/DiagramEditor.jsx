@@ -115,6 +115,7 @@ const DiagramEditor = () => {
             description: payload.description,
             task_id: payload.task_id,
             updated_at: saved.updated_at,
+            integrity: saved.integrity || null,
           }));
           if (wasNew) {
             session.savedRoute = String(saved.id);
@@ -187,6 +188,7 @@ const DiagramEditor = () => {
             onSave={handleSave}
             saving={saving}
             storageMode={storageMode}
+            integrity={diagram?.integrity || null}
             onBack={goBack}
             onAttach={handleAttach}
             contextLabel={contextLabel}
