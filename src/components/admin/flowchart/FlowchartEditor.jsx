@@ -19,6 +19,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import "./flowchart.css";
 import {
+  FiAlertTriangle,
   FiArrowLeft,
   FiCheck,
   FiChevronDown,
@@ -52,6 +53,7 @@ import FlowEdge, { EdgeEditingContext } from "./FlowEdge";
 import { decorateEdge } from "./edgePaths";
 import ShapePalette, { SHAPE_MIME } from "./ShapePalette";
 import PropertiesPanel from "./PropertiesPanel";
+import IntegrityNotice from "./IntegrityNotice";
 import useHistory from "./useHistory";
 import {
   diagramToJsonBlob,
@@ -212,6 +214,7 @@ const EditorInner = ({
   onSave,
   saving = false,
   storageMode = "api",
+  integrity: loadedIntegrity = null,
   onBack,
   onAttach,
   contextLabel = "",
@@ -236,6 +239,9 @@ const EditorInner = ({
   const [settings, setSettings] = useState(initial.data.settings);
   const [savedSignature, setSavedSignature] = useState(() => signature(initial));
   const [savedAt, setSavedAt] = useState(initial.updated_at);
+  // Contenido que la API no conservó (ver `IntegrityNotice`); `null` si todo bien.
+  const [integrity, setIntegrity] = useState(() => loadedIntegrity || initial.integrity || null);
+  const [integrityHidden, setIntegrityHidden] = useState(false);
   const [savePending, setSavePending] = useState(false);
   const [saveError, setSaveError] = useState("");
   const saveInFlight = useRef(null);
@@ -295,6 +301,15 @@ const EditorInner = ({
           // Solo lo enviado está guardado; no marcar cambios posteriores como persistidos.
           setSavedSignature(signature(payload));
           setSavedAt(saved.updated_at || new Date().toISOString());
+          const report = saved.integrity || null;
+          setIntegrity(report);
+          setIntegrityHidden(false);
+          if (report) {
+            // Sí se guardó, pero la API descartó contenido: avisar en vez de
+            // celebrar y dejar el aviso visible hasta que se corrija.
+            notify(report.message, "error");
+            return true;
+          }
           if (!quiet) notify("Diagrama guardado");
           return true;
         } catch (error) {
@@ -1087,6 +1102,14 @@ const EditorInner = ({
           </div>
         </header>
 
+        {integrity && !integrityHidden && (
+          <IntegrityNotice
+            report={integrity}
+            onExportJson={() => download("json")}
+            onClose={() => setIntegrityHidden(true)}
+          />
+        )}
+
         {/* ---------- Cuerpo ---------- */}
         <div className="relative flex min-h-0 flex-1">
           {paletteOpen && <ShapePalette onAddShape={(key) => addShape(key)} onInsertTemplate={insertTemplate} onAddImages={addImages} onAddIcon={addIcon} uploading={uploading} onClose={() => setPaletteOpen(false)} />}
@@ -1282,8 +1305,8 @@ const EditorInner = ({
             {storageMode === "local" ? <FiHardDrive /> : <FiCloud />}
             {storageMode === "local" ? "Guardado en este navegador" : "Guardado en la API"}
           </span>
-          <span role="status" title={saveError || undefined} className={cx("flex items-center gap-1", saveError ? "text-red-600" : dirty || !initial.id ? "text-amber-600" : "text-emerald-600")}>
-            {isSaving ? "Guardando…" : saveError ? "Error al guardar · autoguardado pausado" : dirty ? "Cambios sin guardar" : !initial.id ? "Diagrama sin guardar" : <><FiCheck /> Todo guardado{savedAt ? ` · ${new Date(savedAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}` : ""}</>}
+          <span role="status" title={saveError || integrity?.detail || undefined} className={cx("flex items-center gap-1", saveError || integrity ? "text-red-600" : dirty || !initial.id ? "text-amber-600" : "text-emerald-600")}>
+            {isSaving ? "Guardando…" : saveError ? "Error al guardar · autoguardado pausado" : integrity ? <><FiAlertTriangle /> Guardado incompleto en la API</> : dirty ? "Cambios sin guardar" : !initial.id ? "Diagrama sin guardar" : <><FiCheck /> Todo guardado{savedAt ? ` · ${new Date(savedAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}` : ""}</>}
           </span>
           <label className="ml-auto flex cursor-pointer items-center gap-1.5">
             <input type="checkbox" checked={Boolean(autosave)} onChange={(e) => setAutosave(e.target.checked)} className="accent-brand-600" />
@@ -1339,6 +1362,8 @@ const EditorInner = ({
  * @param {(diagram) => Promise<object|null>} onSave Guarda y devuelve el diagrama con id.
  * @param {boolean} saving
  * @param {"api"|"local"} storageMode
+ * @param {object|null} [integrity] Informe de `inspectDiagramPayload` cuando la
+ *   API devolvió el diagrama sin contenido (ver `IntegrityNotice`).
  * @param {Function} [onBack]
  * @param {(files: File[]) => Promise<void>} [onAttach] Adjunta PNG + JSON al proyecto/tarea.
  * @param {string} [contextLabel] "Proyecto · Tarea" para el encabezado.

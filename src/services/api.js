@@ -1,8 +1,8 @@
 import axios from "axios";
-import { getToken, clearSession } from "./session";
+import { getToken, clearSession } from "./session.js";
 
 const API_URL =
-  import.meta.env.VITE_API_URL || "https://api.appsline.com.mx/api";
+  import.meta.env?.VITE_API_URL || "https://api.appsline.com.mx/api";
 
 /**
  * Cliente HTTP central para la API de Appsline (Laravel Passport).

@@ -98,11 +98,12 @@ const Diagrams = () => {
 
   const duplicate = async (d) => {
     try {
-      await duplicateDiagram(d.project_id, d);
-      notify("Diagrama duplicado");
+      const copy = await duplicateDiagram(d.project_id, d);
+      if (copy?.integrity) notify(copy.integrity.message, "error");
+      else notify("Diagrama duplicado");
       await load();
-    } catch {
-      notify("No se pudo duplicar", "error");
+    } catch (error) {
+      notify(error?.message || "No se pudo duplicar", "error");
     }
   };
 

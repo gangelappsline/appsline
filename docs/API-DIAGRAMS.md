@@ -207,35 +207,147 @@ Un nodo `image` agrega este campo a su `data` (el resto del nodo no cambia):
 
 ## 4. Validación y controlador
 
+> **Regla de oro:** el dibujo (`data`) se guarda y se devuelve **completo, tal
+> cual llegó**. En cuanto existe una regla anidada (`data.nodes.*.data.label`,
+> `data.edges.*.source`, …), `$request->validated()` **descarta** todo lo que no
+> tenga regla propia: `data.shape`, `data.style`, `width`, `height`, `type`,
+> `edges[].data` y los handles desaparecen del servidor y, al reabrir el
+> diagrama, **todos los nodos vuelven como «Proceso»**. Ver
+> [9. Diagnóstico](#9-diagnóstico-todos-los-nodos-vuelven-como-proceso).
+
+### 4.1 Reglas correctas
+
 ```php
 // app/Http/Requests/StoreDiagramRequest.php
 public function rules(): array
 {
     return [
-        'name' => ['required', 'string', 'max:160'],
+        'name'        => ['required', 'string', 'max:160'],
         'description' => ['nullable', 'string', 'max:5000'],
-        'task_id' => [
+        'task_id'     => [
             'nullable', 'integer',
             // La tarea debe pertenecer al mismo proyecto de la URL.
-            Rule::exists('tasks', 'id')->where('project_id', $this->route('project')->id),
+            Rule::exists('project_tasks', 'id')->where('project_id', $this->route('project')->id),
         ],
-        'data' => ['required', 'array'],
-        'data.version' => ['nullable', 'integer'],
-        'data.nodes' => ['present', 'array', 'max:2000'],
-        'data.nodes.*.id' => ['required', 'string', 'max:64'],
-        'data.nodes.*.position.x' => ['required', 'numeric'],
-        'data.nodes.*.position.y' => ['required', 'numeric'],
-        'data.nodes.*.data.label' => ['nullable', 'string', 'max:2000'],
-        'data.nodes.*.data.link' => ['nullable', 'string', 'max:2048'],
-        'data.edges' => ['present', 'array', 'max:4000'],
-        'data.edges.*.id' => ['required', 'string', 'max:64'],
-        'data.edges.*.source' => ['required', 'string', 'max:64'],
-        'data.edges.*.target' => ['required', 'string', 'max:64'],
-        'data.viewport' => ['nullable', 'array'],
-        'data.settings' => ['nullable', 'array'],
+
+        // Una sola regla para el dibujo: SIN 'data.nodes.*' ni 'data.edges.*'.
+        'data'        => ['required', 'array'],
     ];
 }
 ```
+
+### 4.2 Por qué: `validated()` poda los arreglos (Laravel ≥ 9)
+
+Desde Laravel 9, `Illuminate\Validation\Factory` trae
+`$excludeUnvalidatedArrayKeys = true`, que se propaga a cada validador. Con esa
+opción, `validated()` **omite cualquier arreglo que tenga claves hijas
+validadas** y devuelve únicamente las claves con regla propia. Es un cambio de
+comportamiento respecto de Laravel 8 y no depende de cómo se escriban las
+reglas anidadas:
+
+| Reglas del `data` | Lo que devuelve `validated()` |
+| --- | --- |
+| `'data' => ['required', 'array']` (sola) | `data` completo ✅ |
+| `'data' => ['array']` + `'data.nodes' => ['array']` + `'data.nodes.*.data.label'` | `data` **sin** `shape`, `style`, `width`, `height`, `type`; `edges` sin `data` ni handles ❌ |
+
+Ejemplo real (lo que envía el panel → lo que queda en la base de datos con
+reglas anidadas):
+
+```jsonc
+// PUT del panel
+{ "data": { "version": 1, "nodes": [{
+    "id": "a", "type": "flow", "width": 160, "height": 60,
+    "position": { "x": 120, "y": 60 },
+    "data": { "label": "Inicio", "shape": "terminal",
+              "style": { "fill": "#e0f2fe", "stroke": "#0284c7" } }
+  }], "edges": [{ "id": "e1", "source": "a", "target": "b", "type": "smoothstep",
+                  "sourceHandle": "right", "targetHandle": "left",
+                  "data": { "label": "sí", "color": "#dc2626" } }],
+  "settings": { "background": "dots" } } }
+
+// Lo que guarda $diagram->update($request->validated()) con reglas anidadas
+{ "data": { "version": 1, "nodes": [{
+    "id": "a", "position": { "x": 120, "y": 60 },
+    "data": { "label": "Inicio", "link": null }
+  }], "edges": [{ "id": "e1", "source": "a", "target": "b" }],
+  "settings": { "background": "dots" } } }
+```
+
+Sobreviven `version`, `id`, `position`, `data.label`, `data.link`,
+`source`/`target`, `viewport` y `settings` porque tienen regla propia; todo lo
+demás se pierde. Al recargar, el panel no encuentra `data.shape` y dibuja el
+respaldo (`process`), que es un rectángulo: de ahí que «todos los nodos se
+conviertan en nodos de proceso».
+
+### 4.3 Controlador
+
+```php
+// app/Http/Controllers/API/DiagramController.php
+public function store(StoreDiagramRequest $request, Project $project)
+{
+    $this->authorize('update', $project);
+
+    $diagram = $project->diagrams()->create([
+        ...$request->safe()->only(['name', 'description', 'task_id']),
+        // El bloque completo, nunca el subconjunto validado.
+        'data'       => $request->input('data'),
+        'created_by' => $request->user()->id,
+    ]);
+
+    return new DiagramResource($diagram->load('task:id,title'));
+}
+
+public function update(StoreDiagramRequest $request, Project $project, Diagram $diagram)
+{
+    $this->authorize('update', $project);
+    abort_unless($diagram->project_id === $project->id, 404);
+
+    $diagram->update([
+        ...$request->safe()->only(['name', 'description', 'task_id']),
+        'data' => $request->input('data'),
+    ]);
+
+    return new DiagramResource($diagram->fresh()->load('task:id,title'));
+}
+```
+
+El resto de los métodos (`index`, `show`, `destroy`, `all`) y el recurso están
+en [`docs/backend-diagrams/`](./backend-diagrams/), listos para copiar.
+
+### 4.4 Si además quieres validar el interior del dibujo
+
+Validar está bien; lo que rompe el guardado es **usar `validated()` para
+obtener el dibujo**. Dos salidas:
+
+**a) Validación aparte, guardado íntegro (recomendada).**
+
+```php
+// En el controlador, o dentro del FormRequest con after()/withValidator()
+Validator::make($request->input('data'), [
+    'nodes'                 => ['present', 'array', 'max:2000'],
+    'nodes.*.id'            => ['required', 'string', 'max:64'],
+    'nodes.*.position.x'    => ['required', 'numeric'],
+    'nodes.*.position.y'    => ['required', 'numeric'],
+    'edges'                 => ['present', 'array', 'max:4000'],
+    'edges.*.source'        => ['required', 'string', 'max:64'],
+    'edges.*.target'        => ['required', 'string', 'max:64'],
+])->validate();   // solo comprueba: no recorta ni transforma nada
+
+$diagram->update(['data' => $request->input('data')]);
+```
+
+**b) Desactivar la poda en toda la API** (afecta a todos los endpoints; úsalo
+solo si el resto de la API no depende del comportamiento actual):
+
+```php
+// app/Providers/AppServiceProvider.php
+public function boot(): void
+{
+    \Illuminate\Support\Facades\Validator::includeUnvalidatedArrayKeys();
+}
+```
+
+### 4.5 Límites de tamaño
 
 > Las imágenes aumentan el tamaño del JSON: revisar `post_max_size`, el límite
 > del proxy (`client_max_body_size` en Nginx) y cualquier middleware de tamaño
@@ -243,90 +355,38 @@ public function rules(): array
 > imágenes. El frontend muestra los errores de guardado/almacenamiento y no
 > descarta los cambios; se puede exportar JSON como respaldo.
 
-```php
-// app/Http/Controllers/Api/DiagramController.php
-namespace App\Http\Controllers\Api;
+### 4.6 Verificación en 30 segundos
 
-use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreDiagramRequest;
-use App\Http\Resources\DiagramResource;
-use App\Models\Diagram;
-use App\Models\Project;
-use Illuminate\Http\Request;
+```bash
+API=https://api.appsline.com.mx/api
+TOKEN=...   # token de la sesión del panel
 
-class DiagramController extends Controller
-{
-    public function index(Request $request, Project $project)
-    {
-        $this->authorize('view', $project);
-
-        $query = $project->diagrams()->with('task:id,title')->latest('updated_at');
-        if ($request->filled('task_id')) {
-            $query->where('task_id', $request->integer('task_id'));
-        }
-
-        return DiagramResource::collection($query->get());
-    }
-
-    public function store(StoreDiagramRequest $request, Project $project)
-    {
-        $this->authorize('update', $project);
-
-        $diagram = $project->diagrams()->create([
-            ...$request->validated(),
-            'created_by' => $request->user()->id,
-        ]);
-
-        return new DiagramResource($diagram->load('task:id,title'));
-    }
-
-    public function show(Project $project, Diagram $diagram)
-    {
-        $this->authorize('view', $project);
-        abort_unless($diagram->project_id === $project->id, 404);
-
-        return new DiagramResource($diagram->load('task:id,title'));
-    }
-
-    public function update(StoreDiagramRequest $request, Project $project, Diagram $diagram)
-    {
-        $this->authorize('update', $project);
-        abort_unless($diagram->project_id === $project->id, 404);
-
-        $diagram->update($request->validated());
-
-        return new DiagramResource($diagram->fresh()->load('task:id,title'));
-    }
-
-    public function destroy(Project $project, Diagram $diagram)
-    {
-        $this->authorize('update', $project);
-        abort_unless($diagram->project_id === $project->id, 404);
-
-        $diagram->delete();
-
-        return response()->noContent();
-    }
-
-    /** Opcional: GET /api/diagrams — todos los del usuario (vista global). */
-    public function all(Request $request)
-    {
-        $projectIds = Project::query()
-            ->visibleTo($request->user()) // adapta al criterio que ya uses en /projects
-            ->pluck('id');
-
-        $diagrams = Diagram::whereIn('project_id', $projectIds)
-            ->with(['task:id,title', 'project:id,name'])
-            ->latest('updated_at')
-            ->get();
-
-        return DiagramResource::collection($diagrams);
-    }
-}
+curl -sS -X PUT "$API/projects/1/diagrams/1" \
+  -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
+  --data-urlencode "name=Prueba de integridad" \
+  --data-urlencode "data[nodes][0][id]=a" \
+  --data-urlencode "data[nodes][0][type]=flow" \
+  --data-urlencode "data[nodes][0][width]=160" \
+  --data-urlencode "data[nodes][0][height]=60" \
+  --data-urlencode "data[nodes][0][position][x]=120" \
+  --data-urlencode "data[nodes][0][position][y]=60" \
+  --data-urlencode "data[nodes][0][data][label]=Inicio" \
+  --data-urlencode "data[nodes][0][data][shape]=terminal" \
+  --data-urlencode "data[nodes][0][data][style][fill]=#e0f2fe" \
+  --data-urlencode "data[edges]=[]" \
+  --data-urlencode "data[settings][background]=dots" \
+  | jq '.data.nodes[0]'
 ```
 
-Si el proyecto no tiene políticas (`authorize`), sustituye esas líneas por la
-comprobación que ya uses en `TaskController`.
+La respuesta **debe** incluir `type`, `width`, `height`, `data.shape` y
+`data.style.fill`. Si solo aparecen `id`, `position` y `data.label`, la API está
+podando el dibujo (reglas anidadas + `validated()`).
+
+En el panel, la misma comprobación está automatizada:
+`npm run test:unit` → `tests/unit/diagrams-storage.test.mjs` simula un backend
+que poda y verifica que el editor conserva las formas, restaura desde la copia
+local y avisa. `tests/diagrams-integrity.spec.mjs` hace lo mismo en el navegador
+(`npm run test:e2e`).
 
 ### Recurso (respuesta)
 
@@ -390,12 +450,33 @@ Route::get('diagrams', [DiagramController::class, 'all']); // opcional
 `index` devuelve `data` completo porque el panel pinta una **miniatura** de cada
 diagrama a partir de los nodos. Si los diagramas crecen mucho, dos opciones:
 
-1. Devolver en `index` solo `data.nodes` con `id`, `position`, `width`, `height`
-   y `data.shape`/`data.style.fill`/`stroke`, y `data.edges` con `source`/`target`.
-   El panel ya tolera nodos sin el resto de campos.
+1. Devolver en `index` un `data` reducido con **solo** lo que necesita la
+   miniatura —el panel ya tolera nodos sin el resto de campos—:
+
+   ```jsonc
+   { "id": 42, "project_id": 1, "name": "Flujo", "task_id": null, "updated_at": "…",
+     "data": { "version": 1,
+       "nodes": [{ "id": "a", "position": { "x": 120, "y": 60 }, "width": 160, "height": 60,
+                   "data": { "shape": "terminal", "style": { "fill": "#e0f2fe" } } }],
+       "edges": [{ "source": "a", "target": "b" }] } }
+   ```
+
+   Ojo: `id`, `project_id`, `data.nodes[].data.shape` y
+   `data.nodes[].data.style.fill` son imprescindibles; sin ellos la tarjeta no
+   sabe qué dibujar.
 2. Guardar una miniatura PNG (`thumbnail_url`) generada por el panel —no está
    implementado aún en el frontend; si lo quieres, hay que agregar el campo y
    un `POST .../diagrams/{id}/thumbnail` multipart.
+
+**Cómo se comporta el panel con un listado ligero:** al guardar desde una
+tarjeta (renombrar, vincular a una tarea, duplicar) detecta que el contenido que
+tiene es incompleto y **vuelve a leer el registro individual** antes de enviar,
+para no pisar el dibujo del servidor con la versión reducida. Es una petición
+extra por guardado; si `GET /projects/{id}/diagrams/{diagramId}` devuelve el
+`data` completo, no se pierde nada.
+
+Lo que **no** debe pasar es que el registro individual también llegue podado:
+entonces no hay fuente buena y el panel avisa (sección 9).
 
 ---
 
@@ -430,21 +511,76 @@ Los diagramas creados antes de tener la API viven en `localStorage`
 **Base de datos**
 
 - [ ] Migración `diagrams` (`project_id`, `task_id` nullable, `name`, `description`, `data` JSON, `created_by`).
+- [ ] `data` declarado como `array` en `casts()` del modelo.
 
 **API**
 
 - [ ] `GET/POST /projects/{id}/diagrams`, `GET/PUT/DELETE /projects/{id}/diagrams/{diagramId}`.
 - [ ] Filtro `?task_id=` en el listado.
-- [ ] Validación del `data` (arreglos `nodes`/`edges`, límites de tamaño).
+- [ ] **Reglas de validación: `'data' => ['required','array']` y ninguna regla `data.*` anidada** (sección 4.1).
+- [ ] **Guardado con `$request->input('data')`, no con `$request->validated()['data']`** (sección 4.3).
+- [ ] `curl` de verificación: la respuesta conserva `data.shape` y `data.style` (sección 4.6).
 - [ ] Permisos iguales a los de las tareas del proyecto.
 - [ ] `post_max_size` suficiente para diagramas grandes.
 - [ ] *(Opcional)* `GET /diagrams` para la vista global.
 
 **Panel (ya hecho)**
 
-- [x] Editor con 15 formas, conexiones configurables, etiquetas, colores, tipografía,
+- [x] Editor con 17 formas, conexiones configurables, etiquetas, colores, tipografía,
       iconos, bloqueo, capas, alineación/distribución, auto-acomodo, temas, plantillas,
       deshacer/rehacer, copiar/pegar, menú contextual, atajos y pantalla completa.
 - [x] Exportar PNG / SVG / JSON, importar JSON, adjuntar al proyecto o a la tarea.
 - [x] Pestaña **Diagramas** del proyecto, sección en el detalle de tarea y vista global `/admin/diagrams`.
 - [x] Autoguardado, aviso de cambios sin guardar y respaldo local cuando la API no existe.
+- [x] **Integridad del contenido**: detecta la respuesta podada, completa el dibujo con la
+      copia local, no sobrescribe el servidor con contenido degradado y muestra el aviso con
+      la corrección exacta (sección 9).
+
+---
+
+## 9. Diagnóstico: todos los nodos vuelven como Proceso
+
+**Síntoma.** Se dibuja un diagrama con varios tipos de nodo (Inicio/Fin,
+Decisión, Base de datos, Nota…), se guarda sin errores y, al reabrirlo o
+recargar la página, **todos los nodos aparecen como rectángulos de Proceso**;
+las flechas pierden etiqueta, color y estilo.
+
+**Causa.** La API aceptó el guardado (200/201) pero devolvió —y guardó— un
+registro **incompleto**. Ocurre con reglas de validación anidadas
+(`data.nodes.*.data.label`, …) combinadas con `$request->validated()`: desde
+Laravel 9 el validador excluye las claves de un arreglo que no tengan regla
+propia, y `data.shape` no la tiene. Sin `shape`, el panel aplica el respaldo
+`process`. Detalle y arreglo en la sección 4.
+
+**Cómo se ve ahora en el panel.** El editor ya no se queda callado:
+
+- Al **guardar**, si la respuesta viene recortada aparece un aviso ámbar/rojo
+  («La API guardó el diagrama pero descartó el tipo de los nodos…») y el pie
+  cambia a *Guardado incompleto en la API*. El lienzo de la sesión sigue
+  completo.
+- Al **abrir**, si el registro del servidor está podado, el panel lo completa
+  con la última copia que envió desde ese navegador (`restored`) y lo dice; si
+  no tiene copia (otro equipo, otro navegador, almacenamiento limpio), no
+  inventa nada: dibuja Proceso y explica que hay que importar el JSON desde
+  donde se dibujó.
+- **Ver detalle** lista las rutas ausentes (`data.nodes[].data.shape`,
+  `data.nodes[].data.style`, `data.edges[].data`, …), cuántos nodos y conexiones
+  afectan, el fragmento de Laravel correcto y un botón para **exportar el JSON
+  de respaldo**.
+- Al **renombrar, vincular o duplicar** desde una tarjeta, el panel vuelve a
+  leer el registro completo antes de escribir, así que un listado ligero (o un
+  registro podado) no degrada aún más lo que hay en el servidor.
+
+**Qué hacer.**
+
+1. Corregir la API (sección 4): reglas sin anidar + `$request->input('data')`.
+   Los archivos listos para copiar están en [`docs/backend-diagrams/`](./backend-diagrams/).
+2. Verificar con el `curl` de la sección 4.6 y reabrir un diagrama: las formas
+   deben conservarse sin aviso.
+3. Mientras tanto, exportar el JSON de los diagramas importantes desde el
+   editor (Exportar → Archivo JSON) e importarlos en cuanto la API esté
+   corregida.
+
+**Cómo se reproduce en tests.** `tests/unit/diagrams-storage.test.mjs` (capa de
+datos, sin navegador) y `tests/diagrams-integrity.spec.mjs` (editor completo con
+Playwright) simulan exactamente esta API podada.

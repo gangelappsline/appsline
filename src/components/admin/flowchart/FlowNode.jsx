@@ -107,6 +107,7 @@ const FlowNode = ({ id, data, selected, width, height, dragging }) => {
   return (
     <div
       className="group/node relative"
+      data-shape={data.shape}
       title={data.description || undefined}
       style={{ width: w, height: h, opacity: style.opacity ?? 1 }}
       onDoubleClick={(e) => {
