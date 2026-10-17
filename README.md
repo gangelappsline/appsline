@@ -138,16 +138,31 @@ Editor de diagramas de flujo integrado en el panel, guardado **por proyecto** o
   comandos) y el editor a pantalla completa en
   `/admin/projects/:id/diagrams/:diagramId` (`new` para crear).
 - **Editor** (`src/components/admin/flowchart/`, sobre `@xyflow/react`):
-  15 formas (inicio/fin, proceso, decisión, entrada/salida, subproceso,
+  15 formas de flujo (inicio/fin, proceso, decisión, entrada/salida, subproceso,
   documento, base de datos, operación manual, preparación, espera, conector,
   fuera de página, nota, texto libre y carril), conexiones por cualquier lado
   con tipo de línea, flechas, etiqueta, color, grosor, guiones y animación;
   panel de propiedades con relleno, borde, radio, opacidad, sombra, tipografía,
   alineación, icono, enlace, descripción, bloqueo y capas; alinear/distribuir,
-  auto-acomodo (vertical u horizontal), cuadrícula/imán, fondos, minimapa, temas
+  auto-acomodo con Dagre (vertical u horizontal, separación entre nodos/niveles
+  y flechas de retorno exteriores), cuadrícula/imán, fondos, minimapa, temas
   de color aplicables a todo el diagrama, plantillas (proceso básico,
   aprobación, bug, onboarding), deshacer/rehacer, copiar/pegar/duplicar, menú
   contextual, atajos de teclado, autoguardado y aviso de cambios sin guardar.
+- **Recursos propios**: pestaña **Recursos** de la biblioteca (o botón de imagen
+  en la barra). Carga o suelta imágenes PNG/JPG/WebP, hasta **5 MB por archivo**;
+  se optimizan a 1600 px y se guardan embebidas en el JSON, sin URLs temporales
+  ni endpoints extra. Se pueden reemplazar, redimensionar conservando proporción
+  y ajustar a «completa» o «recortada». Catálogo visual de **47 iconos de React
+  Icons** con búsqueda, como elementos independientes o dentro de las formas.
+- **Paneles**: biblioteca con Formas/Recursos/Plantillas y propiedades con
+  Selección/Lienzo. Organización y posición/tamaño accesibles sin recorrer
+  todos los estilos; paneles superpuestos y cerrables en pantallas pequeñas.
+- **Guardado**: conserva el ID tanto con respuestas directas como envueltas en
+  `data`. Solo la creación usa POST; las ediciones usan PUT sobre el mismo ID.
+  No se reinicia el editor al pasar de `/new` a `/ID`; se conservan historial
+  y cambios hechos mientras guarda. Los errores pausan el autoguardado y se
+  avisa si falta espacio local, en vez de informar un guardado inexistente.
 - **Exportar**: PNG, SVG, JSON (reimportable) y **adjuntar** PNG + JSON como
   archivo del proyecto o de la tarea con los endpoints de archivos ya existentes.
 - **Sin API todavía**: si `/projects/{id}/diagrams` responde 404/405/501, los
@@ -155,7 +170,7 @@ Editor de diagramas de flujo integrado en el panel, guardado **por proyecto** o
   una franja ámbar. Al activar la API no hay que cambiar nada en el frontend.
 - `src/utils/diagrams.js` (modelo, normalización, plantillas, auto-acomodo,
   alineación) está cubierto por pruebas unitarias; el flujo completo está en
-  `tests/diagrams-assignees.spec.mjs` (Playwright).
+  `tests/diagrams-assignees.spec.mjs` y `tests/diagrams-editor.spec.mjs` (Playwright).
 
 ## Notificaciones push web (Firebase Cloud Messaging)
 

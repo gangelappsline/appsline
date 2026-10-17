@@ -15,8 +15,8 @@
  * y la vista lo avisa al usuario.
  */
 import api from "./api";
-import { normalizeDiagram, serializeDiagram } from "../utils/diagrams";
-import { readApiStatus, unwrapList, unwrapObject } from "./admin";
+import { normalizeDiagram, serializeDiagram, unwrapDiagramResponse } from "../utils/diagrams";
+import { readApiStatus, unwrapList } from "./admin";
 
 const LOCAL_KEY = "appsline.diagrams.v1";
 const MISSING = [404, 405, 501];
@@ -24,7 +24,7 @@ const MISSING = [404, 405, 501];
 /** `null` = sin sondear · `true` = la API tiene los endpoints · `false` = respaldo local. */
 let endpointSupported = null;
 
-export const diagramsStorageMode = () => (endpointSupported === false ? "local" : "api");
+export const diagramsStorageMode = (diagramId) => (String(diagramId).startsWith("local-") || endpointSupported === false ? "local" : "api");
 export const diagramsEndpointKnown = () => endpointSupported !== null;
 
 /** Solo para pruebas / diagnóstico. */
@@ -57,11 +57,11 @@ const readLocal = () => {
 
 const writeLocal = (list) => {
   const store = storage();
-  if (!store) return;
+  if (!store) throw new Error("El navegador no permite guardar. Exporta el JSON para conservar los cambios.");
   try {
     store.setItem(LOCAL_KEY, JSON.stringify(list));
   } catch {
-    /* cuota llena: se ignora, el usuario puede exportar a JSON */
+    throw new Error("No hay espacio en el navegador. Exporta el JSON o reduce las imágenes; los cambios aún no se han guardado.");
   }
 };
 
@@ -106,12 +106,12 @@ export async function fetchProjectDiagrams(projectId, { taskId } = {}) {
 export const fetchTaskDiagrams = (projectId, taskId) => fetchProjectDiagrams(projectId, { taskId });
 
 export async function fetchDiagram(projectId, diagramId) {
-  if (endpointSupported !== false && !String(diagramId).startsWith("local-")) {
+  if (!String(diagramId).startsWith("local-")) {
     try {
       const { data } = await api.get(`/projects/${projectId}/diagrams/${diagramId}`);
       endpointSupported = true;
-      const found = unwrapObject(data, diagramKeys);
-      return found ? normalizeDiagram(found) : null;
+      const found = unwrapDiagramResponse(data);
+      return found ? normalizeDiagram({ ...found, id: diagramId, project_id: projectId }) : null;
     } catch (error) {
       const status = readApiStatus(error);
       if (status === 404 && endpointSupported === true) return null; // el endpoint existe, el diagrama no
@@ -153,27 +153,35 @@ export async function fetchAllDiagrams(projects = []) {
  */
 export async function saveDiagram(projectId, diagram) {
   const payload = serializeDiagram(diagram);
-  const isLocal = diagram.id && String(diagram.id).startsWith("local-");
+  const hasId = diagram.id !== null && diagram.id !== undefined && diagram.id !== "";
+  const isLocal = hasId && String(diagram.id).startsWith("local-");
 
-  if (endpointSupported !== false && !isLocal) {
+  // Un registro remoto siempre se actualiza por su ID. Un PUT fallido no
+  // significa «crear una copia local» (ni mucho menos repetir un POST).
+  if (!isLocal && (hasId || endpointSupported !== false)) {
     try {
-      const { data } = diagram.id
+      const { data } = hasId
         ? await api.put(`/projects/${projectId}/diagrams/${diagram.id}`, payload)
         : await api.post(`/projects/${projectId}/diagrams`, payload);
       endpointSupported = true;
-      const saved = unwrapObject(data, diagramKeys);
-      return normalizeDiagram({ ...diagram, ...(saved || null), project_id: projectId });
+      const saved = unwrapDiagramResponse(data);
+      const id = hasId ? diagram.id : saved?.id;
+      if (id === null || id === undefined || id === "") {
+        throw new Error("La API no devolvió el ID del diagrama creado. Revisa la lista de diagramas antes de volver a guardar para evitar duplicados.");
+      }
+      // Un PUT puede responder 204 o solo metadatos. Nunca perder contenido/ID.
+      return normalizeDiagram({ ...diagram, ...saved, data: saved?.data ?? payload.data, id, project_id: projectId });
     } catch (error) {
-      if (!MISSING.includes(readApiStatus(error))) throw error;
+      if (hasId || endpointSupported === true || !MISSING.includes(readApiStatus(error))) throw error;
       endpointSupported = false;
     }
   }
 
   const now = new Date().toISOString();
   const list = readLocal();
-  const index = diagram.id ? list.findIndex((d) => same(d.id, diagram.id)) : -1;
+  const index = hasId ? list.findIndex((d) => same(d.id, diagram.id) && same(d.project_id, projectId)) : -1;
   const record = {
-    ...(index >= 0 ? list[index] : { id: localId(), created_at: now }),
+    ...(index >= 0 ? list[index] : { id: isLocal ? diagram.id : localId(), created_at: now }),
     ...payload,
     project_id: projectId,
     updated_at: now,

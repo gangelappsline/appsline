@@ -1,11 +1,7 @@
 /* eslint-disable react/prop-types */
+import { useId } from "react";
 
-/** `stroke-dasharray` para cada estilo de línea. */
-export const dashArray = (dash, width = 2) => {
-  if (dash === "dashed") return `${width * 4} ${width * 3}`;
-  if (dash === "dotted") return `${width} ${width * 2.5}`;
-  return undefined;
-};
+import { dashArray } from "../../../utils/diagramGeometry";
 
 /**
  * Geometría de cada forma en coordenadas reales (no se escala el SVG para
@@ -93,6 +89,7 @@ const geometry = (shape, w, h, i, radius) => {
         { el: "line", x1: x0, y1: y0 + 36, x2: x1, y2: y0 + 36, fill: "none" },
       ];
     case "text":
+    case "icon":
       return [];
     case "process":
     default:
@@ -104,6 +101,7 @@ const geometry = (shape, w, h, i, radius) => {
  * Fondo SVG de un nodo del diagrama. Se dibuja al tamaño real del nodo.
  */
 const ShapeSvg = ({ shape, width, height, style = {}, className = "" }) => {
+  const shadowId = `flow-shadow-${useId().replace(/:/g, "")}`;
   const strokeWidth = Number(style.strokeWidth ?? 2);
   const inset = strokeWidth / 2 + 1;
   const parts = geometry(shape, width, height, inset, Number(style.radius ?? 10));
@@ -120,7 +118,7 @@ const ShapeSvg = ({ shape, width, height, style = {}, className = "" }) => {
     >
       {style.shadow && shape !== "text" && (
         <defs>
-          <filter id={`shadow-${shape}`} x="-10%" y="-10%" width="120%" height="130%">
+          <filter id={shadowId} x="-10%" y="-10%" width="120%" height="130%">
             <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodColor="#0f172a" floodOpacity="0.12" />
           </filter>
         </defs>
@@ -134,7 +132,7 @@ const ShapeSvg = ({ shape, width, height, style = {}, className = "" }) => {
           strokeWidth={strokeWidth}
           strokeDasharray={dash}
           strokeLinejoin="round"
-          filter={index === 0 && style.shadow && shape !== "text" ? `url(#shadow-${shape})` : undefined}
+          filter={index === 0 && style.shadow && shape !== "text" ? `url(#${shadowId})` : undefined}
         />
       ))}
     </svg>

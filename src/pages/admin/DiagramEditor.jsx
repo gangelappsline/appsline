@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { FiAlertTriangle, FiArrowLeft } from "react-icons/fi";
 import LayoutAdmin from "../../layouts/LayoutAdmin";
@@ -27,11 +27,25 @@ const DiagramEditor = () => {
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [storageMode, setStorageMode] = useState(diagramsStorageMode());
+  const [storageMode, setStorageMode] = useState(diagramsStorageMode(diagramId));
+  const [editorKey, setEditorKey] = useState(`${projectId}/${diagramId}`);
+  const sessionRef = useRef(null);
 
   const isNew = diagramId === "new";
 
+  useEffect(() => () => { sessionRef.current = null; }, []);
+
   useEffect(() => {
+    // El primer guardado cambia /new por /ID, pero NO recarga el editor:
+    // conserva historial, selección y cambios realizados durante la petición.
+    const current = sessionRef.current;
+    if (current?.projectId === projectId && current.savedRoute === diagramId) {
+      current.savedRoute = null;
+      return undefined;
+    }
+    const session = { projectId, id: isNew ? null : diagramId, inFlight: null, savedRoute: null };
+    sessionRef.current = session;
+    setSaving(false);
     let active = true;
     (async () => {
       setLoading(true);
@@ -58,7 +72,8 @@ const DiagramEditor = () => {
       } else {
         setMissing(true);
       }
-      setStorageMode(diagramsStorageMode());
+      setEditorKey(`${projectId}/${diagramId}`);
+      setStorageMode(diagramsStorageMode(diagramId));
       setLoading(false);
     })();
     return () => {
@@ -80,28 +95,47 @@ const DiagramEditor = () => {
   }, [project, projectId, diagram?.task_id, taskOf]);
 
   const handleSave = useCallback(
-    async (payload) => {
+    (payload) => {
+      const session = sessionRef.current;
+      if (!session || session.projectId !== projectId) return Promise.resolve(null);
+      if (session.inFlight) return session.inFlight;
       setSaving(true);
-      try {
-        const saved = await saveDiagram(projectId, { ...payload, id: diagram?.id ?? null });
-        setStorageMode(diagramsStorageMode());
-        setDiagram((old) => (old ? { ...old, id: saved.id, updated_at: saved.updated_at } : saved));
-        if (isNew && saved.id) {
-          navigate(`/admin/projects/${projectId}/diagrams/${saved.id}`, { replace: true });
+      session.inFlight = (async () => {
+        try {
+          const wasNew = session.id === null;
+          const saved = await saveDiagram(projectId, { ...payload, id: session.id });
+          // La identidad se actualiza sin esperar al siguiente render de React.
+          session.id = saved.id;
+          if (sessionRef.current !== session) return saved;
+          setStorageMode(diagramsStorageMode(saved.id));
+          setDiagram((old) => ({
+            ...old,
+            id: saved.id,
+            name: payload.name,
+            description: payload.description,
+            task_id: payload.task_id,
+            updated_at: saved.updated_at,
+          }));
+          if (wasNew) {
+            session.savedRoute = String(saved.id);
+            navigate(`/admin/projects/${projectId}/diagrams/${saved.id}`, { replace: true });
+          }
+          return saved;
+        } finally {
+          session.inFlight = null;
+          if (sessionRef.current === session) setSaving(false);
         }
-        return saved;
-      } finally {
-        setSaving(false);
-      }
+      })();
+      return session.inFlight;
     },
-    [projectId, diagram?.id, isNew, navigate],
+    [projectId, navigate],
   );
 
   const handleAttach = useCallback(
-    async (files) => {
-      await uploadProjectFiles(projectId, files, { taskId: diagram?.task_id || null });
+    async (files, taskId) => {
+      await uploadProjectFiles(projectId, files, { taskId: taskId || null });
     },
-    [projectId, diagram?.task_id],
+    [projectId],
   );
 
   const goBack = () => {
@@ -147,7 +181,7 @@ const DiagramEditor = () => {
           </div>
         ) : (
           <FlowchartEditor
-            key={diagram.id || "new"}
+            key={editorKey}
             diagram={diagram}
             tasks={tasks}
             onSave={handleSave}

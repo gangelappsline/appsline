@@ -1,3 +1,7 @@
+import dagre from "@dagrejs/dagre";
+import { normalizeDiagramImage } from "./diagramMedia.js";
+import { routeDiagramEdges } from "./diagramGeometry.js";
+
 /**
  * Modelo de los diagramas de flujo del panel.
  *
@@ -50,6 +54,8 @@ export const SHAPES = [
   { key: "offpage", label: "Fuera de página", hint: "Continúa en otro diagrama", w: 150, h: 84, fill: "#f8fafc", stroke: "#334155", group: "flow" },
   { key: "note", label: "Nota", hint: "Comentario o aclaración", w: 200, h: 90, fill: "#fef08a", stroke: "#eab308", group: "misc" },
   { key: "text", label: "Texto", hint: "Texto libre sin borde", w: 200, h: 44, fill: "transparent", stroke: "transparent", group: "misc" },
+  { key: "image", label: "Imagen", hint: "Imagen propia guardada dentro del diagrama", w: 240, h: 180, fill: "#ffffff", stroke: "#cbd5e1", group: "media" },
+  { key: "icon", label: "Icono", hint: "Icono de React Icons con etiqueta opcional", w: 112, h: 112, fill: "transparent", stroke: "#0060fc", group: "media" },
   { key: "swimlane", label: "Carril / Grupo", hint: "Área para agrupar pasos por responsable", w: 420, h: 260, fill: "#f8fafc", stroke: "#94a3b8", group: "misc" },
 ];
 
@@ -81,6 +87,7 @@ export const DEFAULT_NODE_STYLE = {
   valign: "middle", // top | middle | bottom
   shadow: true,
   icon: "",
+  iconSize: 0, // 0 = proporcional al texto (40 px en los iconos independientes)
 };
 
 export const EDGE_KINDS = [
@@ -133,6 +140,8 @@ export const DEFAULT_SETTINGS = {
   gridSize: 20,
   snap: true,
   direction: "TB",
+  nodeSpacing: 80,
+  rankSpacing: 100,
   canvasColor: "#f8fafc",
   minimap: true,
   controls: true,
@@ -223,7 +232,7 @@ export const makeNode = (shape = "process", position = { x: 0, y: 0 }, overrides
         stroke: meta.stroke,
         radius: meta.key === "note" ? 4 : meta.key === "swimlane" ? 12 : DEFAULT_NODE_STYLE.radius,
         fontWeight: meta.key === "note" || meta.key === "text" ? 500 : DEFAULT_NODE_STYLE.fontWeight,
-        shadow: meta.key !== "text" && meta.key !== "swimlane",
+        shadow: !["text", "swimlane", "icon"].includes(meta.key),
         valign: meta.key === "swimlane" || meta.key === "note" ? "top" : "middle",
         ...styleOverrides,
       },
@@ -272,8 +281,9 @@ const normalizeNode = (raw) => {
   const data = raw.data || {};
   const shape = shapeMeta(data.shape || raw.shape).key;
   const position = raw.position || { x: raw.x, y: raw.y };
-  const width = toNumber(raw.width ?? raw.measured?.width ?? raw.style?.width, shapeMeta(shape).w);
-  const height = toNumber(raw.height ?? raw.measured?.height ?? raw.style?.height, shapeMeta(shape).h);
+  const width = Math.max(44, toNumber(raw.width ?? raw.measured?.width ?? raw.style?.width, shapeMeta(shape).w));
+  const height = Math.max(28, toNumber(raw.height ?? raw.measured?.height ?? raw.style?.height, shapeMeta(shape).h));
+  const image = normalizeDiagramImage(data.image);
   return {
     id: String(raw.id || newId("n")),
     type: "flow",
@@ -291,6 +301,7 @@ const normalizeNode = (raw) => {
       locked: Boolean(data.locked),
       description: data.description || "",
       link: data.link || "",
+      ...(image ? { image } : {}),
       style: { ...DEFAULT_NODE_STYLE, fill: shapeMeta(shape).fill, stroke: shapeMeta(shape).stroke, ...(data.style || {}) },
     },
   };
@@ -319,6 +330,25 @@ const normalizeEdge = (raw, nodeIds) => {
 };
 
 /**
+ * A diferencia del lector genérico de la API, NO desenvuelve el `data` de
+ * un registro: en un diagrama es el contenido, no un envoltorio HTTP.
+ */
+export const unwrapDiagramResponse = (payload) => {
+  let value = payload;
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    if (Object.hasOwn(value, "id") || Array.isArray(value.nodes) ||
+        ((value.name || value.title) && (value.data || value.content || value.payload))) return value;
+    const key = ["diagram", "flowchart", "diagrams", "flowcharts", "data"].find((k) =>
+      value[k] && typeof value[k] === "object" && !Array.isArray(value[k]),
+    );
+    if (!key) return null;
+    value = value[key];
+  }
+  return null;
+};
+
+/**
  * Convierte lo que devuelva la API (o el almacenamiento local) en un diagrama
  * con todos los campos. Tolera `data` como JSON en texto, nodos sin tamaño,
  * conexiones huérfanas, etc.
@@ -330,7 +360,7 @@ export const normalizeDiagram = (raw = {}) => {
   const edgesRaw = Array.isArray(data.edges) ? data.edges : Array.isArray(source.edges) ? source.edges : [];
   const nodes = nodesRaw.map(normalizeNode).filter(Boolean);
   const ids = new Set(nodes.map((n) => n.id));
-  const edges = edgesRaw.map((e) => normalizeEdge(e, ids)).filter(Boolean);
+  const edges = routeDiagramEdges(nodes, edgesRaw.map((e) => normalizeEdge(e, ids)).filter(Boolean), data.settings || {});
   const viewport = data.viewport && typeof data.viewport === "object" ? data.viewport : null;
 
   return {
@@ -439,109 +469,81 @@ export const diagramBounds = (nodes = [], padding = 24) => {
 };
 
 /* ------------------------------------------------------------------ */
-/* Auto-acomodo (layout por capas, sin dependencias)                   */
+/* Auto-acomodo (Dagre: capas, ramas y reducción de cruces)              */
 /* ------------------------------------------------------------------ */
 
-/**
- * Acomoda los nodos en capas siguiendo las conexiones (algoritmo tipo
- * Sugiyama simplificado: capas por camino más largo + orden por baricentro).
- *
- * @param {Array} nodes
- * @param {Array} edges
- * @param {object} [options] `direction` ("TB"|"LR"), `gapX`, `gapY`
- * @returns {Array} nodos con `position` nueva (los carriles y textos sueltos no se mueven)
- */
-export const autoLayout = (nodes = [], edges = [], { direction = "TB", gapX = 60, gapY = 70 } = {}) => {
-  const movable = nodes.filter((n) => n.data?.shape !== "swimlane" && !n.data?.locked);
+/** Acomoda usando el tamaño real de cada nodo y conserva carriles y bloqueos. */
+export const autoLayout = (nodes = [], edges = [], { direction = "TB", gapX = 80, gapY = 100 } = {}) => {
+  const connected = new Set(edges.flatMap((edge) => [edge.source, edge.target]));
+  const movable = nodes.filter((node) => !node.data?.locked && !node.parentId && node.data?.shape !== "swimlane" &&
+    (!["text", "note"].includes(node.data?.shape) || connected.has(node.id)));
   if (!movable.length) return nodes;
-  const ids = new Set(movable.map((n) => n.id));
-  const byId = new Map(movable.map((n) => [n.id, n]));
-  const out = new Map(movable.map((n) => [n.id, []]));
-  const inc = new Map(movable.map((n) => [n.id, []]));
-  edges.forEach((e) => {
-    if (!ids.has(e.source) || !ids.has(e.target) || e.source === e.target) return;
-    out.get(e.source).push(e.target);
-    inc.get(e.target).push(e.source);
+  const ids = new Set(movable.map((node) => node.id));
+  const graph = new dagre.graphlib.Graph({ multigraph: true });
+  graph.setGraph({
+    rankdir: direction === "LR" ? "LR" : "TB",
+    nodesep: Math.max(24, Number(gapX) || 80),
+    ranksep: Math.max(40, Number(gapY) || 100),
+    edgesep: 32,
+    ranker: "network-simplex",
   });
+  graph.setDefaultEdgeLabel(() => ({}));
+  // Orden estable: el resultado no depende del orden de la respuesta de la API.
+  [...movable].sort((a, b) => a.id.localeCompare(b.id)).forEach((node) => {
+    graph.setNode(node.id, { width: node.width || 180, height: node.height || 72 });
+  });
+  const links = edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target) && edge.source !== edge.target);
+  links.forEach((edge, index) => graph.setEdge(edge.source, edge.target, {}, String(index)));
 
-  // Capa = camino más largo desde una fuente (ignorando aristas de retorno).
-  const rank = new Map();
-  const state = new Map(); // 1 = en pila, 2 = listo
-  const visit = (id) => {
-    if (state.get(id) === 2) return rank.get(id);
-    if (state.get(id) === 1) return 0; // ciclo: se corta aquí
-    state.set(id, 1);
-    let r = 0;
-    inc.get(id).forEach((p) => {
-      if (state.get(p) === 1) return; // arista de retorno
-      r = Math.max(r, visit(p) + 1);
-    });
-    rank.set(id, r);
-    state.set(id, 2);
-    return r;
+  // No dejar que un ciclo mande «Corregir» antes de «Inicio». Dentro de cada
+  // componente cíclico, las vueltas hacia atrás no determinan los niveles.
+  const components = new Map();
+  dagre.graphlib.alg.tarjan(graph).forEach((group, index) => {
+    if (group.length > 1) group.forEach((id) => components.set(id, index));
+  });
+  const vertical = links.filter((e) => (e.sourceHandle === "bottom" && e.targetHandle === "top") || (e.sourceHandle === "top" && e.targetHandle === "bottom")).length;
+  const horizontal = links.filter((e) => (e.sourceHandle === "right" && e.targetHandle === "left") || (e.sourceHandle === "left" && e.targetHandle === "right")).length;
+  const currentDirection = vertical === horizontal ? direction : vertical > horizontal ? "TB" : "LR";
+  const byId = new Map(movable.map((node) => [node.id, node]));
+  const along = (id) => {
+    const node = byId.get(id);
+    return currentDirection === "TB" ? node.position.y + node.height / 2 : node.position.x + node.width / 2;
   };
-  movable.forEach((n) => visit(n.id));
-
-  const layers = [];
-  movable.forEach((n) => {
-    const r = rank.get(n.id) || 0;
-    (layers[r] = layers[r] || []).push(n.id);
-  });
-
-  // Orden dentro de cada capa por el promedio de la posición de sus padres.
-  const order = new Map();
-  layers.forEach((layer, index) => {
-    if (index === 0) {
-      layer.sort((a, b) => {
-        const na = byId.get(a).position;
-        const nb = byId.get(b).position;
-        return direction === "TB" ? na.x - nb.x : na.y - nb.y;
-      });
-    } else {
-      const bary = (id) => {
-        const parents = inc.get(id).filter((p) => order.has(p));
-        if (!parents.length) return Number.MAX_SAFE_INTEGER;
-        return parents.reduce((sum, p) => sum + order.get(p), 0) / parents.length;
-      };
-      layer.sort((a, b) => bary(a) - bary(b));
+  links.forEach((edge, index) => {
+    const sizeKey = currentDirection === "TB" ? "height" : "width";
+    const threshold = Math.max(byId.get(edge.source)[sizeKey], byId.get(edge.target)[sizeKey]) / 2;
+    if (vertical + horizontal > 0 && byId.get(edge.source).data?.shape !== "terminal" && components.has(edge.source) && components.get(edge.source) === components.get(edge.target) && along(edge.target) < along(edge.source) - threshold) {
+      graph.removeEdge(edge.source, edge.target, String(index));
     }
-    layer.forEach((id, i) => order.set(id, i));
   });
-
-  const sizeOf = (n) => ({
-    w: toNumber(n.width ?? n.measured?.width, 160),
-    h: toNumber(n.height ?? n.measured?.height, 60),
-  });
-
-  const positions = new Map();
-  let offset = 0;
-  layers.forEach((layer) => {
-    const sizes = layer.map((id) => sizeOf(byId.get(id)));
-    const thickness = Math.max(...sizes.map((s) => (direction === "TB" ? s.h : s.w)));
-    const breadth = sizes.reduce((sum, s) => sum + (direction === "TB" ? s.w : s.h), 0) + gapX * (layer.length - 1);
-    let cursor = -breadth / 2;
-    layer.forEach((id, i) => {
-      const s = sizes[i];
-      if (direction === "TB") {
-        positions.set(id, { x: Math.round(cursor), y: Math.round(offset + (thickness - s.h) / 2) });
-        cursor += s.w + gapX;
-      } else {
-        positions.set(id, { x: Math.round(offset + (thickness - s.w) / 2), y: Math.round(cursor) });
-        cursor += s.h + gapX;
-      }
+  // Si todos estaban superpuestos, cortar solo las aristas de retorno de DFS.
+  const visiting = new Set();
+  const visited = new Set();
+  const visit = (id) => {
+    if (visited.has(id)) return;
+    visiting.add(id);
+    [...graph.outEdges(id)].sort((a, b) => a.w.localeCompare(b.w)).forEach((edge) => {
+      if (visiting.has(edge.w)) graph.removeEdge(edge);
+      else visit(edge.w);
     });
-    offset += thickness + gapY;
-  });
-
-  // Conserva la esquina superior izquierda original del conjunto.
+    visiting.delete(id);
+    visited.add(id);
+  };
+  graph.nodes().filter((id) => !graph.inEdges(id).length).sort().forEach(visit);
+  graph.nodes().sort().forEach(visit);
+  dagre.layout(graph);
+  const positions = new Map(movable.map((node) => {
+    const placed = graph.node(node.id);
+    return [node.id, { x: placed.x - placed.width / 2, y: placed.y - placed.height / 2 }];
+  }));
   const original = diagramBounds(movable, 0);
-  const laid = diagramBounds(movable.map((n) => ({ ...n, position: positions.get(n.id) })), 0);
-  const dx = original.x - laid.x;
-  const dy = original.y - laid.y;
-
-  return nodes.map((n) => {
-    const p = positions.get(n.id);
-    return p ? { ...n, position: { x: p.x + dx, y: p.y + dy } } : n;
+  const laid = diagramBounds(movable.map((node) => ({ ...node, position: positions.get(node.id) })), 0);
+  return nodes.map((node) => {
+    const position = positions.get(node.id);
+    return position ? {
+      ...node,
+      position: { x: Math.round(position.x + original.x - laid.x), y: Math.round(position.y + original.y - laid.y) },
+    } : node;
   });
 };
 
@@ -551,7 +553,7 @@ export const autoLayout = (nodes = [], edges = [], { direction = "TB", gapX = 60
 
 /** Alinea los nodos indicados: left | center | right | top | middle | bottom. */
 export const alignNodes = (nodes, ids, mode) => {
-  const picked = nodes.filter((n) => ids.includes(n.id));
+  const picked = nodes.filter((n) => ids.includes(n.id) && !n.data?.locked);
   if (picked.length < 2) return nodes;
   const b = diagramBounds(picked, 0);
   const size = (n) => ({
@@ -559,7 +561,7 @@ export const alignNodes = (nodes, ids, mode) => {
     h: toNumber(n.height ?? n.measured?.height, 60),
   });
   return nodes.map((n) => {
-    if (!ids.includes(n.id)) return n;
+    if (!ids.includes(n.id) || n.data?.locked) return n;
     const { w, h } = size(n);
     const p = { ...n.position };
     if (mode === "left") p.x = b.x;
@@ -574,7 +576,7 @@ export const alignNodes = (nodes, ids, mode) => {
 
 /** Distribuye con espacio uniforme: "horizontal" | "vertical". */
 export const distributeNodes = (nodes, ids, axis) => {
-  const picked = nodes.filter((n) => ids.includes(n.id));
+  const picked = nodes.filter((n) => ids.includes(n.id) && !n.data?.locked);
   if (picked.length < 3) return nodes;
   const size = (n) => ({
     w: toNumber(n.width ?? n.measured?.width, 160),
