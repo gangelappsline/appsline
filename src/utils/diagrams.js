@@ -296,6 +296,10 @@ const normalizeNode = (raw) => {
     zIndex: raw.zIndex ?? (shape === "swimlane" ? -1 : undefined),
     parentId: raw.parentId || undefined,
     data: {
+      // Mantener metadatos de nodos introducidos por versiones nuevas o
+      // integraciones; reconstruir solo los campos que normalizamos aquí
+      // provocaba que desaparecieran al guardar y volver a cargar.
+      ...data,
       label: typeof data.label === "string" ? data.label : raw.label || shapeMeta(shape).label,
       shape,
       locked: Boolean(data.locked),
