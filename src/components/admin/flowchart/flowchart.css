@@ -1,0 +1,25 @@
+/* Ajustes limitados al editor: el CSS del sitio no debe alterar su geometría. */
+.flowchart-editor .react-flow__node-flow { border-radius: 8px; }
+.flowchart-editor .react-flow__node-flow:focus-visible { outline: 2px solid #60a5fa; outline-offset: 5px; }
+.flowchart-editor .react-flow__handle { cursor: crosshair; }
+/* El ancla mide 1 px para que la flecha llegue al borde; el punto visible
+   mantiene un área de interacción de 12 px sin desplazar los extremos. */
+.flowchart-editor .flow-handle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  border: 2px solid white;
+  border-radius: 50%;
+  background: #3b82f6;
+}
+.flowchart-editor .flow-handle.connectingto::after { background: #16a34a; }
+.flowchart-editor .react-flow__edge.selected .react-flow__edge-path { stroke: #0060fc; }
+.flowchart-editor .react-flow__controls-button { color: #475569; background: white; border-color: #e2e8f0; }
+.flowchart-editor .react-flow__minimap { overflow: hidden; }
+@media (max-width: 1023px) {
+  .flowchart-editor .react-flow__minimap { display: none; }
+}

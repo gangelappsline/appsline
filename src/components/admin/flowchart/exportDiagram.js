@@ -1,4 +1,4 @@
-import { getNodesBounds, getViewportForBounds } from "@xyflow/react";
+import { getNodesBounds } from "@xyflow/react";
 import { serializeDiagram } from "../../../utils/diagrams";
 
 /** Nombre de archivo seguro a partir del nombre del diagrama. */
@@ -51,16 +51,36 @@ export async function renderDiagramImage(container, nodes, { format = "png", bac
   const { toPng, toSvg } = await import("html-to-image");
 
   const bounds = getNodesBounds(nodes);
+  const include = (box) => {
+    const right = Math.max(bounds.x + bounds.width, box.x + box.width);
+    const bottom = Math.max(bounds.y + bounds.height, box.y + box.height);
+    bounds.x = Math.min(bounds.x, box.x);
+    bounds.y = Math.min(bounds.y, box.y);
+    bounds.width = right - bounds.x;
+    bounds.height = bottom - bounds.y;
+  };
+  // También exportar las vueltas exteriores y sus etiquetas, sin recortarlas.
+  viewportEl.querySelectorAll(".react-flow__edge-path").forEach((path) => include(path.getBBox()));
+  const origin = viewportEl.getBoundingClientRect();
+  const zoom = new DOMMatrixReadOnly(getComputedStyle(viewportEl).transform).a || 1;
+  viewportEl.querySelectorAll("[data-flow-edge-label]").forEach((label) => {
+    const rect = label.getBoundingClientRect();
+    include({ x: (rect.left - origin.left) / zoom, y: (rect.top - origin.top) / zoom, width: rect.width / zoom, height: rect.height / zoom });
+  });
   const width = Math.max(200, Math.ceil(bounds.width + padding * 2));
   const height = Math.max(150, Math.ceil(bounds.height + padding * 2));
-  const viewport = getViewportForBounds(bounds, width, height, 0.1, 4, padding);
+  // El PNG/SVG usa las unidades reales del lienzo; el zoom de pantalla no
+  // debe reducir el dibujo ni interpretar «40 px» como un porcentaje enorme.
+  const viewport = { x: padding - bounds.x, y: padding - bounds.y, zoom: 1 };
+  await Promise.all(Array.from(viewportEl.querySelectorAll("img")).map((image) => image.decode()));
 
   const options = {
     backgroundColor: background,
     width,
     height,
     pixelRatio: format === "png" ? scale : 1,
-    cacheBust: true,
+    cacheBust: false,
+    skipFonts: true,
     // Fuera quedan los controles de tamaño y los conectores: solo el dibujo.
     filter: (node) => {
       const cls = typeof node.className === "string" ? node.className : "";

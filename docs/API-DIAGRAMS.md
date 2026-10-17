@@ -151,18 +151,57 @@ basura (§4). La estructura, por si se quiere consultar (p. ej. contar nodos):
   "settings": {
     "background": "dots", "gridSize": 20, "snap": true, "direction": "TB",
     "canvasColor": "#f8fafc", "minimap": true, "controls": true,
-    "edgeKind": "smoothstep", "animatedEdges": false, "theme": "appsline"
+    "edgeKind": "smoothstep", "animatedEdges": false, "theme": "appsline",
+    "nodeSpacing": 80, "rankSpacing": 100
   }
 }
 ```
 
 Formas (`data.shape`): `terminal`, `process`, `decision`, `io`, `subprocess`,
 `document`, `database`, `manual`, `preparation`, `delay`, `connector`,
-`offpage`, `note`, `text`, `swimlane`. Conectores (`sourceHandle`/`targetHandle`):
+`offpage`, `note`, `text`, `swimlane`, **`image`**, **`icon`**. Conectores (`sourceHandle`/`targetHandle`):
 `top`, `right`, `bottom`, `left`.
 
 La referencia es `src/utils/diagrams.js` (`normalizeDiagram`), que además tolera
 `data` serializado como texto JSON.
+
+### Imágenes e iconos (compatibles con `version: 1`)
+
+Un nodo `image` agrega este campo a su `data` (el resto del nodo no cambia):
+
+```json
+{
+  "label": "",
+  "shape": "image",
+  "image": {
+    "src": "data:image/webp;base64,...",
+    "name": "logo.webp",
+    "alt": "Logo del equipo",
+    "fit": "contain",
+    "lockAspectRatio": true,
+    "naturalWidth": 640,
+    "naturalHeight": 400
+  }
+}
+```
+
+- El frontend admite **PNG/JPG/WebP de hasta 5 MB**, reduce el lado mayor a
+  1600 px y rasteriza/comprime a WebP (PNG si el navegador no lo soporta).
+  Se limita cada `src` embebido a 2 MiB de texto. No acepta SVG, URLs externas,
+  `blob:` ni fuentes ejecutables al importar JSON. `fit` admite `contain`/`cover`.
+- **No hace falta un endpoint de carga adicional**: `image` viaja en el mismo
+  JSON del diagrama. La API debe conservar `data.nodes.*.data.image` completo.
+  Si el backend filtra campos internos, incluir este objeto y los campos de
+  estilo nuevos en su lista permitida. No registrar estas imágenes en logs.
+- Los iconos son claves de `src/components/admin/flowchart/icons.js`, no JSX:
+  `data.style.icon: "cloud"`, `data.style.iconSize: 40`. Pueden acompañar el
+  texto de una forma o usarse con `shape: "icon"` como elemento independiente.
+- Imágenes e iconos persisten en copias, JSON exportado/reimportado, miniaturas,
+  PNG/SVG y adjuntos. El autoacomodo usa sus tamaños reales.
+- `settings.nodeSpacing` y `settings.rankSpacing` controlan los espacios del
+  autoacomodo. Los conectores nulos antiguos se resuelven geométricamente;
+  al organizar se recalculan según la dirección, sin cambiar los IDs de nodos
+  ni conexiones.
 
 ---
 
@@ -198,9 +237,11 @@ public function rules(): array
 }
 ```
 
-> El tamaño del JSON puede superar el límite por defecto de PHP si el diagrama
-> es grande: revisa `post_max_size` (p. ej. `8M`) y, si usas un middleware de
-> tamaño máximo de request, permite al menos 2 MB en estas rutas.
+> Las imágenes aumentan el tamaño del JSON: revisar `post_max_size`, el límite
+> del proxy (`client_max_body_size` en Nginx) y cualquier middleware de tamaño
+> máximo. Por ejemplo, permitir 20 MB en estas rutas si se necesitan varias
+> imágenes. El frontend muestra los errores de guardado/almacenamiento y no
+> descarta los cambios; se puede exportar JSON como respaldo.
 
 ```php
 // app/Http/Controllers/Api/DiagramController.php
@@ -311,6 +352,24 @@ public function toArray($request): array
 
 El panel acepta la respuesta envuelta en `data` (como el resto de la API) o
 directa; también acepta `title` en lugar de `name`.
+
+**Importante para no duplicar con el autoguardado:**
+
+- `POST` debe devolver el **ID definitivo** del registro creado, tanto en la
+  respuesta directa (`{id, name, data: {nodes, edges, ...}}`) como envuelta
+  (`{data: {id, name, data: {...}}}`). El `data` interno es el dibujo, no otro
+  envoltorio de respuesta.
+- El editor usa una única petición en vuelo. Tras el primer POST, cambia la URL
+  sin reiniciar el lienzo y los siguientes guardados son `PUT /.../diagrams/{id}`.
+  El ID de la ruta es autoritativo al editar. `PUT` puede devolver el registro,
+  solo metadatos o `204 No Content`.
+- Un PUT fallido **no crea un registro local ni otro diagrama**. Los errores
+  pausan los reintentos automáticos; el usuario conserva el contenido para
+  exportarlo o reintentar con Guardar. Si un POST confirma creación pero no
+  devuelve ID, se pide revisar la lista antes de repetirlo.
+- El respaldo local sigue disponible cuando los endpoints no existen al crear;
+  conserva su ID `local-*` y actualiza el mismo registro. Si se agota la cuota
+  del navegador (especialmente con imágenes), el editor avisa que no se guardó.
 
 ### Rutas
 

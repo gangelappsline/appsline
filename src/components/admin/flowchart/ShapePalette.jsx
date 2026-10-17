@@ -1,13 +1,14 @@
 /* eslint-disable react/prop-types */
-import { useState } from "react";
-import { FiLayout, FiSearch } from "react-icons/fi";
+import { useRef, useState } from "react";
+import { FiImage, FiLayout, FiSearch, FiUpload, FiX } from "react-icons/fi";
 import ShapeSvg from "./ShapeSvg";
+import IconPicker from "./IconPicker";
 import { SHAPES, SHAPE_GROUPS, TEMPLATES } from "../../../utils/diagrams";
+import { DIAGRAM_IMAGE_ACCEPT } from "../../../utils/diagramMedia";
 import { cx } from "../../../utils/format";
 
 export const SHAPE_MIME = "application/x-appsline-shape";
 
-/** Miniatura de una forma para la paleta. */
 export const ShapeGlyph = ({ shape, width = 48, height = 30, className = "" }) => (
   <ShapeSvg
     shape={shape.key}
@@ -18,35 +19,31 @@ export const ShapeGlyph = ({ shape, width = 48, height = 30, className = "" }) =
   />
 );
 
-/**
- * Paleta lateral: formas (arrastrar al lienzo o clic para insertarlas) y
- * plantillas que se pueden insertar en el diagrama actual.
- */
-const ShapePalette = ({ onAddShape, onInsertTemplate }) => {
+/** Biblioteca organizada; los recursos forman parte del JSON, sin rutas temporales. */
+const ShapePalette = ({ onAddShape, onInsertTemplate, onAddImages, onAddIcon, uploading, onClose }) => {
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState("shapes");
+  const imageRef = useRef(null);
   const term = query.trim().toLowerCase();
-
-  const visible = SHAPES.filter(
-    (s) => !term || `${s.label} ${s.hint}`.toLowerCase().includes(term),
-  );
+  const visible = SHAPES.filter((s) => s.group !== "media" && (!term || `${s.label} ${s.hint}`.toLowerCase().includes(term)));
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
-      <div className="flex gap-1 border-b border-slate-100 p-2">
+    <aside aria-label="Biblioteca de elementos" className="flow-library thin-scroll absolute inset-y-0 left-0 z-20 flex w-64 max-w-[85vw] shrink-0 flex-col border-r border-slate-200 bg-white shadow-xl lg:relative lg:shadow-none">
+      <div className="flex items-center justify-between px-3 pb-1 pt-3">
+        <div>
+          <p className="text-xs font-bold text-slate-800">Elementos</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">Construye tu diagrama</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Cerrar biblioteca" className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100"><FiX /></button>
+      </div>
+      <div role="tablist" aria-label="Biblioteca" className="flex gap-1 border-b border-slate-100 p-2">
         {[
           { key: "shapes", label: "Formas" },
+          { key: "media", label: "Recursos" },
           { key: "templates", label: "Plantillas" },
         ].map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={cx(
-              "flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition",
-              tab === t.key ? "bg-brand-50 text-brand-700" : "text-slate-500 hover:bg-slate-100",
-            )}
-          >
+          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}
+            className={cx("flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition", tab === t.key ? "bg-brand-50 text-brand-700" : "text-slate-500 hover:bg-slate-100")}>
             {t.label}
           </button>
         ))}
@@ -56,13 +53,7 @@ const ShapePalette = ({ onAddShape, onInsertTemplate }) => {
         <>
           <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
             <FiSearch className="shrink-0 text-slate-400" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar forma..."
-              aria-label="Buscar forma"
-              className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
-            />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar forma…" aria-label="Buscar forma" className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400" />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
             {SHAPE_GROUPS.map((group) => {
@@ -70,62 +61,55 @@ const ShapePalette = ({ onAddShape, onInsertTemplate }) => {
               if (!items.length) return null;
               return (
                 <div key={group.key} className="mb-3">
-                  <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {group.label}
-                  </p>
+                  <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">{group.label}</p>
                   <div className="grid grid-cols-2 gap-1.5">
                     {items.map((shape) => (
-                      <button
-                        key={shape.key}
-                        type="button"
-                        draggable
+                      <button key={shape.key} type="button" draggable
                         title={`${shape.label} — ${shape.hint}\nArrastra al lienzo o haz clic para insertar`}
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData(SHAPE_MIME, shape.key);
-                          e.dataTransfer.effectAllowed = "move";
-                        }}
+                        onDragStart={(e) => { e.dataTransfer.setData(SHAPE_MIME, shape.key); e.dataTransfer.effectAllowed = "move"; }}
                         onClick={() => onAddShape?.(shape.key)}
-                        className="flex cursor-grab flex-col items-center gap-1 rounded-lg border border-slate-200 bg-white px-1.5 py-2 text-center transition hover:border-brand-300 hover:bg-brand-50/40 active:cursor-grabbing"
-                      >
+                        className="flex cursor-grab flex-col items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-1.5 py-2.5 text-center transition hover:border-brand-300 hover:bg-brand-50/40 active:cursor-grabbing">
                         <ShapeGlyph shape={shape} />
-                        <span className="w-full truncate text-[11px] font-medium text-slate-600">
-                          {shape.label}
-                        </span>
+                        <span className="w-full truncate text-[11px] font-medium text-slate-600">{shape.label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
               );
             })}
-            {visible.length === 0 && (
-              <p className="px-2 py-6 text-center text-xs text-slate-400">Sin formas con ese nombre</p>
-            )}
+            {!visible.length && <p className="px-2 py-6 text-center text-xs text-slate-400">Sin formas con ese nombre</p>}
           </div>
-          <p className="border-t border-slate-100 px-3 py-2 text-[11px] leading-4 text-slate-400">
-            Doble clic en el lienzo crea un proceso. Doble clic en una forma edita su texto.
-          </p>
+          <p className="border-t border-slate-100 px-3 py-2 text-[11px] leading-4 text-slate-400">Arrastra al lienzo o haz clic para insertar sin superponer elementos.</p>
         </>
+      ) : tab === "media" ? (
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
+          <section>
+            <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Tus imágenes</h3>
+            <button type="button" disabled={uploading} onClick={() => imageRef.current?.click()} className="flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-brand-200 bg-brand-50/40 px-3 py-4 text-brand-700 transition hover:bg-brand-50 disabled:opacity-50">
+              <FiImage className="text-2xl" />
+              <span className="flex items-center gap-1.5 text-xs font-semibold"><FiUpload /> {uploading ? "Procesando…" : "Subir imágenes"}</span>
+              <span className="text-[10px] text-slate-500">PNG, JPG o WebP · hasta 5 MB por imagen</span>
+            </button>
+            <input ref={imageRef} type="file" multiple accept={DIAGRAM_IMAGE_ACCEPT} aria-label="Subir imágenes al diagrama" hidden onChange={(e) => { onAddImages?.(Array.from(e.target.files || [])); e.target.value = ""; }} />
+            <p className="mt-2 text-[11px] leading-4 text-slate-400">También puedes soltarlas en el lienzo. Se incluyen al guardar y exportar el diagrama.</p>
+          </section>
+          <section>
+            <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Iconos · React Icons</h3>
+            <IconPicker inserting onChange={onAddIcon} />
+          </section>
+        </div>
       ) : (
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
           {TEMPLATES.filter((t) => t.key !== "blank").map((tpl) => (
-            <button
-              key={tpl.key}
-              type="button"
-              onClick={() => onInsertTemplate?.(tpl.key)}
-              className="flex w-full items-start gap-2.5 rounded-lg border border-slate-200 p-2.5 text-left transition hover:border-brand-300 hover:bg-brand-50/40"
-            >
-              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-                <FiLayout />
-              </span>
+            <button key={tpl.key} type="button" onClick={() => onInsertTemplate?.(tpl.key)} className="flex w-full items-start gap-2.5 rounded-lg border border-slate-200 p-2.5 text-left transition hover:border-brand-300 hover:bg-brand-50/40">
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600"><FiLayout /></span>
               <span className="min-w-0">
                 <span className="block text-[13px] font-semibold text-slate-700">{tpl.label}</span>
                 <span className="block text-[11px] leading-4 text-slate-400">{tpl.description}</span>
               </span>
             </button>
           ))}
-          <p className="px-1 pt-1 text-[11px] leading-4 text-slate-400">
-            La plantilla se agrega junto a lo que ya tengas en el lienzo; nada se borra.
-          </p>
+          <p className="px-1 pt-1 text-[11px] leading-4 text-slate-400">La plantilla se agrega junto a lo que ya tengas en el lienzo; nada se borra.</p>
         </div>
       )}
     </aside>

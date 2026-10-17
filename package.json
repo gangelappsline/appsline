@@ -12,6 +12,7 @@
     "test:unit": "node --test 'tests/unit/*.test.mjs'"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^3.1.1",
     "@headlessui/react": "^2.2.7",
     "@imgly/background-removal": "^1.7.0",
     "@xyflow/react": "^12.12.0",

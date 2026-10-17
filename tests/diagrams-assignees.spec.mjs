@@ -100,7 +100,7 @@ test("varias personas por tarea: tarjetas, detalle, filtro y Mi trabajo", async 
   await page.getByRole("button", { name: "Limpiar filtros" }).click();
 
   // En el detalle se puede quitar y agregar gente; el PUT lleva la lista completa.
-  await card.getByRole("button", { name: "Diseñar navegación" }).click();
+  await card.getByRole("button", { name: "Diseñar navegación", exact: true }).click();
   const drawer = page.getByRole("dialog");
   await drawer.getByRole("button", { name: "Responsables" }).click();
   await drawer.getByRole("option", { name: /Marta Ruiz/ }).click();
@@ -136,7 +136,7 @@ test("diagramas: crear desde plantilla, editar, guardar en el navegador y verlo 
   await expect(canvas.locator(".react-flow__node")).toHaveCount(9);
   const selected = canvas.locator(".react-flow__node.selected");
   await selected.dblclick();
-  await page.getByLabel("Texto del nodo").fill("Tabla de clientes");
+  await page.getByLabel("Editar texto en el lienzo").fill("Tabla de clientes");
   await page.keyboard.press("Enter");
   await expect(canvas.getByText("Tabla de clientes")).toBeVisible();
 

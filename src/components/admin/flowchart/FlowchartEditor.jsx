@@ -17,6 +17,7 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import "./flowchart.css";
 import {
   FiArrowLeft,
   FiCheck,
@@ -47,7 +48,8 @@ import {
   FiZap,
 } from "react-icons/fi";
 import FlowNode from "./FlowNode";
-import FlowEdge, { EdgeEditingContext, decorateEdge } from "./FlowEdge";
+import FlowEdge, { EdgeEditingContext } from "./FlowEdge";
+import { decorateEdge } from "./edgePaths";
 import ShapePalette, { SHAPE_MIME } from "./ShapePalette";
 import PropertiesPanel from "./PropertiesPanel";
 import useHistory from "./useHistory";
@@ -80,6 +82,9 @@ import {
   templateMeta,
 } from "../../../utils/diagrams";
 import { cx } from "../../../utils/format";
+import { edgeRoutingOffsets, findFreeNodePosition, routeDiagramEdges } from "../../../utils/diagramGeometry";
+import { DIAGRAM_IMAGE_ACCEPT, diagramImageSize, readDiagramImage } from "../../../utils/diagramMedia";
+import { NODE_ICONS } from "./icons";
 
 const nodeTypes = { flow: FlowNode };
 const edgeTypes = { flow: FlowEdge };
@@ -216,6 +221,9 @@ const EditorInner = ({
   const wrapperRef = useRef(null);
   const shellRef = useRef(null);
   const importRef = useRef(null);
+  const imageRef = useRef(null);
+  const imageBusyRef = useRef(false);
+  const [uploading, setUploading] = useState(false);
 
   const initial = useMemo(() => normalizeDiagram(diagram), [diagram]);
   const [nodes, setNodes] = useState(() => initial.data.nodes.map(withDraggable));
@@ -228,9 +236,13 @@ const EditorInner = ({
   const [settings, setSettings] = useState(initial.data.settings);
   const [savedSignature, setSavedSignature] = useState(() => signature(initial));
   const [savedAt, setSavedAt] = useState(initial.updated_at);
+  const [savePending, setSavePending] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const saveInFlight = useRef(null);
+  const isSaving = saving || savePending;
 
-  const [paletteOpen, setPaletteOpen] = useDisplayPreference("flow.palette", true);
-  const [propsOpen, setPropsOpen] = useDisplayPreference("flow.props", true);
+  const [paletteOpen, setPaletteOpen] = useDisplayPreference("flow.palette", window.innerWidth >= 1024);
+  const [propsOpen, setPropsOpen] = useDisplayPreference("flow.props", window.innerWidth >= 1024);
   const [autosave, setAutosave] = useDisplayPreference("flow.autosave", true);
   const [editingEdgeId, setEditingEdgeId] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
@@ -269,31 +281,44 @@ const EditorInner = ({
   /* ---------------- Guardado ---------------- */
   const saveRef = useRef(null);
   const handleSave = useCallback(
-    async (quiet = false) => {
-      if (!onSave || saving) return false;
+    (quiet = false) => {
+      // El candado es síncrono: Ctrl+S y el temporizador no pueden crear dos POST.
+      if (saveInFlight.current) return saveInFlight.current;
+      if (!onSave || saving) return Promise.resolve(false);
       const payload = buildDiagram(true);
-      try {
-        const saved = await onSave(payload);
-        if (saved) {
-          setSavedSignature(signature({ ...payload, ...saved, data: payload.data }));
+      setSavePending(true);
+      setSaveError("");
+      saveInFlight.current = (async () => {
+        try {
+          const saved = await onSave(payload);
+          if (!saved) throw new Error("No se recibió confirmación del guardado.");
+          // Solo lo enviado está guardado; no marcar cambios posteriores como persistidos.
+          setSavedSignature(signature(payload));
           setSavedAt(saved.updated_at || new Date().toISOString());
           if (!quiet) notify("Diagrama guardado");
+          return true;
+        } catch (error) {
+          const message = error?.response?.data?.message || error?.message || "No se pudo guardar el diagrama";
+          setSaveError(message);
+          notify(message, "error");
+          return false;
+        } finally {
+          saveInFlight.current = null;
+          setSavePending(false);
         }
-        return Boolean(saved);
-      } catch {
-        notify("No se pudo guardar el diagrama", "error");
-        return false;
-      }
+      })();
+      return saveInFlight.current;
     },
     [onSave, saving, buildDiagram, notify],
   );
   saveRef.current = handleSave;
 
   useEffect(() => {
-    if (!autosave || !dirty || saving) return undefined;
+    // Tras un error no reintentar en bucle, especialmente un POST sin ID confirmado.
+    if (!autosave || !dirty || isSaving || saveError) return undefined;
     const timer = setTimeout(() => saveRef.current?.(true), 2500);
     return () => clearTimeout(timer);
-  }, [autosave, dirty, saving, nodes, edges, meta, settings]);
+  }, [autosave, dirty, isSaving, saveError, nodes, edges, meta, settings]);
 
   useEffect(() => {
     if (!dirty) return undefined;
@@ -313,7 +338,7 @@ const EditorInner = ({
     },
     [history],
   );
-  const onEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), []);
+  const onEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds).map(decorateEdge)), []);
 
   const onConnect = useCallback(
     (connection) => {
@@ -368,43 +393,90 @@ const EditorInner = ({
   );
 
   const addShape = useCallback(
-    (shapeKey, flowPosition = null) => {
-      const meta = shapeMeta(shapeKey);
-      let position = flowPosition;
-      if (!position) {
-        const rect = wrapperRef.current?.getBoundingClientRect();
-        const center = rf.screenToFlowPosition({
-          x: (rect?.left || 0) + (rect?.width || 800) / 2,
-          y: (rect?.top || 0) + (rect?.height || 600) / 2,
-        });
-        position = { x: center.x - meta.w / 2, y: center.y - meta.h / 2 };
-      }
-      const node = withDraggable(makeNode(shapeKey, snapPos(position), { selected: true }));
-      history.snapshot();
-      setNodes((nds) => nds.map((n) => ({ ...n, selected: false })).concat(node));
-      setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
+    (shapeKey, flowPosition = null, overrides = {}) => {
+      const shape = shapeMeta(shapeKey);
+      const size = { width: overrides.width || shape.w, height: overrides.height || shape.h };
+      const rect = wrapperRef.current?.getBoundingClientRect();
+      const center = rf.screenToFlowPosition({
+        x: (rect?.left || 0) + (rect?.width || 800) / 2,
+        y: (rect?.top || 0) + (rect?.height || 600) / 2,
+      });
+      const position = snapPos(flowPosition || { x: center.x - size.width / 2, y: center.y - size.height / 2 });
+      const node = withDraggable(makeNode(shapeKey, position, { ...overrides, selected: true }));
+      history.snapshot(shapeKey === "image" ? "insert-images" : null);
+      setNodes((nds) => {
+        const next = { ...node, position: findFreeNodePosition(nds, size, position, { grid: settings.snap ? settings.gridSize : 1 }) };
+        return nds.map((n) => ({ ...n, selected: false })).concat(next);
+      });
+      setEdges((eds) => eds.map((e) => decorateEdge({ ...e, selected: false })));
       return node;
     },
-    [rf, snapPos, history],
+    [rf, snapPos, history, settings.snap, settings.gridSize],
   );
 
+  const addIcon = useCallback((key) => {
+    const icon = NODE_ICONS.find((item) => item.key === key);
+    if (icon) addShape("icon", null, { data: { label: icon.label, style: { icon: key, iconSize: 40 } } });
+  }, [addShape]);
+
+  const addImages = useCallback(async (files, position = null) => {
+    if (!files?.length || imageBusyRef.current) return;
+    imageBusyRef.current = true;
+    setUploading(true);
+    try {
+      for (const file of files.slice(0, 10)) {
+        try {
+          const image = await readDiagramImage(file);
+          addShape("image", position, { ...diagramImageSize(image), data: { label: "", image } });
+        } catch (error) {
+          notify(`${file.name}: ${error.message}`, "error");
+        }
+      }
+      if (files.length > 10) notify("Puedes agregar hasta 10 imágenes a la vez.", "info");
+    } finally {
+      imageBusyRef.current = false;
+      setUploading(false);
+    }
+  }, [addShape, notify]);
+
+  const replaceImage = useCallback(async (file) => {
+    const node = selectedNodes[0];
+    if (!file || !node || imageBusyRef.current) return;
+    imageBusyRef.current = true;
+    setUploading(true);
+    try {
+      const image = await readDiagramImage(file);
+      history.snapshot();
+      setNodes((nds) => nds.map((n) => n.id === node.id ? { ...n, data: { ...n.data, image } } : n));
+    } catch (error) {
+      notify(error.message, "error");
+    } finally {
+      imageBusyRef.current = false;
+      setUploading(false);
+    }
+  }, [selectedNodes, history, notify]);
+
   const onDragOver = useCallback((e) => {
-    if (e.dataTransfer.types.includes(SHAPE_MIME)) {
+    if (e.dataTransfer.types.includes(SHAPE_MIME) || e.dataTransfer.types.includes("Files")) {
       e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
+      e.dataTransfer.dropEffect = "copy";
     }
   }, []);
 
   const onDrop = useCallback(
     (e) => {
-      const shapeKey = e.dataTransfer.getData(SHAPE_MIME);
-      if (!shapeKey) return;
       e.preventDefault();
-      const meta = shapeMeta(shapeKey);
       const p = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-      addShape(shapeKey, { x: p.x - meta.w / 2, y: p.y - meta.h / 2 });
+      if (e.dataTransfer.files?.length) {
+        addImages(Array.from(e.dataTransfer.files), p);
+        return;
+      }
+      const shapeKey = e.dataTransfer.getData(SHAPE_MIME);
+      if (!SHAPES.some((shape) => shape.key === shapeKey)) return;
+      const shape = shapeMeta(shapeKey);
+      addShape(shapeKey, { x: p.x - shape.w / 2, y: p.y - shape.h / 2 });
     },
-    [rf, addShape],
+    [rf, addShape, addImages],
   );
 
   const onPaneDoubleClick = useCallback(
@@ -432,7 +504,7 @@ const EditorInner = ({
       const newNodes = built.nodes.map((n) =>
         withDraggable({ ...n, id: map.get(n.id), position: { x: n.position.x + dx, y: n.position.y + dy }, selected: true }),
       );
-      const newEdges = built.edges.map((e) =>
+      const newEdges = routeDiagramEdges(built.nodes, built.edges).map((e) =>
         decorateEdge({ ...e, id: newId("e"), source: map.get(e.source), target: map.get(e.target) }),
       );
       setNodes((nds) => nds.map((n) => ({ ...n, selected: false })).concat(newNodes));
@@ -490,18 +562,23 @@ const EditorInner = ({
     (size) =>
       patchNodes(
         selectedIds,
-        (n) => ({
-          ...n,
-          width: Math.max(24, size.width ?? n.width),
-          height: Math.max(20, size.height ?? n.height),
-        }),
+        (n) => {
+          if (n.data.locked) return n;
+          const next = { width: Math.max(44, size.width ?? n.width), height: Math.max(28, size.height ?? n.height) };
+          if (n.data.shape === "image" && n.data.image?.lockAspectRatio !== false) {
+            const ratio = n.width / n.height;
+            if (size.width !== undefined) next.height = Math.max(28, Math.round(next.width / ratio));
+            else next.width = Math.max(44, Math.round(next.height * ratio));
+          }
+          return { ...n, ...next };
+        },
         "size",
       ),
     [patchNodes, selectedIds],
   );
 
   const moveSelected = useCallback(
-    (pos) => patchNodes(selectedIds, (n) => ({ ...n, position: { ...n.position, ...pos } }), "move"),
+    (pos) => patchNodes(selectedIds, (n) => n.data.locked ? n : ({ ...n, position: { ...n.position, ...pos } }), "move"),
     [patchNodes, selectedIds],
   );
 
@@ -614,14 +691,15 @@ const EditorInner = ({
         nds.map((n) => {
           const preset = presetFor(theme.map[n.data.shape] || "blue");
           const isText = n.data.shape === "text";
+          const isIcon = n.data.shape === "icon";
           return {
             ...n,
             data: {
               ...n.data,
               style: {
                 ...n.data.style,
-                fill: isText ? "transparent" : preset.fill,
-                stroke: isText ? "transparent" : preset.stroke,
+                fill: isText || isIcon ? "transparent" : preset.fill,
+                stroke: isText ? "transparent" : isIcon && theme.key === "dark" ? "#e2e8f0" : preset.stroke,
                 textColor: isText && theme.key === "dark" ? "#f8fafc" : preset.text,
               },
             },
@@ -638,10 +716,17 @@ const EditorInner = ({
 
   const runLayout = useCallback(() => {
     history.snapshot();
-    setNodes((nds) => autoLayout(nds, stateRef.current.edges, { direction: settings.direction }));
-    setTimeout(() => rf.fitView({ padding: 0.15, duration: 300 }), 50);
-    notify("Diagrama acomodado automáticamente");
-  }, [history, rf, settings.direction, notify]);
+    const current = stateRef.current;
+    const arranged = autoLayout(current.nodes, current.edges, {
+      direction: settings.direction,
+      gapX: settings.nodeSpacing,
+      gapY: settings.rankSpacing,
+    });
+    setNodes(arranged);
+    setEdges(routeDiagramEdges(arranged, current.edges, { direction: settings.direction, reset: true }).map(decorateEdge));
+    setTimeout(() => rf.fitView({ padding: 0.15, duration: 300, maxZoom: 1.2 }), 50);
+    notify("Nodos y flechas organizados. Puedes deshacer el cambio.");
+  }, [history, rf, settings.direction, settings.nodeSpacing, settings.rankSpacing, notify]);
 
   const clearAll = useCallback(() => {
     history.snapshot();
@@ -711,12 +796,12 @@ const EditorInner = ({
       await onAttach([
         new File([blob], `${base}.png`, { type: "image/png" }),
         new File([json], `${base}.flow.json`, { type: "application/json" }),
-      ]);
+      ], meta.task_id);
       notify("Imagen y archivo del diagrama adjuntados");
     } catch {
       notify("No se pudieron adjuntar los archivos", "error");
     }
-  }, [onAttach, exportImage, meta.name, buildDiagram, notify]);
+  }, [onAttach, exportImage, meta.name, meta.task_id, buildDiagram, notify]);
 
   const importJson = useCallback(
     async (file) => {
@@ -756,9 +841,14 @@ const EditorInner = ({
   /* ---------------- Atajos ---------------- */
   useEffect(() => {
     const onKey = (e) => {
-      if (isTypingTarget(e.target)) return;
       const mod = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
+      if (mod && k === "s") {
+        e.preventDefault();
+        saveRef.current?.();
+        return;
+      }
+      if (isTypingTarget(e.target)) return;
       if (mod && k === "z" && !e.shiftKey) {
         e.preventDefault();
         undo();
@@ -777,9 +867,7 @@ const EditorInner = ({
       } else if (mod && k === "a") {
         e.preventDefault();
         selectAll();
-      } else if (mod && k === "s") {
-        e.preventDefault();
-        saveRef.current?.();
+
       } else if (e.key === "Escape") {
         setContextMenu(null);
         setEditingEdgeId(null);
@@ -876,7 +964,9 @@ const EditorInner = ({
 
   /* ---------------- Render ---------------- */
   const stats = { nodes: nodes.length, edges: edges.length };
-  const edgeCtx = useMemo(() => ({ editingId: editingEdgeId, setEditingId: setEditingEdgeId }), [editingEdgeId]);
+  const routingBounds = useMemo(() => diagramBounds(nodes.filter((node) => node.data.shape !== "swimlane"), 0), [nodes]);
+  const routingOffsets = useMemo(() => edgeRoutingOffsets(edges), [edges]);
+  const edgeCtx = useMemo(() => ({ editingId: editingEdgeId, setEditingId: setEditingEdgeId, routingBounds, routingOffsets }), [editingEdgeId, routingBounds, routingOffsets]);
 
   const exportItems = [
     { label: "Imagen PNG", hint: "Alta resolución, fondo del lienzo", icon: FiImage, onClick: () => download("png"), disabled: exporting },
@@ -905,7 +995,7 @@ const EditorInner = ({
       <div
         ref={shellRef}
         className={cx(
-          "flex h-full min-h-[560px] flex-col overflow-hidden bg-white",
+          "flowchart-editor flex h-full min-h-[560px] flex-col overflow-hidden bg-white text-slate-800",
           fullscreen ? "" : "rounded-2xl border border-slate-200 shadow-card",
         )}
       >
@@ -958,14 +1048,15 @@ const EditorInner = ({
             <FiGrid />
           </ToolButton>
           <ToolButton title="Auto-acomodar" onClick={runLayout} disabled={nodes.length < 2}>
-            <FiZap />
+            <FiZap /><span className="hidden xl:inline text-xs font-semibold">Organizar</span>
           </ToolButton>
+          <ToolButton title="Agregar imágenes" onClick={() => imageRef.current?.click()} disabled={uploading}><FiImage /></ToolButton>
 
           <div className="ml-auto flex items-center gap-1">
-            <ToolButton title={paletteOpen ? "Ocultar formas" : "Mostrar formas"} active={paletteOpen} onClick={() => setPaletteOpen((v) => !v)}>
+            <ToolButton title={paletteOpen ? "Ocultar formas" : "Mostrar formas"} active={paletteOpen} onClick={() => { setPaletteOpen((v) => !v); if (window.innerWidth < 1024) setPropsOpen(false); }}>
               <FiSidebar />
             </ToolButton>
-            <ToolButton title={propsOpen ? "Ocultar propiedades" : "Mostrar propiedades"} active={propsOpen} onClick={() => setPropsOpen((v) => !v)}>
+            <ToolButton title={propsOpen ? "Ocultar propiedades" : "Mostrar propiedades"} active={propsOpen} onClick={() => { setPropsOpen((v) => !v); if (window.innerWidth < 1024) setPaletteOpen(false); }}>
               <FiSliders />
             </ToolButton>
             <ToolButton title={fullscreen ? "Salir de pantalla completa" : "Pantalla completa"} onClick={toggleFullscreen} active={fullscreen}>
@@ -976,10 +1067,10 @@ const EditorInner = ({
             <button
               type="button"
               onClick={() => handleSave()}
-              disabled={saving || (!dirty && Boolean(initial.id))}
+              disabled={isSaving || (!dirty && Boolean(initial.id))}
               className="btn-primary !px-3 !py-1.5 text-sm"
             >
-              {saving ? (
+              {isSaving ? (
                 <>
                   <FiCloud className="animate-pulse" /> Guardando…
                 </>
@@ -997,8 +1088,8 @@ const EditorInner = ({
         </header>
 
         {/* ---------- Cuerpo ---------- */}
-        <div className="flex min-h-0 flex-1">
-          {paletteOpen && <ShapePalette onAddShape={(key) => addShape(key)} onInsertTemplate={insertTemplate} />}
+        <div className="relative flex min-h-0 flex-1">
+          {paletteOpen && <ShapePalette onAddShape={(key) => addShape(key)} onInsertTemplate={insertTemplate} onAddImages={addImages} onAddIcon={addIcon} uploading={uploading} onClose={() => setPaletteOpen(false)} />}
 
           <div
             ref={wrapperRef}
@@ -1027,7 +1118,7 @@ const EditorInner = ({
               onEdgeDoubleClick={(_, edge) => setEditingEdgeId(edge.id)}
               defaultViewport={initial.data.viewport || { x: 40, y: 40, zoom: 1 }}
               fitView={!initial.data.viewport && nodes.length > 0}
-              fitViewOptions={{ padding: 0.15 }}
+              fitViewOptions={{ padding: 0.15, maxZoom: 1.2 }}
               connectionMode={ConnectionMode.Loose}
               connectionLineType={settings.edgeKind}
               connectionLineStyle={{ stroke: "#0060fc", strokeWidth: 2 }}
@@ -1061,6 +1152,7 @@ const EditorInner = ({
               {settings.minimap && (
                 <MiniMap
                   position="bottom-right"
+                  style={{ width: 140, height: 96 }}
                   pannable
                   zoomable
                   nodeColor={(n) => n.data?.style?.fill || "#cbd5e1"}
@@ -1145,6 +1237,7 @@ const EditorInner = ({
             <PropertiesPanel
               selectedNodes={selectedNodes}
               selectedEdges={selectedEdges}
+              onClose={() => setPropsOpen(false)}
               node={{
                 onPatchData: patchSelectedData,
                 onPatchStyle: patchSelectedStyle,
@@ -1157,6 +1250,8 @@ const EditorInner = ({
                 onDuplicate: duplicateSelected,
                 onZOrder: zOrder,
                 onToggleLock: toggleLock,
+                onReplaceImage: replaceImage,
+                uploading,
               }}
               edge={{
                 onPatch: patchSelectedEdges,
@@ -1171,6 +1266,7 @@ const EditorInner = ({
                 onMeta: (patch) => setMeta((m) => ({ ...m, ...patch })),
                 onSettings: (patch) => setSettings((s) => ({ ...s, ...patch })),
                 onApplyTheme: applyTheme,
+                onLayout: runLayout,
               }}
             />
           )}
@@ -1186,8 +1282,8 @@ const EditorInner = ({
             {storageMode === "local" ? <FiHardDrive /> : <FiCloud />}
             {storageMode === "local" ? "Guardado en este navegador" : "Guardado en la API"}
           </span>
-          <span className={cx("flex items-center gap-1", dirty ? "text-amber-600" : "text-emerald-600")}>
-            {dirty ? "Cambios sin guardar" : <><FiCheck /> Todo guardado{savedAt ? ` · ${new Date(savedAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}` : ""}</>}
+          <span role="status" title={saveError || undefined} className={cx("flex items-center gap-1", saveError ? "text-red-600" : dirty || !initial.id ? "text-amber-600" : "text-emerald-600")}>
+            {isSaving ? "Guardando…" : saveError ? "Error al guardar · autoguardado pausado" : dirty ? "Cambios sin guardar" : !initial.id ? "Diagrama sin guardar" : <><FiCheck /> Todo guardado{savedAt ? ` · ${new Date(savedAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}` : ""}</>}
           </span>
           <label className="ml-auto flex cursor-pointer items-center gap-1.5">
             <input type="checkbox" checked={Boolean(autosave)} onChange={(e) => setAutosave(e.target.checked)} className="accent-brand-600" />
@@ -1198,10 +1294,13 @@ const EditorInner = ({
           </button>
         </footer>
 
+        <input ref={imageRef} type="file" multiple accept={DIAGRAM_IMAGE_ACCEPT} aria-label="Agregar imágenes al lienzo" hidden onChange={(event) => { addImages(Array.from(event.target.files || [])); event.target.value = ""; }} />
+
         <input
           ref={importRef}
           type="file"
           accept="application/json,.json"
+          aria-label="Importar diagrama JSON"
           hidden
           onChange={(e) => {
             importJson(e.target.files?.[0]);
