@@ -62,6 +62,25 @@ test("normaliza un diagrama con data como JSON en texto y completa estilos", () 
   assert.equal(d.data.settings.background, "dots");
 });
 
+test("conserva tipo, posición, tamaño y metadatos propios de cada nodo al guardar y recargar", () => {
+  const original = {
+    name: "Flujo con variantes",
+    data: {
+      nodes: [
+        { id: "start", type: "flow", position: { x: 123, y: 245 }, width: 160, height: 56, data: { label: "Inicio", shape: "terminal", custom: { owner: "ventas" } } },
+        { id: "decision", type: "flow", position: { x: 390, y: 260 }, width: 170, height: 100, data: { label: "¿Aprobado?", shape: "decision", validation: "required" } },
+      ],
+      edges: [{ id: "e1", source: "start", target: "decision" }],
+    },
+  };
+  const sent = serializeDiagram(original);
+  const reloaded = normalizeDiagram({ ...original, data: sent.data });
+  assert.deepEqual(reloaded.data.nodes.map(({ id, position, width, height, data }) => ({ id, position, width, height, data: { shape: data.shape, custom: data.custom, validation: data.validation } })), [
+    { id: "start", position: { x: 123, y: 245 }, width: 160, height: 56, data: { shape: "terminal", custom: { owner: "ventas" }, validation: undefined } },
+    { id: "decision", position: { x: 390, y: 260 }, width: 170, height: 100, data: { shape: "decision", custom: undefined, validation: "required" } },
+  ]);
+});
+
 test("normalizar algo vacío o roto no explota", () => {
   assert.equal(normalizeDiagram(null).data.nodes.length, 0);
   assert.equal(normalizeDiagram({ data: "{no es json" }).data.nodes.length, 0);
