@@ -1,5 +1,10 @@
 # API · Diagramas de flujo
 
+> El mismo editor incluye **mockups de pantallas** (iPhone, Android, tablet y
+> web) con elementos configurables, conexiones desde un botón y comentarios del
+> equipo: todo viaja dentro de `data`, sin tablas nuevas. Ver
+> [`API-MOCKUPS.md`](./API-MOCKUPS.md).
+>
 > El panel ya incluye un editor completo de diagramas de flujo
 > (`src/components/admin/flowchart/`) que guarda cada diagrama **en un proyecto**
 > o **en una tarea**. Mientras la API no exponga los endpoints de este documento,
@@ -159,7 +164,8 @@ basura (§4). La estructura, por si se quiere consultar (p. ej. contar nodos):
 
 Formas (`data.shape`): `terminal`, `process`, `decision`, `io`, `subprocess`,
 `document`, `database`, `manual`, `preparation`, `delay`, `connector`,
-`offpage`, `note`, `text`, `swimlane`, **`image`**, **`icon`**. Conectores (`sourceHandle`/`targetHandle`):
+`offpage`, `note`, `text`, `swimlane`, **`image`**, **`icon`** y **`screen`**
+(mockups de pantallas, ver [`API-MOCKUPS.md`](./API-MOCKUPS.md)). Conectores (`sourceHandle`/`targetHandle`):
 `top`, `right`, `bottom`, `left`.
 
 La referencia es `src/utils/diagrams.js` (`normalizeDiagram`), que además tolera

@@ -172,6 +172,42 @@ Editor de diagramas de flujo integrado en el panel, guardado **por proyecto** o
   alineación) está cubierto por pruebas unitarias; el flujo completo está en
   `tests/diagrams-assignees.spec.mjs` y `tests/diagrams-editor.spec.mjs` (Playwright).
 
+## Mockups de pantallas (web, iPhone, Android y tablet)
+
+Dentro de la sección de diagramas se pueden diseñar **pantallas** y conectarlas
+con el mismo lienzo para validar flujos en equipo. Contrato y pasos para la API
+en [`docs/API-MOCKUPS.md`](docs/API-MOCKUPS.md).
+
+- **Biblioteca «Pantallas»** (barra superior → **Pantallas**, o clic derecho en
+  el lienzo): 12 marcos reales —iPhone 15 Pro/15/SE, Pixel 8, Galaxy S24,
+  Android compacto, iPad, tablet Android, escritorio 1440, laptop 1280, web
+  móvil 390 y tamaño libre— con su isla, barra de estado, indicador de inicio y
+  barra de navegador.
+- **34 elementos 100 % configurables**: títulos, textos, enlaces, etiquetas,
+  valoraciones, campos, textarea, buscador, selector, casilla, radio,
+  interruptor, deslizador, botones (primario, secundario, icono y flotante),
+  imagen, avatar, icono, video, tarjeta, lista, tabla, gráfica, progreso, mapa,
+  galería, barra superior, barra inferior, divisor, diálogo, teclado y barra de
+  navegador. Cada uno con posición, tamaño, rotación, relleno, borde, esquinas,
+  opacidad, sombra, tipografía, alineación, icono, imagen propia y estado.
+- **Edición directa en el lienzo**: arrastrar, redimensionar, doble clic para
+  escribir el texto, duplicar, ordenar capas, guías de área segura y panel de
+  propiedades de la pantalla o del elemento.
+- **Flujos entre pantallas**: flechas entre pantallas o **desde un botón/campo
+  concreto** (`sourceHandle: "w:<id>"`), con etiqueta, color y estilo. El
+  prototipo (**Probar**) navega esas conexiones a tamaño de dispositivo.
+- **Revisión del equipo**: panel **Comentarios** con hilos anclados a una
+  pantalla o a un elemento, estado abierto/resuelto, salto al lienzo y borrado.
+  Se guardan con el diagrama (`data.comments`), así que los ve todo el equipo.
+- **Sin tablas nuevas**: pantallas, elementos y comentarios viajan dentro de
+  `diagrams.data` y se guardan con los endpoints de diagramas ya documentados.
+  La tabla opcional `diagram_comments` (notificaciones/historial) está lista en
+  [`docs/backend-diagrams/`](docs/backend-diagrams/).
+- **Plantillas** «App móvil · 3 pantallas» y «Web · landing y panel», miniaturas
+  con las pantallas y exportación PNG/SVG/JSON como el resto del diagrama; la
+  imagen exportada sale limpia (sin nombre de pantalla, pines de comentarios,
+  guías de área segura ni resaltado de selección).
+
 ## Notificaciones push web (Firebase Cloud Messaging)
 
 Los usuarios con sesión iniciada pueden recibir notificaciones del panel en el

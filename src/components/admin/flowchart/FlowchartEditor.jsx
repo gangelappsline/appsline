@@ -43,6 +43,9 @@ import {
   FiSave,
   FiSidebar,
   FiSliders,
+  FiSmartphone,
+  FiMessageSquare,
+  FiPlay,
   FiTrash2,
   FiUnlock,
   FiUpload,
@@ -50,6 +53,10 @@ import {
 } from "react-icons/fi";
 import FlowNode from "./FlowNode";
 import FlowEdge, { EdgeEditingContext } from "./FlowEdge";
+import MockupNode, { MockupContext } from "./MockupNode";
+import MockupPalette, { SCREEN_MIME, WIDGET_MIME } from "./MockupPalette";
+import ReviewPanel from "./ReviewPanel";
+import PrototypePlayer from "./PrototypePlayer";
 import { decorateEdge } from "./edgePaths";
 import ShapePalette, { SHAPE_MIME } from "./ShapePalette";
 import PropertiesPanel from "./PropertiesPanel";
@@ -87,8 +94,20 @@ import { cx } from "../../../utils/format";
 import { edgeRoutingOffsets, findFreeNodePosition, routeDiagramEdges } from "../../../utils/diagramGeometry";
 import { DIAGRAM_IMAGE_ACCEPT, diagramImageSize, readDiagramImage } from "../../../utils/diagramMedia";
 import { NODE_ICONS } from "./icons";
+import {
+  SCREEN_SHAPE,
+  deviceMeta,
+  makeComment,
+  makeScreenNode,
+  makeWidget,
+  newWidgetId,
+  normalizeWidget,
+  screenContentSize,
+  screenInsets,
+  widgetMeta,
+} from "../../../utils/mockups";
 
-const nodeTypes = { flow: FlowNode };
+const nodeTypes = { flow: FlowNode, screen: MockupNode };
 const edgeTypes = { flow: FlowEdge };
 
 const BG_VARIANT = {
@@ -110,6 +129,10 @@ const SHORTCUTS = [
   ["Ctrl + S", "Guardar"],
   ["Flechas", "Mover la selección"],
   ["Ctrl + rueda / pellizcar", "Zoom"],
+  ["Arrastrar un elemento sobre una pantalla", "Colocarlo en ese punto"],
+  ["Arrastrar desde el punto azul de un botón", "Conectar ese elemento con otra pantalla"],
+  ["Doble clic en un elemento de la pantalla", "Editar su texto"],
+  ["Supr con un elemento activo", "Quitar solo ese elemento"],
   ["Espacio + arrastrar o botón central", "Desplazar el lienzo"],
   ["Esc", "Quitar selección / cerrar menús"],
 ];
@@ -218,6 +241,7 @@ const EditorInner = ({
   onBack,
   onAttach,
   contextLabel = "",
+  currentUser = null,
 }) => {
   const rf = useReactFlow();
   const { notify } = useToast();
@@ -257,6 +281,11 @@ const EditorInner = ({
   const [exporting, setExporting] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [paletteMode, setPaletteMode] = useState("shapes");
+  const [activeWidget, setActiveWidget] = useState(null);
+  const [comments, setComments] = useState(() => initial.data.comments || []);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [prototype, setPrototype] = useState({ open: false, startId: null });
   const clipboard = useRef(null);
 
   const stateRef = useRef({ nodes, edges });
@@ -273,9 +302,10 @@ const EditorInner = ({
         edges,
         viewport: withViewport ? rf.getViewport() : initial.data.viewport,
         settings,
+        comments,
       },
     }),
-    [initial, meta, nodes, edges, settings, rf],
+    [initial, meta, nodes, edges, settings, comments, rf],
   );
 
   const dirty = useMemo(() => signature(buildDiagram()) !== savedSignature, [buildDiagram, savedSignature]);
@@ -471,8 +501,316 @@ const EditorInner = ({
     }
   }, [selectedNodes, history, notify]);
 
+  /* ---------------- Mockups: pantallas y elementos ---------------- */
+
+  const selectWidget = useCallback((nodeId, widgetId) => {
+    setActiveWidget(widgetId ? { nodeId, widgetId } : null);
+    setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === nodeId })));
+    setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
+  }, []);
+
+  const addScreen = useCallback(
+    (deviceKey = "iphone-15-pro", flowPosition = null) => {
+      const device = deviceMeta(deviceKey);
+      const rect = wrapperRef.current?.getBoundingClientRect();
+      const center = rf.screenToFlowPosition({
+        x: (rect?.left || 0) + (rect?.width || 800) / 2,
+        y: (rect?.top || 0) + (rect?.height || 600) / 2,
+      });
+      const preferred = snapPos(flowPosition || { x: center.x - device.width / 2, y: center.y - device.height / 2 });
+      const node = withDraggable(makeScreenNode(device.key, preferred, { selected: true }));
+      history.snapshot();
+      setActiveWidget(null);
+      setNodes((nds) => {
+        const position = findFreeNodePosition(nds, { width: device.width, height: device.height }, preferred, {
+          grid: settings.snap ? settings.gridSize : 1,
+        });
+        return nds.map((n) => ({ ...n, selected: false })).concat({ ...node, position, selected: true });
+      });
+      setEdges((eds) => eds.map((e) => decorateEdge({ ...e, selected: false })));
+      notify(`Pantalla “${device.label}” agregada`);
+    },
+    [rf, snapPos, history, settings.snap, settings.gridSize, notify],
+  );
+
+  /** Pantalla bajo un punto del lienzo (para soltar elementos encima). */
+  const screenAt = useCallback((point) => {
+    const screens = stateRef.current.nodes.filter((n) => n.data?.shape === SCREEN_SHAPE);
+    return [...screens].reverse().find((node) => {
+      const size = { width: node.width || 393, height: node.height || 852 };
+      return (
+        point.x >= node.position.x && point.x <= node.position.x + size.width &&
+        point.y >= node.position.y && point.y <= node.position.y + size.height
+      );
+    });
+  }, []);
+
+  const addWidget = useCallback(
+    (type, { nodeId = null, point = null } = {}) => {
+      const current = stateRef.current.nodes;
+      let target = nodeId ? current.find((node) => node.id === nodeId) : null;
+      if (!target && point) target = screenAt(point);
+      if (!target) target = current.find((node) => node.selected && node.data?.shape === SCREEN_SHAPE);
+      if (!target) target = current.find((node) => node.data?.shape === SCREEN_SHAPE);
+      if (!target) {
+        notify("Primero agrega o selecciona una pantalla para colocar elementos", "info");
+        return null;
+      }
+      const inset = screenInsets(target.data.device);
+      const meta = widgetMeta(type);
+      const widgets = target.data.widgets || [];
+      let position;
+      if (point) {
+        position = {
+          x: point.x - target.position.x - inset.left - meta.w / 2,
+          y: point.y - target.position.y - inset.top - meta.h / 2,
+        };
+      } else {
+        const content = screenContentSize(target.data.device);
+        const bottom = widgets.reduce((max, widget) => Math.max(max, widget.y + widget.h), 16);
+        position = {
+          x: Math.min(20, Math.max(0, content.width - meta.w - 8)),
+          y: Math.min(bottom + 12, Math.max(8, content.height - meta.h - 16)),
+        };
+      }
+      const widget = makeWidget(type, position);
+      history.snapshot();
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === target.id
+            ? { ...node, selected: true, data: { ...node.data, widgets: [...(node.data.widgets || []), widget] } }
+            : { ...node, selected: false },
+        ),
+      );
+      setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
+      setActiveWidget({ nodeId: target.id, widgetId: widget.id });
+      return widget;
+    },
+    [history, notify, screenAt],
+  );
+
+  const updateWidgets = useCallback(
+    (nodeId, updater, key) => {
+      history.snapshot(key);
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === nodeId ? { ...node, data: { ...node.data, widgets: updater(node.data.widgets || []) } } : node,
+        ),
+      );
+    },
+    [history],
+  );
+
+  const patchWidget = useCallback(
+    (patch, key) => {
+      if (!activeWidget) return;
+      updateWidgets(
+        activeWidget.nodeId,
+        (widgets) =>
+          widgets.map((widget) => {
+            if (widget.id !== activeWidget.widgetId) return widget;
+            return (
+              normalizeWidget({
+                ...widget,
+                ...patch,
+                style: patch.style ? { ...widget.style, ...patch.style } : widget.style,
+                props: patch.props ? { ...widget.props, ...patch.props } : widget.props,
+              }) || widget
+            );
+          }),
+        key,
+      );
+    },
+    [activeWidget, updateWidgets],
+  );
+
+  const patchWidgetBox = useCallback(
+    (nodeId, widgetId, box, key = "widget-box") => {
+      updateWidgets(
+        nodeId,
+        (widgets) => widgets.map((widget) => (widget.id === widgetId ? { ...widget, ...box } : widget)),
+        key,
+      );
+    },
+    [updateWidgets],
+  );
+
+  const patchWidgetText = useCallback(
+    (nodeId, widgetId, text) => {
+      updateWidgets(
+        nodeId,
+        (widgets) => widgets.map((widget) => (widget.id === widgetId ? { ...widget, text } : widget)),
+        `widget-text-${widgetId}`,
+      );
+    },
+    [updateWidgets],
+  );
+
+  const deleteWidget = useCallback(
+    (nodeId = activeWidget?.nodeId, widgetId = activeWidget?.widgetId) => {
+      if (!nodeId || !widgetId) return;
+      updateWidgets(nodeId, (widgets) => widgets.filter((widget) => widget.id !== widgetId));
+      setActiveWidget(null);
+    },
+    [activeWidget, updateWidgets],
+  );
+
+  const duplicateWidget = useCallback(() => {
+    if (!activeWidget) return;
+    const screen = stateRef.current.nodes.find((node) => node.id === activeWidget.nodeId);
+    const widget = screen?.data?.widgets?.find((item) => item.id === activeWidget.widgetId);
+    if (!widget) return;
+    const copy = makeWidget(widget.type, { x: widget.x + 16, y: widget.y + 16 }, { ...widget, id: newWidgetId() });
+    updateWidgets(activeWidget.nodeId, (widgets) => [...widgets, copy]);
+    setActiveWidget({ nodeId: activeWidget.nodeId, widgetId: copy.id });
+  }, [activeWidget, updateWidgets]);
+
+  const orderWidget = useCallback(
+    (direction) => {
+      if (!activeWidget) return;
+      updateWidgets(activeWidget.nodeId, (widgets) => {
+        const index = widgets.findIndex((widget) => widget.id === activeWidget.widgetId);
+        if (index < 0) return widgets;
+        const next = [...widgets];
+        const [item] = next.splice(index, 1);
+        if (direction === "front") next.push(item);
+        else next.unshift(item);
+        return next;
+      });
+    },
+    [activeWidget, updateWidgets],
+  );
+
+  /** Datos de la pantalla seleccionada (`__width`/`__height` redimensionan el marco). */
+  const patchScreenData = useCallback(
+    (patch, key) => {
+      const { __width, __height, ...rest } = patch;
+      history.snapshot(key);
+      setNodes((nds) =>
+        nds.map((node) => {
+          if (!node.selected || node.data?.shape !== SCREEN_SHAPE) return node;
+          const next = { ...node, data: { ...node.data, ...rest } };
+          if (Number.isFinite(__width)) next.width = Math.max(200, __width);
+          if (Number.isFinite(__height)) next.height = Math.max(280, __height);
+          // Al cambiar de dispositivo, el marco toma su tamaño si el anterior
+          // no se había redimensionado a mano.
+          if (rest.device) {
+            const previous = deviceMeta(node.data.device);
+            const following = deviceMeta(rest.device);
+            const untouched =
+              Math.abs((node.width || previous.width) - previous.width) < 2 &&
+              Math.abs((node.height || previous.height) - previous.height) < 2;
+            if (untouched) {
+              next.width = following.width;
+              next.height = following.height;
+            }
+          }
+          return next;
+        }),
+      );
+    },
+    [history],
+  );
+
+  const replaceWidgetImage = useCallback(
+    async (file) => {
+      if (!file || !activeWidget || imageBusyRef.current) return;
+      imageBusyRef.current = true;
+      setUploading(true);
+      try {
+        const image = await readDiagramImage(file);
+        patchWidget({ props: { image } }, "widget-image");
+      } catch (error) {
+        notify(error.message, "error");
+      } finally {
+        imageBusyRef.current = false;
+        setUploading(false);
+      }
+    },
+    [activeWidget, patchWidget, notify],
+  );
+
+  /* ---------------- Revisión del equipo ---------------- */
+
+  const addComment = useCallback(
+    ({ text, nodeId = null, widgetId = null }) => {
+      const comment = makeComment({ text, author: currentUser, nodeId, widgetId });
+      setComments((list) => [...list, comment]);
+    },
+    [currentUser],
+  );
+
+  const toggleComment = useCallback((id) => {
+    setComments((list) => list.map((comment) => (comment.id === id ? { ...comment, resolved: !comment.resolved } : comment)));
+  }, []);
+
+  const deleteComment = useCallback((id) => {
+    setComments((list) => list.filter((comment) => comment.id !== id));
+  }, []);
+
+  const clearResolvedComments = useCallback(() => {
+    setComments((list) => list.filter((comment) => !comment.resolved));
+  }, []);
+
+  const focusComment = useCallback(
+    (comment) => {
+      if (comment.widget_id) selectWidget(comment.node_id, comment.widget_id);
+      const node = stateRef.current.nodes.find((item) => item.id === comment.node_id);
+      if (node) {
+        rf.setCenter(node.position.x + (node.width || 393) / 2, node.position.y + (node.height || 852) / 2, {
+          zoom: 0.7,
+          duration: 400,
+        });
+      }
+    },
+    [rf, selectWidget],
+  );
+
+  const screenNodes = useMemo(
+    () => nodes.filter((node) => node.data?.shape === SCREEN_SHAPE || node.type === "screen"),
+    [nodes],
+  );
+
+  const activeScreen = useMemo(
+    () =>
+      nodes.find((node) => node.id === activeWidget?.nodeId) ||
+      nodes.find((node) => node.selected && (node.type === "screen" || node.data?.shape === SCREEN_SHAPE)) ||
+      null,
+    [nodes, activeWidget],
+  );
+  const activeWidgetData = useMemo(
+    () => activeScreen?.data?.widgets?.find((widget) => widget.id === activeWidget?.widgetId) || null,
+    [activeScreen, activeWidget],
+  );
+
+  const openPrototype = useCallback((startId = null) => setPrototype({ open: true, startId }), []);
+
+  const mockupContext = useMemo(
+    () => ({
+      activeWidget,
+      selectWidget,
+      patchWidgetBox,
+      patchWidgetText,
+      openComment: () => setReviewOpen(true),
+      comments,
+      playFrom: (nodeId) => openPrototype(nodeId),
+    }),
+    [activeWidget, selectWidget, patchWidgetBox, patchWidgetText, comments, openPrototype],
+  );
+
+  // Si la pantalla del elemento activo desaparece, se limpia la selección.
+  useEffect(() => {
+    if (!activeWidget) return;
+    if (!nodes.some((node) => node.id === activeWidget.nodeId)) setActiveWidget(null);
+  }, [activeWidget, nodes]);
+
   const onDragOver = useCallback((e) => {
-    if (e.dataTransfer.types.includes(SHAPE_MIME) || e.dataTransfer.types.includes("Files")) {
+    if (
+      e.dataTransfer.types.includes(SHAPE_MIME) ||
+      e.dataTransfer.types.includes(SCREEN_MIME) ||
+      e.dataTransfer.types.includes(WIDGET_MIME) ||
+      e.dataTransfer.types.includes("Files")
+    ) {
       e.preventDefault();
       e.dataTransfer.dropEffect = "copy";
     }
@@ -486,12 +824,23 @@ const EditorInner = ({
         addImages(Array.from(e.dataTransfer.files), p);
         return;
       }
+      const screenKey = e.dataTransfer.getData(SCREEN_MIME);
+      if (screenKey) {
+        const device = deviceMeta(screenKey);
+        addScreen(device.key, { x: p.x - device.width / 2, y: p.y - 40 });
+        return;
+      }
+      const widgetKey = e.dataTransfer.getData(WIDGET_MIME);
+      if (widgetKey) {
+        addWidget(widgetKey, { point: p });
+        return;
+      }
       const shapeKey = e.dataTransfer.getData(SHAPE_MIME);
       if (!SHAPES.some((shape) => shape.key === shapeKey)) return;
       const shape = shapeMeta(shapeKey);
       addShape(shapeKey, { x: p.x - shape.w / 2, y: p.y - shape.h / 2 });
     },
-    [rf, addShape, addImages],
+    [rf, addShape, addImages, addScreen, addWidget],
   );
 
   const onPaneDoubleClick = useCallback(
@@ -829,6 +1178,8 @@ const EditorInner = ({
         setNodes(parsed.data.nodes.map(withDraggable));
         setEdges(parsed.data.edges.map(decorateEdge));
         setSettings((s) => ({ ...s, ...parsed.data.settings }));
+        setComments(parsed.data.comments || []);
+        setActiveWidget(null);
         if (!meta.name || meta.name === "Nuevo diagrama") setMeta((m) => ({ ...m, name: parsed.name }));
         setTimeout(() => rf.fitView({ padding: 0.15 }), 50);
         notify(`Importado: ${parsed.data.nodes.length} nodos, ${parsed.data.edges.length} conexiones`);
@@ -864,6 +1215,16 @@ const EditorInner = ({
         return;
       }
       if (isTypingTarget(e.target)) return;
+      // Con un elemento de pantalla activo, Supr borra ese elemento (no la pantalla).
+      if (activeWidget && (e.key === "Delete" || e.key === "Backspace")) {
+        e.preventDefault();
+        deleteWidget();
+        return;
+      }
+      if (activeWidget && e.key === "Escape") {
+        setActiveWidget(null);
+        return;
+      }
       if (mod && k === "z" && !e.shiftKey) {
         e.preventDefault();
         undo();
@@ -892,7 +1253,7 @@ const EditorInner = ({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, copySelected, paste, duplicateSelected, selectAll]);
+  }, [undo, redo, copySelected, paste, duplicateSelected, selectAll, activeWidget, deleteWidget]);
 
   /* ---------------- Menú contextual ---------------- */
   const openContextMenu = useCallback((event, kind, target = null) => {
@@ -945,6 +1306,23 @@ const EditorInner = ({
             addShape(s.key, { x: p.x - s.w / 2, y: p.y - s.h / 2 });
           },
         })),
+        ...(screenAt(at())
+          ? [{
+              label: "Insertar elemento en la pantalla",
+              hint: "Texto, botón, campo…",
+              icon: FiSmartphone,
+              onClick: () => addWidget("text", { point: at() }),
+            }]
+          : [{
+              label: "Insertar pantalla (iPhone)",
+              hint: "Mockup",
+              icon: FiSmartphone,
+              onClick: () => {
+                const p = at();
+                const device = deviceMeta("iphone-15-pro");
+                addScreen(device.key, { x: p.x - device.width / 2, y: p.y - 40 });
+              },
+            }]),
         "-",
         { label: "Pegar", icon: FiCopy, disabled: !clipboard.current, onClick: paste },
         { label: "Seleccionar todo", icon: FiMaximize, onClick: selectAll },
@@ -975,10 +1353,17 @@ const EditorInner = ({
       "-",
       { label: "Eliminar", hint: "Supr", icon: FiTrash2, danger: true, onClick: deleteSelected },
     ];
-  }, [contextMenu, rf, addShape, paste, selectAll, reverseSelectedEdges, selectedNodes, duplicateSelected, copySelected, toggleLock, zOrder, patchSelectedStyle, deleteSelected]);
+  }, [contextMenu, rf, addShape, addWidget, addScreen, screenAt, paste, selectAll, reverseSelectedEdges, selectedNodes, duplicateSelected, copySelected, toggleLock, zOrder, patchSelectedStyle, deleteSelected]);
 
   /* ---------------- Render ---------------- */
-  const stats = { nodes: nodes.length, edges: edges.length };
+  const stats = {
+    nodes: nodes.length,
+    edges: edges.length,
+    screens: screenNodes.length,
+    widgets: screenNodes.reduce((sum, node) => sum + (node.data.widgets?.length || 0), 0),
+    comments: comments.length,
+    openComments: comments.filter((comment) => !comment.resolved).length,
+  };
   const routingBounds = useMemo(() => diagramBounds(nodes.filter((node) => node.data.shape !== "swimlane"), 0), [nodes]);
   const routingOffsets = useMemo(() => edgeRoutingOffsets(edges), [edges]);
   const edgeCtx = useMemo(() => ({ editingId: editingEdgeId, setEditingId: setEditingEdgeId, routingBounds, routingOffsets }), [editingEdgeId, routingBounds, routingOffsets]);
@@ -1007,6 +1392,7 @@ const EditorInner = ({
 
   return (
     <EdgeEditingContext.Provider value={edgeCtx}>
+      <MockupContext.Provider value={mockupContext}>
       <div
         ref={shellRef}
         className={cx(
@@ -1068,8 +1454,50 @@ const EditorInner = ({
           <ToolButton title="Agregar imágenes" onClick={() => imageRef.current?.click()} disabled={uploading}><FiImage /></ToolButton>
 
           <div className="ml-auto flex items-center gap-1">
-            <ToolButton title={paletteOpen ? "Ocultar formas" : "Mostrar formas"} active={paletteOpen} onClick={() => { setPaletteOpen((v) => !v); if (window.innerWidth < 1024) setPropsOpen(false); }}>
+            <ToolButton
+              title={paletteOpen && paletteMode === "shapes" ? "Ocultar formas" : "Mostrar formas"}
+              active={paletteOpen && paletteMode === "shapes"}
+              onClick={() => {
+                if (paletteOpen && paletteMode === "shapes") setPaletteOpen(false);
+                else {
+                  setPaletteMode("shapes");
+                  setPaletteOpen(true);
+                }
+                if (window.innerWidth < 1024) setPropsOpen(false);
+              }}
+            >
               <FiSidebar />
+            </ToolButton>
+            <ToolButton
+              title="Pantallas y mockups"
+              active={paletteOpen && paletteMode === "mockups"}
+              onClick={() => {
+                if (paletteOpen && paletteMode === "mockups") setPaletteOpen(false);
+                else {
+                  setPaletteMode("mockups");
+                  setPaletteOpen(true);
+                }
+                if (window.innerWidth < 1024) setPropsOpen(false);
+              }}
+            >
+              <FiSmartphone /><span className="hidden text-xs font-semibold xl:inline">Pantallas</span>
+            </ToolButton>
+            <ToolButton
+              title={reviewOpen ? "Ocultar comentarios" : `Comentarios del equipo${stats.openComments ? ` · ${stats.openComments} abiertos` : ""}`}
+              active={reviewOpen}
+              onClick={() => setReviewOpen((value) => !value)}
+            >
+              <span className="relative">
+                <FiMessageSquare />
+                {stats.openComments > 0 && (
+                  <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-bold text-amber-950">
+                    {stats.openComments}
+                  </span>
+                )}
+              </span>
+            </ToolButton>
+            <ToolButton title="Probar el flujo" onClick={() => openPrototype()} disabled={!stats.screens}>
+              <FiPlay /><span className="hidden text-xs font-semibold xl:inline">Probar</span>
             </ToolButton>
             <ToolButton title={propsOpen ? "Ocultar propiedades" : "Mostrar propiedades"} active={propsOpen} onClick={() => { setPropsOpen((v) => !v); if (window.innerWidth < 1024) setPaletteOpen(false); }}>
               <FiSliders />
@@ -1112,7 +1540,16 @@ const EditorInner = ({
 
         {/* ---------- Cuerpo ---------- */}
         <div className="relative flex min-h-0 flex-1">
-          {paletteOpen && <ShapePalette onAddShape={(key) => addShape(key)} onInsertTemplate={insertTemplate} onAddImages={addImages} onAddIcon={addIcon} uploading={uploading} onClose={() => setPaletteOpen(false)} />}
+          {paletteOpen && (paletteMode === "mockups" ? (
+            <MockupPalette
+              onAddScreen={(deviceKey) => addScreen(deviceKey)}
+              onAddWidget={(type) => addWidget(type, { nodeId: activeWidget?.nodeId || activeScreen?.id || null })}
+              activeScreenLabel={activeScreen?.data?.label || ""}
+              onClose={() => setPaletteOpen(false)}
+            />
+          ) : (
+            <ShapePalette onAddShape={(key) => addShape(key)} onInsertTemplate={insertTemplate} onAddImages={addImages} onAddIcon={addIcon} uploading={uploading} onClose={() => setPaletteOpen(false)} />
+          ))}
 
           <div
             ref={wrapperRef}
@@ -1137,7 +1574,13 @@ const EditorInner = ({
               onNodeContextMenu={onNodeContextMenu}
               onEdgeContextMenu={onEdgeContextMenu}
               onPaneContextMenu={onPaneContextMenu}
-              onPaneClick={() => setContextMenu(null)}
+              onPaneClick={() => {
+                setContextMenu(null);
+                setActiveWidget(null);
+              }}
+              onNodeClick={(_, node) => {
+                if (activeWidget && activeWidget.nodeId !== node.id) setActiveWidget(null);
+              }}
               onEdgeDoubleClick={(_, edge) => setEditingEdgeId(edge.id)}
               defaultViewport={initial.data.viewport || { x: 40, y: 40, zoom: 1 }}
               fitView={!initial.data.viewport && nodes.length > 0}
@@ -1154,7 +1597,7 @@ const EditorInner = ({
               panActivationKeyCode="Space"
               selectionKeyCode="Shift"
               multiSelectionKeyCode={["Shift", "Meta", "Control"]}
-              deleteKeyCode={["Backspace", "Delete"]}
+              deleteKeyCode={activeWidget ? null : ["Backspace", "Delete"]}
               zoomOnDoubleClick={false}
               edgesReconnectable
               elevateNodesOnSelect
@@ -1189,7 +1632,8 @@ const EditorInner = ({
                   <div className="rounded-2xl border border-dashed border-slate-300 bg-white/80 px-6 py-5 text-center shadow-sm backdrop-blur">
                     <p className="text-sm font-semibold text-slate-700">El lienzo está vacío</p>
                     <p className="mt-1 max-w-xs text-xs leading-5 text-slate-500">
-                      Arrastra una forma desde la paleta, haz doble clic aquí o inserta una plantilla para empezar.
+                      Arrastra una forma o una pantalla desde la paleta, haz doble clic aquí o inserta una plantilla para empezar.
+                      Con «Pantallas» diseñas mockups de iPhone, Android o web y los conectas con flechas.
                     </p>
                   </div>
                 </Panel>
@@ -1291,6 +1735,20 @@ const EditorInner = ({
                 onApplyTheme: applyTheme,
                 onLayout: runLayout,
               }}
+              mockup={{
+                screen: activeScreen,
+                widget: activeWidgetData,
+                comments,
+                onScreenData: patchScreenData,
+                onPatchWidget: patchWidget,
+                onDeleteWidget: () => deleteWidget(),
+                onDuplicateWidget: duplicateWidget,
+                onOrderWidget: orderWidget,
+                onReplaceWidgetImage: replaceWidgetImage,
+                onAddWidget: (type) => addWidget(type, { nodeId: activeScreen?.id || null }),
+                onPlay: () => openPrototype(activeScreen?.id || null),
+                onComment: () => setReviewOpen(true),
+              }}
             />
           )}
         </div>
@@ -1299,6 +1757,7 @@ const EditorInner = ({
         <footer className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-200 bg-slate-50/70 px-3 py-1.5 text-[11px] text-slate-500">
           <span>
             {stats.nodes} nodos · {stats.edges} conexiones
+            {stats.screens ? ` · ${stats.screens} pantallas · ${stats.widgets} elementos` : ""}
             {selectedNodes.length ? ` · ${selectedNodes.length} seleccionados` : ""}
           </span>
           <span className="flex items-center gap-1" title={storageMode === "local" ? "La API aún no tiene los endpoints de diagramas: se guarda en este navegador" : "Se guarda en la API"}>
@@ -1343,6 +1802,29 @@ const EditorInner = ({
         </dl>
       </Modal>
 
+      {reviewOpen && (
+        <ReviewPanel
+          comments={comments}
+          screens={screenNodes}
+          currentUser={currentUser}
+          selection={{ nodeId: activeWidget?.nodeId || activeScreen?.id || null, widget: activeWidget?.widgetId || null }}
+          onAdd={addComment}
+          onResolve={toggleComment}
+          onDelete={deleteComment}
+          onClearResolved={clearResolvedComments}
+          onFocus={focusComment}
+          onClose={() => setReviewOpen(false)}
+        />
+      )}
+
+      <PrototypePlayer
+        open={prototype.open}
+        startId={prototype.startId}
+        nodes={nodes}
+        edges={edges}
+        onClose={() => setPrototype({ open: false, startId: null })}
+      />
+
       <ConfirmDialog
         open={confirmClear}
         onClose={() => setConfirmClear(false)}
@@ -1350,6 +1832,7 @@ const EditorInner = ({
         title="Vaciar el lienzo"
         message="Se quitarán todos los nodos y conexiones del diagrama. Puedes deshacerlo con Ctrl+Z mientras no cierres el editor."
       />
+      </MockupContext.Provider>
     </EdgeEditingContext.Provider>
   );
 };

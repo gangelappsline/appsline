@@ -42,6 +42,19 @@ interior del dibujo: [`../API-DIAGRAMS.md` §4](../API-DIAGRAMS.md#4-validación
 | `routes/api.diagrams.php` | pegar dentro del grupo `auth:api` de `routes/api.php` |
 | `tests/Feature/DiagramContentIntegrityTest.php` | `tests/Feature/` |
 
+Opcionales, solo para comentarios de revisión con tabla propia
+(ver [`../API-MOCKUPS.md`](../API-MOCKUPS.md) §5.1). **Los mockups de pantallas
+no necesitan nada de esto**: viajan dentro de `diagrams.data`:
+
+| Archivo de esta carpeta | Destino en la API |
+| --- | --- |
+| `database/migrations/2026_10_19_000000_create_diagram_comments_table.php` | `database/migrations/` |
+| `app/Models/DiagramComment.php` | `app/Models/DiagramComment.php` |
+| `app/Http/Resources/DiagramCommentResource.php` | `app/Http/Resources/DiagramCommentResource.php` |
+| `app/Http/Controllers/API/DiagramCommentController.php` | `app/Http/Controllers/API/DiagramCommentController.php` |
+| `routes/api.diagram-comments.php` | pegar dentro del grupo `auth:api` |
+| `tests/Feature/DiagramMockupContentTest.php` | `tests/Feature/` (mockups dentro de `data`) |
+
 ## Instalación
 
 1. **Copiar** los archivos de la tabla a su destino.
@@ -73,6 +86,21 @@ interior del dibujo: [`../API-DIAGRAMS.md` §4](../API-DIAGRAMS.md#4-validación
    ```bash
    php artisan test --filter=DiagramContentIntegrityTest
    ```
+
+## Mockups de pantallas
+
+El editor de diagramas incluye diseño de pantallas (iPhone, Android, tablet y
+web) con elementos configurables y conexiones desde un botón concreto. **No
+requiere cambios en la API ni tablas nuevas**: cada pantalla es un nodo
+`type: "screen"` dentro de `data.nodes` y sus elementos viven en
+`data.nodes[].data.widgets`; los comentarios, en `data.comments`.
+
+Lo único que hay que respetar es lo mismo de siempre: guardar `data` completo y
+devolverlo completo. El contrato detallado (dispositivos, elementos, handles
+`w:<id>` y extensión opcional de comentarios) está en
+[`../API-MOCKUPS.md`](../API-MOCKUPS.md). El test
+`DiagramMockupContentTest` falla si una regla anidada poda `widgets`, `device` o
+`comments`.
 
 ## Tamaño de las peticiones
 
