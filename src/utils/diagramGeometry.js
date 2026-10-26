@@ -1,5 +1,10 @@
 /** Geometría compartida por el lienzo y las miniaturas (sin depender de React). */
+import { isWidgetHandle, widgetAnchor, widgetIdFromHandle } from "./mockups.js";
+
 export const HANDLE_SIDES = ["top", "right", "bottom", "left"];
+
+/** Conectores propios (el de un botón dentro de una pantalla de mockup). */
+const isCustomHandle = (handle) => isWidgetHandle(handle);
 
 const sizeOf = (node) => ({ width: node.width || node.measured?.width || 180, height: node.height || node.measured?.height || 72 });
 
@@ -24,7 +29,12 @@ export const nodeAnchors = (shape, width, height, strokeWidth = 2) => {
 
 export const edgeAnchor = (node, side) => {
   const { width, height } = sizeOf(node);
-  const p = nodeAnchors(node.data?.shape, width, height, node.data?.style?.strokeWidth ?? 2)[side || "top"];
+  if (isWidgetHandle(side) && node.data?.shape === "screen") {
+    const point = widgetAnchor(node, widgetIdFromHandle(side), "right");
+    return { x: node.position.x + point.x, y: node.position.y + point.y };
+  }
+  const anchors = nodeAnchors(node.data?.shape, width, height, node.data?.style?.strokeWidth ?? 2);
+  const p = anchors[side] || (isCustomHandle(side) ? { x: width / 2, y: height / 2 } : anchors.top);
   return { x: node.position.x + p.x, y: node.position.y + p.y };
 };
 
@@ -52,10 +62,12 @@ export const routeDiagramEdges = (nodes, edges, { direction = "TB", reset = fals
       sourceHandle = horizontal ? (dx >= 0 ? "right" : "left") : (dy >= 0 ? "bottom" : "top");
       targetHandle = horizontal ? (dx >= 0 ? "left" : "right") : (dy >= 0 ? "top" : "bottom");
     }
+    // Los conectores de elementos (mockups) se conservan siempre: cambiarlos
+    // movería la flecha del botón al borde de la pantalla.
     return {
       ...edge,
-      sourceHandle: !reset && HANDLE_SIDES.includes(edge.sourceHandle) ? edge.sourceHandle : sourceHandle,
-      targetHandle: !reset && HANDLE_SIDES.includes(edge.targetHandle) ? edge.targetHandle : targetHandle,
+      sourceHandle: isCustomHandle(edge.sourceHandle) || (!reset && HANDLE_SIDES.includes(edge.sourceHandle)) ? edge.sourceHandle : sourceHandle,
+      targetHandle: isCustomHandle(edge.targetHandle) || (!reset && HANDLE_SIDES.includes(edge.targetHandle)) ? edge.targetHandle : targetHandle,
     };
   });
 };

@@ -23,6 +23,18 @@ export const downloadBlob = (blob, filename) => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
+/** Escala (zoom) aplicada al viewport, sin depender de `DOMMatrixReadOnly`. */
+const readZoom = (element) => {
+  const transform = getComputedStyle(element)?.transform || "";
+  if (!transform || transform === "none") return 1;
+  const matrix = transform.match(/^matrix\(([^)]+)\)/);
+  if (matrix) return Math.abs(Number(matrix[1].split(",")[0])) || 1;
+  if (typeof DOMMatrixReadOnly === "function") return Math.abs(new DOMMatrixReadOnly(transform).a) || 1;
+  if (typeof DOMMatrix === "function") return Math.abs(new DOMMatrix(transform).a) || 1;
+  const scale = transform.match(/scale\(([^)]+)\)/);
+  return scale ? Math.abs(Number(scale[1])) || 1 : 1;
+};
+
 export const dataUrlToBlob = async (dataUrl) => {
   const res = await fetch(dataUrl);
   return res.blob();
@@ -62,7 +74,7 @@ export async function renderDiagramImage(container, nodes, { format = "png", bac
   // También exportar las vueltas exteriores y sus etiquetas, sin recortarlas.
   viewportEl.querySelectorAll(".react-flow__edge-path").forEach((path) => include(path.getBBox()));
   const origin = viewportEl.getBoundingClientRect();
-  const zoom = new DOMMatrixReadOnly(getComputedStyle(viewportEl).transform).a || 1;
+  const zoom = readZoom(viewportEl);
   viewportEl.querySelectorAll("[data-flow-edge-label]").forEach((label) => {
     const rect = label.getBoundingClientRect();
     include({ x: (rect.left - origin.left) / zoom, y: (rect.top - origin.top) / zoom, width: rect.width / zoom, height: rect.height / zoom });
@@ -81,9 +93,11 @@ export async function renderDiagramImage(container, nodes, { format = "png", bac
     pixelRatio: format === "png" ? scale : 1,
     cacheBust: false,
     skipFonts: true,
-    // Fuera quedan los controles de tamaño y los conectores: solo el dibujo.
+    // Fuera quedan los controles de tamaño, los conectores y el chrome del
+    // editor (nombre de pantalla, pines, candado, guías, «Probar desde aquí»).
     filter: (node) => {
-      const cls = typeof node.className === "string" ? node.className : "";
+      if (node?.dataset?.export === "hide") return false;
+      const cls = typeof node?.className === "string" ? node.className : "";
       return !/react-flow__(resize-control|handle)|react-flow__minimap|react-flow__controls/.test(cls);
     },
     style: {
@@ -93,8 +107,26 @@ export async function renderDiagramImage(container, nodes, { format = "png", bac
     },
   };
 
-  const dataUrl = format === "svg" ? await toSvg(viewportEl, options) : await toPng(viewportEl, options);
-  return dataUrlToBlob(dataUrl);
+  // El resaltado de selección (azul) tampoco es parte del diseño: se apaga un
+  // instante mientras se captura y se restaura después.
+  const cleaned = Array.from(viewportEl.querySelectorAll("[data-export-clean]")).map((el) => {
+    const previous = { boxShadow: el.style.boxShadow, outline: el.style.outline, outlineOffset: el.style.outlineOffset };
+    el.style.boxShadow = "none";
+    el.style.outline = "none";
+    el.style.outlineOffset = "0px";
+    return { el, previous };
+  });
+
+  try {
+    const dataUrl = format === "svg" ? await toSvg(viewportEl, options) : await toPng(viewportEl, options);
+    return dataUrlToBlob(dataUrl);
+  } finally {
+    cleaned.forEach(({ el, previous }) => {
+      el.style.boxShadow = previous.boxShadow;
+      el.style.outline = previous.outline;
+      el.style.outlineOffset = previous.outlineOffset;
+    });
+  }
 }
 
 /** Lee un JSON exportado (o un diagrama crudo) desde un archivo. */

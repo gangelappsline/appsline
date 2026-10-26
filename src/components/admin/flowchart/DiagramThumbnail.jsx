@@ -5,6 +5,7 @@ import { dashArray, edgeAnchor, edgeRoutingOffsets } from "../../../utils/diagra
 import ShapeSvg from "./ShapeSvg";
 import { edgePath } from "./edgePaths";
 import { nodeIcon } from "./icons";
+import { deviceMeta, SCREEN_SHAPE, screenInsets } from "../../../utils/mockups";
 
 /** SVG estático: conserva formas, conectores, iconos e imágenes del documento. */
 const DiagramThumbnail = ({ diagram, className = "", height = 120 }) => {
@@ -17,6 +18,61 @@ const DiagramThumbnail = ({ diagram, className = "", height = 120 }) => {
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const canvas = d.data.settings.canvasColor;
   if (!nodes.length) return <div className={`flex items-center justify-center text-[11px] text-slate-400 ${className}`} style={{ height, background: canvas }}>Diagrama vacío</div>;
+
+  /** Aproximación vectorial de una pantalla de mockup para la miniatura. */
+  const swatch = (background) => {
+    const value = String(background || "");
+    if (/^#[0-9a-f]{3,8}$/i.test(value)) return value;
+    return /#0b1220|#0f172a|#1d4ed8|#4c1d95|#7c3aed|#0060fc/i.test(value) ? "#1e293b" : "#e2e8f0";
+  };
+
+  /** Lado del contorno que usa el trazado (los conectores de elementos salen por la derecha). */
+  const sideFor = (handle) => (["top", "right", "bottom", "left"].includes(handle) ? handle : "right");
+
+  const renderScreen = (node) => {
+    const device = deviceMeta(node.data.device);
+    const inset = screenInsets(device);
+    const w = node.width || device.width;
+    const h = node.height || device.height;
+    const bezel = device.bezel || 0;
+    const radius = Math.min(device.radius || 0, Math.min(w, h) / 2);
+    return (
+      <g key={node.id} transform={`translate(${node.position.x} ${node.position.y})`} opacity={node.data.style?.opacity ?? 1}>
+        <rect x={0} y={0} width={w} height={h} rx={radius} fill={device.platform === "web" ? "#e2e8f0" : "#0b1220"} />
+        <rect
+          x={bezel}
+          y={bezel}
+          width={Math.max(1, w - bezel * 2)}
+          height={Math.max(1, h - bezel * 2)}
+          rx={Math.max(0, radius - bezel)}
+          fill={swatch(node.data.background)}
+        />
+        {(node.data.widgets || []).slice(0, 60).map((widget, index) => {
+          const style = widget.style || {};
+          const x = inset.left + widget.x;
+          const y = inset.top + widget.y;
+          const fill = style.fill === "transparent" || !style.fill ? "rgba(148,163,184,.45)" : style.fill;
+          const isImage = widget.type === "image" || widget.type === "video" || widget.type === "map" || widget.type === "gallery";
+          const isLine = widget.type === "divider" || widget.type === "progress" || widget.type === "slider";
+          return (
+            <rect
+              key={`${node.id}-w-${index}`}
+              x={x}
+              y={y}
+              width={Math.max(1, widget.w)}
+              height={Math.max(1, isLine ? Math.max(2, widget.h) : widget.h)}
+              rx={Math.min(6, style.radius || 0)}
+              fill={isImage ? "#cbd5e1" : fill}
+              opacity={widget.type === "text" || widget.type === "heading" ? 0.55 : 0.95}
+            />
+          );
+        })}
+        {node.data.label && (
+          <text x={0} y={-6} fill="#64748b" fontSize={11} fontWeight={600}>{String(node.data.label).slice(0, 32)}</text>
+        )}
+      </g>
+    );
+  };
 
   const renderNode = (node, index) => {
     const { width: w, height: h, data } = node;
@@ -50,13 +106,14 @@ const DiagramThumbnail = ({ diagram, className = "", height = 120 }) => {
   return (
     <svg width="100%" viewBox={`${box.x} ${box.y} ${box.width} ${box.height}`} preserveAspectRatio="xMidYMid meet" className={className} style={{ height, background: canvas, display: "block" }} aria-hidden="true">
       {nodes.filter((node) => node.data.shape === "swimlane").map(renderNode)}
+      {nodes.filter((node) => node.data.shape === SCREEN_SHAPE || node.type === "screen").map(renderScreen)}
       {edges.map((edge, index) => {
         const source = byId.get(edge.source);
         const target = byId.get(edge.target);
         if (!source || !target) return null;
         const p = edgeAnchor(source, edge.sourceHandle);
         const q = edgeAnchor(target, edge.targetHandle);
-        const [path, labelX, labelY] = edgePath(edge.data.kind, { sourceX: p.x, sourceY: p.y, targetX: q.x, targetY: q.y, sourcePosition: edge.sourceHandle, targetPosition: edge.targetHandle, bounds: routingBounds, routeOffset: offsets[edge.id] });
+        const [path, labelX, labelY] = edgePath(edge.data.kind, { sourceX: p.x, sourceY: p.y, targetX: q.x, targetY: q.y, sourcePosition: sideFor(edge.sourceHandle), targetPosition: sideFor(edge.targetHandle), bounds: routingBounds, routeOffset: offsets[edge.id] });
         const s = edge.data;
         const markerId = `arrow-${uid}-${index}`;
         return <g key={edge.id}>
@@ -72,7 +129,7 @@ const DiagramThumbnail = ({ diagram, className = "", height = 120 }) => {
           </g>}
         </g>;
       })}
-      {nodes.filter((node) => node.data.shape !== "swimlane").map(renderNode)}
+      {nodes.filter((node) => node.data.shape !== "swimlane" && node.data.shape !== SCREEN_SHAPE).map(renderNode)}
     </svg>
   );
 };

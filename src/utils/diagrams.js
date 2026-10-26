@@ -1,6 +1,17 @@
 import dagre from "@dagrejs/dagre";
 import { normalizeDiagramImage } from "./diagramMedia.js";
 import { routeDiagramEdges } from "./diagramGeometry.js";
+import {
+  SCREEN_SHAPE,
+  SCREEN_TYPE,
+  deviceMeta,
+  makeScreenNode,
+  makeWidget,
+  mockupStats,
+  normalizeComments,
+  normalizeScreen,
+  screenSize,
+} from "./mockups.js";
 
 /**
  * Modelo de los diagramas de flujo del panel.
@@ -57,6 +68,7 @@ export const SHAPES = [
   { key: "image", label: "Imagen", hint: "Imagen propia guardada dentro del diagrama", w: 240, h: 180, fill: "#ffffff", stroke: "#cbd5e1", group: "media" },
   { key: "icon", label: "Icono", hint: "Icono de React Icons con etiqueta opcional", w: 112, h: 112, fill: "transparent", stroke: "#0060fc", group: "media" },
   { key: "swimlane", label: "Carril / Grupo", hint: "Área para agrupar pasos por responsable", w: 420, h: 260, fill: "#f8fafc", stroke: "#94a3b8", group: "misc" },
+  { key: "screen", label: "Pantalla", hint: "Mockup de una pantalla móvil o web", w: 393, h: 852, fill: "#ffffff", stroke: "#94a3b8", group: "screens" },
 ];
 
 export const SHAPE_GROUPS = [
@@ -104,6 +116,7 @@ export const SHAPE_ALIASES = {
   img: "image", picture: "image", photo: "image", imagen: "image", fotografia: "image",
   glyph: "icon", icono: "icon", simbolo: "icon",
   lane: "swimlane", pool: "swimlane", group: "swimlane", carril: "swimlane", banda: "swimlane", grupo: "swimlane",
+  screen: "screen", pantalla: "screen", mockup: "screen", mock: "screen", wireframe: "screen", prototipo: "screen", mockup_screen: "screen",
 };
 
 const shapeName = (value) =>
@@ -372,9 +385,13 @@ const normalizeNode = (raw) => {
   const data = asObject(raw.data) || {};
   const shape = resolveNodeShape(raw, data);
   const meta = shapeMeta(shape);
+  // Las pantallas de mockup son nodos de pleno derecho del mismo lienzo.
+  const isScreen = shape === SCREEN_SHAPE || raw.type === SCREEN_TYPE;
+  const type = isScreen ? SCREEN_TYPE : FLOW_TYPE;
+  const screen = isScreen ? screenSize(data.device) : null;
   const position = asObject(raw.position) || { x: raw.x, y: raw.y };
-  const width = Math.max(44, toNumber(raw.width ?? raw.measured?.width ?? raw.style?.width, meta.w));
-  const height = Math.max(28, toNumber(raw.height ?? raw.measured?.height ?? raw.style?.height, meta.h));
+  const width = Math.max(44, toNumber(raw.width ?? raw.measured?.width ?? raw.style?.width, screen?.width ?? meta.w));
+  const height = Math.max(28, toNumber(raw.height ?? raw.measured?.height ?? raw.style?.height, screen?.height ?? meta.h));
   const image = normalizeDiagramImage(data.image);
   const normalizedData = {
     // Mantener metadatos de nodos introducidos por versiones nuevas o
@@ -392,9 +409,15 @@ const normalizeNode = (raw) => {
   // grande) NO puede sobrevivir a través del spread de metadatos: se quita.
   if (image) normalizedData.image = image;
   else delete normalizedData.image;
+  if (isScreen) {
+    // Elementos, dispositivo y fondo de la pantalla (ver `docs/API-MOCKUPS.md`).
+    Object.assign(normalizedData, normalizeScreen(data));
+    normalizedData.shape = SCREEN_SHAPE;
+    normalizedData.label = typeof data.label === "string" && data.label ? data.label : deviceMeta(data.device).label;
+  }
   return {
     id: String(raw.id || newId("n")),
-    type: FLOW_TYPE,
+    type,
     position: {
       x: toNumber(position?.x, 0),
       y: toNumber(position?.y, 0),
@@ -463,6 +486,8 @@ export const normalizeDiagram = (raw = {}) => {
   const edges = routeDiagramEdges(nodes, edgesRaw.map((e) => normalizeEdge(e, ids)).filter(Boolean), data.settings || {});
   const viewport = data.viewport && typeof data.viewport === "object" ? data.viewport : null;
 
+  const comments = normalizeComments(data.comments ?? source.comments);
+
   return {
     id: source.id ?? null,
     name: source.name || source.title || "Diagrama sin título",
@@ -481,6 +506,7 @@ export const normalizeDiagram = (raw = {}) => {
         ? { x: toNumber(viewport.x, 0), y: toNumber(viewport.y, 0), zoom: toNumber(viewport.zoom, 1) }
         : null,
       settings: { ...DEFAULT_SETTINGS, ...(data.settings || {}) },
+      comments,
     },
   };
 };
@@ -515,6 +541,8 @@ export const serializeDiagram = (diagram) => {
       })),
       viewport: normalized.data.viewport,
       settings: normalized.data.settings,
+      // Comentarios de revisión del equipo (ver `docs/API-MOCKUPS.md` §6).
+      comments: normalized.data.comments,
     },
   };
 };
@@ -545,6 +573,8 @@ const LOSS_LABELS = [
   ["data.nodes[].data.shape", "el tipo de los nodos (data.shape)"],
   ["data.nodes[].data.style", "los colores y estilos (data.style)"],
   ["data.nodes[].data.image", "las imágenes incrustadas (data.image)"],
+  ["data.nodes[].data.widgets", "los elementos de las pantallas (data.widgets)"],
+  ["data.nodes[].data.device", "el dispositivo de las pantallas (data.device)"],
   ["data.edges[].data", "el estilo y las etiquetas de las conexiones (edges[].data)"],
   ["data.edges[].sourceHandle", "los lados de conexión de las flechas (sourceHandle/targetHandle)"],
   ["data.edges[].targetHandle", "los lados de conexión de las flechas (sourceHandle/targetHandle)"],
@@ -635,6 +665,17 @@ export const inspectDiagramPayload = (received) => {
           damaged = true;
         }
       });
+      // Las pantallas de mockup pierden todo su contenido si la API poda `data`:
+      // `widgets` y `device` no tienen regla propia en un validador anidado.
+      const isScreen = item?.type === "screen" || data.shape === "screen";
+      if (isScreen && data.widgets === undefined) {
+        note("data.nodes[].data.widgets");
+        damaged = true;
+      }
+      if (isScreen && data.device === undefined) {
+        note("data.nodes[].data.device");
+        damaged = true;
+      }
     }
     if (damaged) damagedNodes += 1;
   });
@@ -817,10 +858,15 @@ export const createDiagram = ({ name = "Nuevo diagrama", projectId = null, taskI
 export const diagramStats = (diagram) => {
   const d = normalizeDiagram(diagram);
   const decisions = d.data.nodes.filter((n) => n.data.shape === "decision").length;
+  const mockups = mockupStats(d.data.nodes, d.data.comments);
   return {
     nodes: d.data.nodes.length,
     edges: d.data.edges.length,
     decisions,
+    screens: mockups.screens,
+    widgets: mockups.widgets,
+    comments: mockups.comments,
+    openComments: mockups.openComments,
     empty: d.data.nodes.length === 0,
   };
 };
@@ -1100,5 +1146,100 @@ export const TEMPLATES = [
     },
   },
 ];
+
+
+/* ------------------------- Plantillas de mockup ------------------------- */
+
+/**
+ * Las pantallas de mockup son nodos del mismo diagrama: las plantillas ya
+ * traen las conexiones entre pantallas y desde botones concretos.
+ */
+const mockupScreen = (id, device, x, label, data = {}) =>
+  makeScreenNode(device, { x, y: 80 }, { id, data: { label, ...data } });
+
+export const MOCKUP_TEMPLATES = [
+  {
+    key: "mockup-app",
+    label: "App móvil · 3 pantallas",
+    description: "iPhone: inicio de sesión, feed y detalle, conectadas.",
+    build: () => {
+      const loginTitle = makeWidget("heading", { x: 24, y: 132 }, { text: "Bienvenido", style: { textColor: "#ffffff", fontSize: 30 }, w: 345 });
+      const loginSub = makeWidget("text", { x: 24, y: 184 }, { text: "Inicia sesión para continuar.", style: { textColor: "#c7d2fe" }, w: 345 });
+      const email = makeWidget("input", { x: 24, y: 252 }, { w: 345, props: { placeholder: "Correo electrónico" } });
+      const password = makeWidget("input", { x: 24, y: 316 }, { w: 345, props: { placeholder: "Contraseña" } });
+      const loginButton = makeWidget("button", { x: 24, y: 392 }, { w: 345, text: "Iniciar sesión" });
+      const forgot = makeWidget("link", { x: 24, y: 456 }, { w: 200, text: "¿Olvidaste tu contraseña?", style: { textColor: "#e0e7ff" } });
+
+      const feedBar = makeWidget("appbar", { x: 0, y: 0 }, { w: 393, text: "Inicio" });
+      const feedSearch = makeWidget("search", { x: 20, y: 70 }, { w: 353 });
+      const feedList = makeWidget("list", { x: 20, y: 132 }, {
+        w: 353,
+        h: 220,
+        text: "Ana compartió un archivo\nNuevo comentario de Luis\nEntrega aprobada",
+      });
+      const feedCard = makeWidget("card", { x: 20, y: 368 }, { w: 353, h: 140, text: "Resumen semanal\n8 tareas cerradas y 3 pendientes." });
+      const feedTab = makeWidget("tabbar", { x: 0, y: 776 }, { w: 393 });
+
+      const detailBar = makeWidget("appbar", { x: 0, y: 0 }, { w: 393, text: "Detalle" });
+      const detailImage = makeWidget("image", { x: 20, y: 76 }, { w: 353, h: 200 });
+      const detailTitle = makeWidget("heading", { x: 20, y: 296 }, { w: 353, text: "Entrega aprobada", style: { fontSize: 24 } });
+      const detailText = makeWidget("text", { x: 20, y: 340 }, { w: 353, h: 80, text: "El cliente aprobó la entrega del sprint 12. Puedes continuar con el despliegue." });
+      const detailButton = makeWidget("button", { x: 20, y: 440 }, { w: 353, text: "Compartir" });
+
+      const screens = [
+        mockupScreen("scr-login", "iphone-15-pro", 80, "Inicio de sesión", {
+          background: "linear-gradient(160deg,#0b1220 0%,#1d4ed8 100%)",
+          start: true,
+          widgets: [loginTitle, loginSub, email, password, loginButton, forgot],
+        }),
+        mockupScreen("scr-feed", "iphone-15-pro", 620, "Feed", {
+          widgets: [feedBar, feedSearch, feedList, feedCard, feedTab],
+        }),
+        mockupScreen("scr-detail", "iphone-15-pro", 1160, "Detalle", {
+          widgets: [detailBar, detailImage, detailTitle, detailText, detailButton],
+        }),
+      ];
+
+      return {
+        nodes: screens,
+        edges: [
+          makeEdge("scr-login", "scr-feed", { sourceHandle: `w:${loginButton.id}`, targetHandle: "left", data: { label: "Iniciar sesión" } }),
+          makeEdge("scr-feed", "scr-detail", { sourceHandle: `w:${feedList.id}`, targetHandle: "left", data: { label: "Abrir" } }),
+          makeEdge("scr-detail", "scr-feed", { sourceHandle: "left", targetHandle: "right", data: { label: "Volver", kind: "step", color: "#94a3b8" } }),
+        ],
+      };
+    },
+  },
+  {
+    key: "mockup-web",
+    label: "Web · landing y panel",
+    description: "Escritorio: landing y panel conectados.",
+    build: () => {
+      const nav = makeWidget("appbar", { x: 0, y: 0 }, { w: 1440, h: 64, text: "Appsline" });
+      const hero = makeWidget("heading", { x: 96, y: 180 }, { w: 620, h: 120, text: "Diseña, valida y entrega.", style: { fontSize: 46, fontWeight: 800 } });
+      const sub = makeWidget("text", { x: 96, y: 316 }, { w: 520, h: 60, text: "Mockups conectados al flujo real de tu proyecto." });
+      const cta = makeWidget("button", { x: 96, y: 400 }, { w: 220, text: "Comenzar" });
+      const heroImage = makeWidget("image", { x: 760, y: 140 }, { w: 580, h: 400 });
+
+      const panelNav = makeWidget("appbar", { x: 0, y: 0 }, { w: 1440, h: 64, text: "Panel" });
+      const panelChart = makeWidget("chart", { x: 64, y: 120 }, { w: 560, h: 300 });
+      const panelTable = makeWidget("table", { x: 672, y: 120 }, { w: 700, h: 220 });
+      const panelList = makeWidget("list", { x: 672, y: 380 }, { w: 700, h: 200, text: "Proyecto Atlas\nProyecto Nube\nProyecto Faro" });
+
+      return {
+        nodes: [
+          mockupScreen("scr-landing", "desktop", 80, "Landing", { start: true, widgets: [nav, hero, sub, cta, heroImage] }),
+          mockupScreen("scr-panel", "desktop", 1680, "Panel", { widgets: [panelNav, panelChart, panelTable, panelList] }),
+        ],
+        edges: [
+          makeEdge("scr-landing", "scr-panel", { sourceHandle: `w:${cta.id}`, targetHandle: "left", data: { label: "Comenzar" } }),
+          makeEdge("scr-panel", "scr-landing", { sourceHandle: "top", targetHandle: "bottom", data: { label: "Salir", kind: "step", color: "#94a3b8" } }),
+        ],
+      };
+    },
+  },
+];
+
+TEMPLATES.push(...MOCKUP_TEMPLATES);
 
 export const templateMeta = (key) => TEMPLATES.find((t) => t.key === key) || TEMPLATES[0];

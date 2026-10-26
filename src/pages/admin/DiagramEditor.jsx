@@ -7,6 +7,7 @@ import FlowchartEditor from "../../components/admin/flowchart/FlowchartEditor";
 import { fetchProject, fetchProjectTasks, uploadProjectFiles } from "../../services/admin";
 import { diagramsStorageMode, fetchDiagram, saveDiagram } from "../../services/diagrams";
 import { createDiagram } from "../../utils/diagrams";
+import { useAuth } from "../../routes/AuthContext";
 
 /**
  * Editor a pantalla completa de un diagrama de flujo.
@@ -20,6 +21,7 @@ const DiagramEditor = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { notify } = useToast();
+  const { user } = useAuth();
 
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -192,6 +194,7 @@ const DiagramEditor = () => {
             onBack={goBack}
             onAttach={handleAttach}
             contextLabel={contextLabel}
+            currentUser={user}
           />
         )}
       </div>
