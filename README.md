@@ -149,6 +149,13 @@ Editor de diagramas de flujo integrado en el panel, guardado **por proyecto** o
   de color aplicables a todo el diagrama, plantillas (proceso básico,
   aprobación, bug, onboarding), deshacer/rehacer, copiar/pegar/duplicar, menú
   contextual, atajos de teclado, autoguardado y aviso de cambios sin guardar.
+- **Selección múltiple**: arrastra en el fondo para dibujar un recuadro que
+  selecciona nodos y líneas (incluso las que solo lo cruzan, sin sus extremos),
+  o usa **Shift / Ctrl / Cmd + clic** para añadir o quitar elementos. Arrastra la
+  selección para mover los nodos juntos; **Supr / Retroceso** elimina nodos y
+  líneas seleccionados. El lienzo se desplaza con **Espacio + arrastrar** o el
+  botón central. Las rutas de retorno se calculan por flujo conectado: insertar
+  o mover un texto/icono independiente cercano no las desplaza ni ensancha.
 - **Recursos propios**: pestaña **Recursos** de la biblioteca (o botón de imagen
   en la barra). Carga o suelta imágenes PNG/JPG/WebP, hasta **5 MB por archivo**;
   se optimizan a 1600 px y se guardan embebidas en el JSON, sin URLs temporales

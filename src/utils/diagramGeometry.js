@@ -98,14 +98,54 @@ export const findFreeNodePosition = (nodes, size, preferred, { grid = 20, gap = 
 };
 
 
-/** Carriles exteriores separados para que las etiquetas de retorno no se apilen. */
+/**
+ * Caja de cada componente conectado, no del diagrama entero. Así un texto,
+ * un icono o un flujo independiente no ensancha las vueltas de otro flujo.
+ * Los nodos intermedios del mismo componente sí se tienen en cuenta.
+ */
+export const edgeRoutingBounds = (nodes, edges) => {
+  const boxes = new Map(nodes.filter((node) => node.data?.shape !== "swimlane").map((node) => {
+    const { width, height } = sizeOf(node);
+    return [node.id, { x: node.position.x, y: node.position.y, right: node.position.x + width, bottom: node.position.y + height }];
+  }));
+  const parents = new Map([...boxes.keys()].map((id) => [id, id]));
+  const rootOf = (id) => {
+    while (parents.get(id) !== id) {
+      parents.set(id, parents.get(parents.get(id)));
+      id = parents.get(id);
+    }
+    return id;
+  };
+  const connected = edges.filter((edge) => boxes.has(edge.source) && boxes.has(edge.target));
+  connected.forEach((edge) => {
+    const source = rootOf(edge.source);
+    const target = rootOf(edge.target);
+    if (source !== target) parents.set(target, source);
+  });
+  const bounds = new Map();
+  boxes.forEach((box, id) => {
+    const root = rootOf(id);
+    const current = bounds.get(root);
+    bounds.set(root, current ? {
+      x: Math.min(current.x, box.x), y: Math.min(current.y, box.y),
+      right: Math.max(current.right, box.right), bottom: Math.max(current.bottom, box.bottom),
+    } : { ...box });
+  });
+  return new Map(connected.map((edge) => {
+    const box = bounds.get(rootOf(edge.source));
+    return [edge.id, { x: box.x, y: box.y, width: Math.max(1, box.right - box.x), height: Math.max(1, box.bottom - box.y) }];
+  }));
+};
+
+/** Carriles separados solo entre retornos que comparten nodos y conectores. */
 export const edgeRoutingOffsets = (edges) => {
-  const counts = {};
+  const counts = new Map();
   return Object.fromEntries(edges.map((edge) => {
     const side = edge.sourceHandle;
     if (side !== edge.targetHandle) return [edge.id, 40];
-    const count = counts[side] || 0;
-    counts[side] = count + 1;
+    const lane = JSON.stringify([edge.source, edge.target, side]);
+    const count = counts.get(lane) || 0;
+    counts.set(lane, count + 1);
     return [edge.id, 40 + count * 20];
   }));
 };

@@ -40,7 +40,7 @@ const FlowEdge = ({
     targetY,
     sourcePosition,
     targetPosition,
-    bounds: routingBounds,
+    bounds: routingBounds?.get(id),
     routeOffset: routingOffsets?.[id],
   });
 
@@ -84,6 +84,7 @@ const FlowEdge = ({
         <EdgeLabelRenderer>
           <div
             data-flow-edge-label
+            data-edge-id={id}
             className="nodrag nopan pointer-events-auto absolute"
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,

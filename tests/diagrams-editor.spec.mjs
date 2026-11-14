@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { createDiagram, serializeDiagram } from "../src/utils/diagrams.js";
+import { createDiagram, makeEdge, makeNode, serializeDiagram } from "../src/utils/diagrams.js";
 
 const project = { id: 1, name: "Flujos del equipo", status: "active" };
 const record = (id = 42) => ({ ...createDiagram({ name: "Proceso existente", projectId: 1, template: "basic" }), id });
@@ -385,4 +385,161 @@ test("soltar una imagen en el lienzo funciona también con guardado local", asyn
   expect(data).toHaveLength(1);
   expect(data[0].id).toBe(id);
   expect(data[0].data.nodes[0].data.image.src).toMatch(/^data:image\/webp;base64,/);
+});
+
+/* ---------------- Selección múltiple y rutas estables ---------------- */
+
+function selectionRecord() {
+  const base = createDiagram({ name: "Selección y rutas", projectId: 1 });
+  const nodes = [
+    makeNode("process", { x: 80, y: 80 }, { id: "a", width: 140, height: 60, data: { label: "A" } }),
+    makeNode("process", { x: 80, y: 300 }, { id: "b", width: 140, height: 60, data: { label: "B" } }),
+    makeNode("process", { x: 400, y: 190 }, { id: "c", width: 140, height: 60, data: { label: "C" } }),
+    makeNode("process", { x: 560, y: 80 }, { id: "d", width: 140, height: 60, data: { label: "D" } }),
+    makeNode("process", { x: 560, y: 300 }, { id: "e", width: 140, height: 60, data: { label: "E" } }),
+  ];
+  const edges = [
+    makeEdge("a", "b", { id: "ab", sourceHandle: "bottom", targetHandle: "top", data: { kind: "straight" } }),
+    makeEdge("b", "c", { id: "bc", sourceHandle: "right", targetHandle: "left", data: { kind: "straight" } }),
+    makeEdge("c", "a", { id: "return", sourceHandle: "right", targetHandle: "right", data: { kind: "smoothstep", label: "Volver" } }),
+    makeEdge("d", "e", { id: "de", sourceHandle: "bottom", targetHandle: "top", data: { kind: "straight" } }),
+  ];
+  return { ...base, id: 42, data: { ...base.data, nodes, edges, viewport: { x: 20, y: 20, zoom: 1 }, settings: { ...base.data.settings, minimap: false, controls: false } } };
+}
+
+async function flowToScreen(page, point) {
+  const pane = await page.locator(".react-flow__pane").boundingBox();
+  const viewport = await page.locator(".react-flow__viewport").evaluate((element) => {
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+    return { x: matrix.e, y: matrix.f, zoom: matrix.a };
+  });
+  return { x: pane.x + viewport.x + point.x * viewport.zoom, y: pane.y + viewport.y + point.y * viewport.zoom };
+}
+
+async function marquee(page, from, to) {
+  const start = await flowToScreen(page, from);
+  const end = await flowToScreen(page, to);
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 12 });
+  await page.mouse.up();
+}
+
+const nodePosition = (page, id) => page.locator(`.react-flow__node[data-id="${id}"]`).evaluate((element) => {
+  const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+  return { x: matrix.e, y: matrix.f };
+});
+
+test("recuadro: selecciona nodos y conexiones, los mueve juntos y deshace un solo gesto", async ({ page }) => {
+  const api = await setup(page, { records: [selectionRecord()] });
+  await page.goto("/admin/projects/1/diagrams/42");
+  await page.getByRole("button", { name: "Ocultar propiedades" }).click();
+  await expect(page.locator(".react-flow__node")).toHaveCount(5);
+  await marquee(page, { x: 60, y: 60 }, { x: 550, y: 380 });
+  await expect(page.locator(".react-flow__node.selected")).toHaveCount(3);
+  await expect(page.locator(".react-flow__edge.selected")).toHaveCount(3);
+  await expect(page.locator('.react-flow__edge[data-id="de"]')).not.toHaveClass(/selected/);
+  const before = Object.fromEntries(await Promise.all(["a", "b", "c", "d"].map(async (id) => [id, await nodePosition(page, id)])));
+  const selection = await page.locator(".react-flow__nodesselection-rect").boundingBox();
+  await page.mouse.move(selection.x + 8, selection.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(selection.x + 68, selection.y + 48, { steps: 10 });
+  await page.mouse.up();
+  for (const id of ["a", "b", "c"]) {
+    const after = await nodePosition(page, id);
+    expect(after.x).toBeCloseTo(before[id].x + 60, 0);
+    expect(after.y).toBeCloseTo(before[id].y + 40, 0);
+  }
+  expect(await nodePosition(page, "d")).toEqual(before.d);
+  await page.getByRole("button", { name: "Deshacer (Ctrl+Z)" }).click();
+  for (const id of ["a", "b", "c"]) expect(await nodePosition(page, id)).toEqual(before[id]);
+  expect(api.errors).toEqual([]);
+});
+
+test("recuadro sobre dos líneas: selecciona trazados sin sus nodos y permite eliminarlos", async ({ page }) => {
+  const api = await setup(page, { records: [selectionRecord()] });
+  await page.goto("/admin/projects/1/diagrams/42");
+  await page.getByRole("button", { name: "Ocultar propiedades" }).click();
+  await expect(page.locator(".react-flow__edge")).toHaveCount(4);
+  await marquee(page, { x: 555, y: 180 }, { x: 650, y: 210 });
+  await expect(page.locator(".react-flow__node.selected")).toHaveCount(0);
+  await expect(page.locator(".react-flow__edge.selected")).toHaveCount(2);
+  await expect(page.locator('.react-flow__edge[data-id="return"]')).toHaveClass(/selected/);
+  await expect(page.locator('.react-flow__edge[data-id="de"]')).toHaveClass(/selected/);
+  await page.getByRole("button", { name: "Eliminar selección", exact: true }).click();
+  await expect(page.locator(".react-flow__edge")).toHaveCount(2);
+  await expect(page.locator(".react-flow__node")).toHaveCount(5);
+  await page.keyboard.press("Control+z");
+  await expect(page.locator(".react-flow__edge")).toHaveCount(4);
+  expect(api.errors).toEqual([]);
+});
+
+for (const modifier of ["Control", "Meta", "Shift"]) {
+  test(`${modifier} + clic permite mezclar nodos y líneas y eliminarlos juntos`, async ({ page }) => {
+    const api = await setup(page, { records: [selectionRecord()] });
+    await page.goto("/admin/projects/1/diagrams/42");
+    await page.getByRole("button", { name: "Ocultar propiedades" }).click();
+    await page.locator('.react-flow__node[data-id="a"]').click();
+    await page.keyboard.down(modifier);
+    await page.locator('.react-flow__node[data-id="b"]').click();
+    const edgeAt = await flowToScreen(page, { x: 630, y: 220 });
+    await page.mouse.click(edgeAt.x, edgeAt.y);
+    await page.keyboard.up(modifier);
+    await expect(page.locator(".react-flow__node.selected")).toHaveCount(2);
+    await expect(page.locator(".react-flow__edge.selected")).toHaveCount(1);
+    await page.keyboard.press("Delete");
+    await expect(page.locator('.react-flow__node[data-id="a"]')).toHaveCount(0);
+    await expect(page.locator('.react-flow__node[data-id="b"]')).toHaveCount(0);
+    await expect(page.locator('.react-flow__edge[data-id="de"]')).toHaveCount(0);
+    await expect(page.locator(".react-flow__node")).toHaveCount(3);
+    await expect(page.locator(".react-flow__edge")).toHaveCount(0);
+    expect(api.errors).toEqual([]);
+  });
+}
+
+test("insertar texto o un icono junto a un retorno no desplaza la línea ni su etiqueta", async ({ page }) => {
+  const api = await setup(page);
+  const record = selectionRecord();
+  record.data.nodes = record.data.nodes.filter((node) => ["a", "b", "c"].includes(node.id));
+  record.data.edges = record.data.edges.filter((edge) => edge.id !== "de");
+  api.records().splice(0, api.records().length, record);
+  await page.goto("/admin/projects/1/diagrams/42");
+  await page.getByRole("button", { name: "Ocultar propiedades" }).click();
+  const path = page.locator('.react-flow__edge[data-id="return"] .react-flow__edge-path');
+  const label = page.locator('[data-flow-edge-label][data-edge-id="return"]');
+  await expect(path).toBeVisible();
+  const originalPath = await path.getAttribute("d");
+  const originalLabel = await label.getAttribute("style");
+  await page.getByRole("complementary", { name: "Biblioteca de elementos" }).getByRole("button", { name: "Texto", exact: true }).click();
+  const text = page.locator('.react-flow__node [data-shape="text"]');
+  await expect(text).toHaveCount(1);
+  expect(await path.getAttribute("d")).toBe(originalPath);
+  const textBox = await text.boundingBox();
+  const textAt = await flowToScreen(page, { x: 600, y: 320 });
+  await page.mouse.move(textBox.x + textBox.width / 2, textBox.y + textBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(textAt.x, textAt.y, { steps: 10 });
+  await page.mouse.up();
+  expect(await path.getAttribute("d")).toBe(originalPath);
+  expect(await label.getAttribute("style")).toBe(originalLabel);
+  await page.getByRole("tab", { name: "Recursos", exact: true }).click();
+  await page.getByRole("button", { name: "Insertar icono Nube" }).click();
+  await expect(page.locator('.react-flow__node [data-shape="icon"]')).toHaveCount(1);
+  expect(await path.getAttribute("d")).toBe(originalPath);
+  const icon = page.locator('.react-flow__node [data-shape="icon"]');
+  const iconBox = await icon.boundingBox();
+  const iconAt = await flowToScreen(page, { x: 640, y: 160 });
+  await page.mouse.move(iconBox.x + iconBox.width / 2, iconBox.y + iconBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(iconAt.x, iconAt.y, { steps: 10 });
+  await page.mouse.up();
+  expect(await path.getAttribute("d")).toBe(originalPath);
+  expect(await label.getAttribute("style")).toBe(originalLabel);
+  await page.keyboard.press("Control+s");
+  await expect.poll(() => updates(api).length).toBeGreaterThan(0);
+  const saved = api.records()[0];
+  expect(saved.data.edges.find((edge) => edge.id === "return").sourceHandle).toBe("right");
+  await page.reload();
+  await expect(path).toHaveAttribute("d", originalPath);
+  expect(api.errors).toEqual([]);
 });

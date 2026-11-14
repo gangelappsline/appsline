@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types */
 import { useId, useMemo } from "react";
 import { diagramBounds, normalizeDiagram } from "../../../utils/diagrams";
-import { dashArray, edgeAnchor, edgeRoutingOffsets } from "../../../utils/diagramGeometry";
+import { dashArray, edgeAnchor, edgeRoutingBounds, edgeRoutingOffsets } from "../../../utils/diagramGeometry";
 import ShapeSvg from "./ShapeSvg";
 import { edgePath } from "./edgePaths";
 import { nodeIcon } from "./icons";
@@ -13,7 +13,7 @@ const DiagramThumbnail = ({ diagram, className = "", height = 120 }) => {
   const d = useMemo(() => normalizeDiagram(diagram), [diagram]);
   const { nodes, edges } = d.data;
   const offsets = useMemo(() => edgeRoutingOffsets(edges), [edges]);
-  const routingBounds = useMemo(() => diagramBounds(nodes.filter((node) => node.data.shape !== "swimlane"), 0), [nodes]);
+  const routingBounds = useMemo(() => edgeRoutingBounds(nodes, edges), [nodes, edges]);
   const box = useMemo(() => diagramBounds(nodes, Math.max(64, ...Object.values(offsets)) + 24), [nodes, offsets]);
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const canvas = d.data.settings.canvasColor;
@@ -113,7 +113,7 @@ const DiagramThumbnail = ({ diagram, className = "", height = 120 }) => {
         if (!source || !target) return null;
         const p = edgeAnchor(source, edge.sourceHandle);
         const q = edgeAnchor(target, edge.targetHandle);
-        const [path, labelX, labelY] = edgePath(edge.data.kind, { sourceX: p.x, sourceY: p.y, targetX: q.x, targetY: q.y, sourcePosition: sideFor(edge.sourceHandle), targetPosition: sideFor(edge.targetHandle), bounds: routingBounds, routeOffset: offsets[edge.id] });
+        const [path, labelX, labelY] = edgePath(edge.data.kind, { sourceX: p.x, sourceY: p.y, targetX: q.x, targetY: q.y, sourcePosition: sideFor(edge.sourceHandle), targetPosition: sideFor(edge.targetHandle), bounds: routingBounds.get(edge.id), routeOffset: offsets[edge.id] });
         const s = edge.data;
         const markerId = `arrow-${uid}-${index}`;
         return <g key={edge.id}>

@@ -91,7 +91,8 @@ import {
   templateMeta,
 } from "../../../utils/diagrams";
 import { cx } from "../../../utils/format";
-import { edgeRoutingOffsets, findFreeNodePosition, routeDiagramEdges } from "../../../utils/diagramGeometry";
+import { edgeRoutingBounds, edgeRoutingOffsets, findFreeNodePosition, routeDiagramEdges } from "../../../utils/diagramGeometry";
+import { rectanglesIntersect, svgPathIntersectsRect } from "../../../utils/diagramSelection";
 import { DIAGRAM_IMAGE_ACCEPT, diagramImageSize, readDiagramImage } from "../../../utils/diagramMedia";
 import { NODE_ICONS } from "./icons";
 import {
@@ -120,8 +121,10 @@ const SHORTCUTS = [
   ["Doble clic en el lienzo", "Crear un proceso"],
   ["Doble clic en una forma / conexión", "Editar su texto"],
   ["Arrastrar desde un punto azul", "Conectar con otra forma"],
-  ["Shift + arrastrar", "Seleccionar varias formas"],
-  ["Supr / Retroceso", "Eliminar selección"],
+  ["Arrastrar en el fondo", "Seleccionar nodos y líneas con un recuadro"],
+  ["Shift / Ctrl / Cmd + clic", "Añadir o quitar elementos de la selección"],
+  ["Arrastrar la selección", "Mover los nodos juntos"],
+  ["Supr / Retroceso", "Eliminar nodos y líneas seleccionados"],
   ["Ctrl + Z / Ctrl + Y", "Deshacer / Rehacer"],
   ["Ctrl + C / Ctrl + V", "Copiar / Pegar"],
   ["Ctrl + D", "Duplicar"],
@@ -313,6 +316,7 @@ const EditorInner = ({
   const selectedNodes = useMemo(() => nodes.filter((n) => n.selected), [nodes]);
   const selectedEdges = useMemo(() => edges.filter((e) => e.selected), [edges]);
   const selectedIds = useMemo(() => selectedNodes.map((n) => n.id), [selectedNodes]);
+  const selectedCount = selectedNodes.length + selectedEdges.length;
 
   /* ---------------- Guardado ---------------- */
   const saveRef = useRef(null);
@@ -426,6 +430,26 @@ const EditorInner = ({
   );
 
   const onNodeDragStart = useCallback(() => history.snapshot("drag", 100), [history]);
+
+  // React Flow selecciona los nodos y sus conexiones. Añadimos también las
+  // líneas que cruzan el recuadro aunque sus dos extremos queden fuera.
+  // Se hace al soltar, antes de que React retire el rectángulo del DOM.
+  const onSelectionEnd = useCallback(() => {
+    const canvas = wrapperRef.current;
+    const rect = canvas?.querySelector(".react-flow__selection")?.getBoundingClientRect();
+    if (!rect?.width || !rect?.height) return;
+    const ids = new Set();
+    canvas.querySelectorAll(".react-flow__edge").forEach((element) => {
+      const path = element.querySelector(".react-flow__edge-path");
+      if (path && svgPathIntersectsRect(path, rect)) ids.add(element.dataset.id);
+    });
+    canvas.querySelectorAll("[data-flow-edge-label]").forEach((element) => {
+      if (rectanglesIntersect(element.getBoundingClientRect(), rect)) ids.add(element.dataset.edgeId);
+    });
+    if (ids.size) {
+      setEdges((edges) => edges.map((edge) => ids.has(edge.id) && !edge.selected ? decorateEdge({ ...edge, selected: true }) : edge));
+    }
+  }, []);
 
   /* ---------------- Inserción ---------------- */
   const snapPos = useCallback(
@@ -1271,8 +1295,9 @@ const EditorInner = ({
   const onNodeContextMenu = useCallback(
     (event, node) => {
       if (!node.selected) {
-        setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === node.id })));
-        setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
+        const additive = event.ctrlKey || event.metaKey || event.shiftKey;
+        setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === node.id || (additive && n.selected) })));
+        if (!additive) setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
       }
       openContextMenu(event, "node", node);
     },
@@ -1281,8 +1306,13 @@ const EditorInner = ({
 
   const onEdgeContextMenu = useCallback(
     (event, edge) => {
-      setEdges((eds) => eds.map((e) => ({ ...e, selected: e.id === edge.id })));
-      setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+      setActiveWidget(null);
+      // El menú contextual no debe romper una selección múltiple existente.
+      if (!edge.selected) {
+        const additive = event.ctrlKey || event.metaKey || event.shiftKey;
+        setEdges((eds) => eds.map((e) => decorateEdge({ ...e, selected: e.id === edge.id || (additive && e.selected) })));
+        if (!additive) setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+      }
       openContextMenu(event, "edge", edge);
     },
     [openContextMenu],
@@ -1334,7 +1364,7 @@ const EditorInner = ({
         { label: "Editar etiqueta", icon: FiSliders, onClick: () => setEditingEdgeId(contextMenu.target.id) },
         { label: "Invertir dirección", icon: FiCornerUpLeft, onClick: reverseSelectedEdges },
         "-",
-        { label: "Eliminar", icon: FiTrash2, danger: true, onClick: () => rf.deleteElements({ edges: [contextMenu.target] }) },
+        { label: selectedCount > 1 ? "Eliminar selección" : "Eliminar", icon: FiTrash2, danger: true, onClick: deleteSelected },
       ];
     }
     const locked = selectedNodes.every((n) => n.data.locked);
@@ -1353,7 +1383,7 @@ const EditorInner = ({
       "-",
       { label: "Eliminar", hint: "Supr", icon: FiTrash2, danger: true, onClick: deleteSelected },
     ];
-  }, [contextMenu, rf, addShape, addWidget, addScreen, screenAt, paste, selectAll, reverseSelectedEdges, selectedNodes, duplicateSelected, copySelected, toggleLock, zOrder, patchSelectedStyle, deleteSelected]);
+  }, [contextMenu, rf, addShape, addWidget, addScreen, screenAt, paste, selectAll, reverseSelectedEdges, selectedNodes, selectedCount, duplicateSelected, copySelected, toggleLock, zOrder, patchSelectedStyle, deleteSelected]);
 
   /* ---------------- Render ---------------- */
   const stats = {
@@ -1364,7 +1394,7 @@ const EditorInner = ({
     comments: comments.length,
     openComments: comments.filter((comment) => !comment.resolved).length,
   };
-  const routingBounds = useMemo(() => diagramBounds(nodes.filter((node) => node.data.shape !== "swimlane"), 0), [nodes]);
+  const routingBounds = useMemo(() => edgeRoutingBounds(nodes, edges), [nodes, edges]);
   const routingOffsets = useMemo(() => edgeRoutingOffsets(edges), [edges]);
   const edgeCtx = useMemo(() => ({ editingId: editingEdgeId, setEditingId: setEditingEdgeId, routingBounds, routingOffsets }), [editingEdgeId, routingBounds, routingOffsets]);
 
@@ -1568,6 +1598,10 @@ const EditorInner = ({
               onReconnect={onReconnect}
               onBeforeDelete={onBeforeDelete}
               onNodeDragStart={onNodeDragStart}
+              onSelectionDragStart={onNodeDragStart}
+              onSelectionStart={() => { setActiveWidget(null); setContextMenu(null); }}
+              onSelectionEnd={onSelectionEnd}
+              onSelectionContextMenu={(event) => openContextMenu(event, "node")}
               onDragOver={onDragOver}
               onDrop={onDrop}
               onMove={(_, viewport) => setZoom(viewport.zoom)}
@@ -1579,9 +1613,11 @@ const EditorInner = ({
                 setActiveWidget(null);
               }}
               onNodeClick={(_, node) => {
+                setContextMenu(null);
                 if (activeWidget && activeWidget.nodeId !== node.id) setActiveWidget(null);
               }}
-              onEdgeDoubleClick={(_, edge) => setEditingEdgeId(edge.id)}
+              onEdgeClick={() => { setActiveWidget(null); setContextMenu(null); }}
+              onEdgeDoubleClick={(_, edge) => { setActiveWidget(null); setEditingEdgeId(edge.id); }}
               defaultViewport={initial.data.viewport || { x: 40, y: 40, zoom: 1 }}
               fitView={!initial.data.viewport && nodes.length > 0}
               fitViewOptions={{ padding: 0.15, maxZoom: 1.2 }}
@@ -1592,8 +1628,8 @@ const EditorInner = ({
               snapToGrid={settings.snap}
               snapGrid={[settings.gridSize, settings.gridSize]}
               selectionMode={SelectionMode.Partial}
-              selectionOnDrag={false}
-              panOnDrag={[0, 1]}
+              selectionOnDrag
+              panOnDrag={[1]}
               panActivationKeyCode="Space"
               selectionKeyCode="Shift"
               multiSelectionKeyCode={["Shift", "Meta", "Control"]}
@@ -1638,10 +1674,10 @@ const EditorInner = ({
                   </div>
                 </Panel>
               )}
-              {selectedNodes.length > 1 && (
-                <Panel position="top-center" className="mt-2">
-                  <div className="flex items-center gap-0.5 rounded-xl border border-slate-200 bg-white p-1 shadow-card">
-                    <span className="px-2 text-[11px] font-semibold text-slate-500">{selectedNodes.length} seleccionados</span>
+              {selectedCount > 1 && (
+                <Panel position="top-center" className="mt-2 max-w-[calc(100%-16px)]">
+                  <div className="flex flex-wrap items-center justify-center gap-0.5 rounded-xl border border-slate-200 bg-white p-1 shadow-card">
+                    <span className="px-2 text-[11px] font-semibold text-slate-500" title={`${selectedNodes.length} nodos · ${selectedEdges.length} líneas`}>{selectedCount} seleccionados</span>
                     {[
                       ["left", "⇤", "Alinear a la izquierda"],
                       ["center", "↔", "Centrar horizontalmente"],
@@ -1650,7 +1686,7 @@ const EditorInner = ({
                       ["middle", "↕", "Centrar verticalmente"],
                       ["bottom", "⤓", "Alinear abajo"],
                     ].map(([mode, glyph, title]) => (
-                      <ToolButton key={mode} title={title} onClick={() => align(mode)} className="!min-w-7 !px-1.5 text-xs">
+                      <ToolButton key={mode} title={title} onClick={() => align(mode)} disabled={selectedNodes.length < 2} className="!min-w-7 !px-1.5 text-xs">
                         {glyph}
                       </ToolButton>
                     ))}
@@ -1658,8 +1694,8 @@ const EditorInner = ({
                     <ToolButton title="Distribuir horizontalmente" onClick={() => distribute("horizontal")} disabled={selectedNodes.length < 3} className="!px-1.5 text-xs">H</ToolButton>
                     <ToolButton title="Distribuir verticalmente" onClick={() => distribute("vertical")} disabled={selectedNodes.length < 3} className="!px-1.5 text-xs">V</ToolButton>
                     <Divider />
-                    <ToolButton title="Duplicar" onClick={duplicateSelected}><FiCopy /></ToolButton>
-                    <ToolButton title="Eliminar" onClick={deleteSelected} className="hover:!bg-red-50 hover:!text-red-600"><FiTrash2 /></ToolButton>
+                    <ToolButton title="Duplicar nodos" onClick={duplicateSelected} disabled={!selectedNodes.length}><FiCopy /></ToolButton>
+                    <ToolButton title="Eliminar selección" onClick={deleteSelected} className="hover:!bg-red-50 hover:!text-red-600"><FiTrash2 /></ToolButton>
                   </div>
                 </Panel>
               )}
@@ -1758,7 +1794,7 @@ const EditorInner = ({
           <span>
             {stats.nodes} nodos · {stats.edges} conexiones
             {stats.screens ? ` · ${stats.screens} pantallas · ${stats.widgets} elementos` : ""}
-            {selectedNodes.length ? ` · ${selectedNodes.length} seleccionados` : ""}
+            {selectedCount ? ` · ${selectedNodes.length} ${selectedNodes.length === 1 ? "nodo" : "nodos"} y ${selectedEdges.length} ${selectedEdges.length === 1 ? "línea" : "líneas"} seleccionados` : ""}
           </span>
           <span className="flex items-center gap-1" title={storageMode === "local" ? "La API aún no tiene los endpoints de diagramas: se guarda en este navegador" : "Se guarda en la API"}>
             {storageMode === "local" ? <FiHardDrive /> : <FiCloud />}
